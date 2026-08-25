@@ -1065,6 +1065,10 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
             deparse_expr_into(buf, e);
             buf.push('}');
         }
+        ExprKind::GlobSlot { glob, slot } => {
+            deparse_expr_into(buf, glob);
+            let _ = write!(buf, "{{{}}}", slot);
+        }
         ExprKind::Print { handle, args } => {
             buf.push_str("print");
             if let Some(h) = handle {

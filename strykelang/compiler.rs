@@ -4186,12 +4186,24 @@ impl Compiler {
                 }
             }
             ExprKind::Typeglob(name) => {
-                let idx = self.chunk.add_constant(StrykeValue::string(name.clone()));
+                // A glob is a value, not its name: `ref \*main::v` is GLOB and
+                // `"" . *STDOUT` is `*main::STDOUT`. The package binds at compile
+                // time, the same point perl resolves `*foo` against the package
+                // in effect. IO paths strip the sigil back off in
+                // `resolve_io_handle_name`.
+                let idx = self
+                    .chunk
+                    .add_constant(StrykeValue::glob(self.qualify_stash_array_name_full(name)));
                 self.emit_op(Op::LoadConst(idx), line, Some(root));
             }
             ExprKind::TypeglobExpr(expr) => {
                 self.compile_expr(expr)?;
                 self.emit_op(Op::LoadDynamicTypeglob, line, Some(root));
+            }
+            ExprKind::GlobSlot { glob, slot } => {
+                self.compile_expr(glob)?;
+                let idx = self.chunk.intern_name(slot);
+                self.emit_op(Op::GlobSlot(idx), line, Some(root));
             }
             ExprKind::ArrayElement { array, index } => {
                 self.check_strict_array_access(array, line)?;

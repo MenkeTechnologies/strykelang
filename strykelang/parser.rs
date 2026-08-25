@@ -509,6 +509,41 @@ impl Parser {
             .unwrap_or(&Token::Eof)
     }
 
+    /// Slot names `*glob{THING}` accepts — perl's `perlref` typeglob-slot table.
+    /// `FORMAT` is parsed for source compatibility even though stryke has no
+    /// formats; it always selects an empty slot.
+    const GLOB_SLOT_NAMES: [&'static str; 9] = [
+        "SCALAR", "ARRAY", "HASH", "CODE", "IO", "GLOB", "FORMAT", "NAME", "PACKAGE",
+    ];
+
+    /// Consume a `{THING}` typeglob-slot subscript when one follows a glob.
+    ///
+    /// Only an exact `{` BAREWORD `}` with a known slot name is taken, so an
+    /// ordinary hash subscript after a glob-valued expression still parses as a
+    /// hash subscript. Returns the slot name, or `None` (position unchanged).
+    fn eat_glob_slot(&mut self) -> Option<String> {
+        if !matches!(self.peek(), Token::LBrace) {
+            return None;
+        }
+        let name = match self.peek_at(1) {
+            Token::Ident(n) if Self::GLOB_SLOT_NAMES.contains(&n.as_str()) => n.clone(),
+            // `{CODE}` lexes as the bareword-ish string form in some contexts.
+            Token::SingleString(n) | Token::DoubleString(n)
+                if Self::GLOB_SLOT_NAMES.contains(&n.as_str()) =>
+            {
+                n.clone()
+            }
+            _ => return None,
+        };
+        if !matches!(self.peek_at(2), Token::RBrace) {
+            return None;
+        }
+        self.advance();
+        self.advance();
+        self.advance();
+        Some(name)
+    }
+
     fn advance(&mut self) -> (Token, usize) {
         let tok = self
             .tokens
@@ -9803,13 +9838,23 @@ impl Parser {
                     self.advance();
                     let inner = self.parse_expression()?;
                     self.expect(&Token::RBrace)?;
-                    return Ok(Expr {
+                    let g = Expr {
                         kind: ExprKind::Deref {
                             expr: Box::new(inner),
                             kind: Sigil::Typeglob,
                         },
                         line,
-                    });
+                    };
+                    if let Some(slot) = self.eat_glob_slot() {
+                        return Ok(Expr {
+                            kind: ExprKind::GlobSlot {
+                                glob: Box::new(g),
+                                slot,
+                            },
+                            line,
+                        });
+                    }
+                    return Ok(g);
                 }
                 // `*$_{$k}`, `*${expr}`, `*$foo` — typeglob from a sigil expression (Perl 5 `*$globref`).
                 if matches!(
@@ -9821,11 +9866,49 @@ impl Parser {
                         | Token::ScalarDerefLBrace
                         | Token::HashPercent
                 ) {
+                    // `*$gr{ARRAY}` is a glob slot on `$gr`, not a hash subscript
+                    // on `%$gr` — take the variable alone so `{ARRAY}` stays for
+                    // the slot subscript below.
+                    if let (Token::ScalarVar(n), true) = (
+                        self.peek().clone(),
+                        matches!(self.peek_at(1), Token::LBrace)
+                            && matches!(self.peek_at(2), Token::Ident(t)
+                                if Self::GLOB_SLOT_NAMES.contains(&t.as_str()))
+                            && matches!(self.peek_at(3), Token::RBrace),
+                    ) {
+                        self.advance();
+                        let var = Expr {
+                            kind: ExprKind::ScalarVar(n),
+                            line,
+                        };
+                        let g = Expr {
+                            kind: ExprKind::TypeglobExpr(Box::new(var)),
+                            line,
+                        };
+                        let slot = self.eat_glob_slot().expect("slot lookahead just matched");
+                        return Ok(Expr {
+                            kind: ExprKind::GlobSlot {
+                                glob: Box::new(g),
+                                slot,
+                            },
+                            line,
+                        });
+                    }
                     let inner = self.parse_postfix()?;
-                    return Ok(Expr {
+                    let g = Expr {
                         kind: ExprKind::TypeglobExpr(Box::new(inner)),
                         line,
-                    });
+                    };
+                    if let Some(slot) = self.eat_glob_slot() {
+                        return Ok(Expr {
+                            kind: ExprKind::GlobSlot {
+                                glob: Box::new(g),
+                                slot,
+                            },
+                            line,
+                        });
+                    }
+                    return Ok(g);
                 }
                 // `x` tokenizes as `Token::X` (repeat op) — still a valid package/typeglob name.
                 let mut full_name = match self.advance() {
@@ -9852,10 +9935,20 @@ impl Parser {
                         }
                     }
                 }
-                Ok(Expr {
+                let g = Expr {
                     kind: ExprKind::Typeglob(full_name),
                     line,
-                })
+                };
+                if let Some(slot) = self.eat_glob_slot() {
+                    return Ok(Expr {
+                        kind: ExprKind::GlobSlot {
+                            glob: Box::new(g),
+                            slot,
+                        },
+                        line,
+                    });
+                }
+                Ok(g)
             }
             Token::SingleString(s) => {
                 self.advance();

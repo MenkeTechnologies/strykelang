@@ -1843,10 +1843,9 @@ impl VMHelper {
     }
 
     /// Populate `%main::` / `%Foo::` package stashes with current symbol-table
-    /// state so `keys %main::` and `keys %Foo::` enumerate live names. Maps
-    /// each unqualified name → its kind string (`"scalar"`, `"array"`,
-    /// `"hash"`, `"sub"`). Stryke has no real Perl typeglob layer; the kind
-    /// string is the most useful per-symbol value we can offer.
+    /// state so `keys %main::` and `keys %Foo::` enumerate live names. Each
+    /// entry is the symbol's typeglob, as in perl — so `$stash->{ISA}` is
+    /// `*Foo::ISA` and `*{$stash->{ISA}}{ARRAY}` reaches `@Foo::ISA`.
     ///
     /// Callable repeatedly — overwrites prior stashes — so the REPL refreshes
     /// after every line and scripts can call it explicitly via the
@@ -1859,14 +1858,14 @@ impl VMHelper {
 
         let record = |pkg: &str,
                       sym: &str,
-                      kind: &str,
                       map: &mut std::collections::HashMap<
             String,
             IndexMap<String, StrykeValue>,
         >| {
+            let glob = StrykeValue::glob(format!("{}::{}", pkg, sym));
             map.entry(pkg.to_string())
                 .or_default()
-                .insert(sym.to_string(), StrykeValue::string(kind.to_string()));
+                .insert(sym.to_string(), glob);
         };
 
         // Subs: keys like "main::foo" / "Foo::Bar::baz".
@@ -1877,10 +1876,10 @@ impl VMHelper {
                 if pkg.is_empty() || sym.is_empty() {
                     continue;
                 }
-                record(pkg, sym, "sub", &mut by_pkg);
+                record(pkg, sym, &mut by_pkg);
             } else {
                 // Bare-name sub (no package qualifier) lives in main::.
-                record("main", key, "sub", &mut by_pkg);
+                record("main", key, &mut by_pkg);
             }
         }
 
@@ -1892,7 +1891,7 @@ impl VMHelper {
                     let (pkg, rest) = name.split_at(idx);
                     let sym = &rest[2..];
                     if !pkg.is_empty() && !sym.is_empty() {
-                        record(pkg, sym, "scalar", &mut by_pkg);
+                        record(pkg, sym, &mut by_pkg);
                     }
                 }
             }
@@ -1901,7 +1900,7 @@ impl VMHelper {
                     let (pkg, rest) = name.split_at(idx);
                     let sym = &rest[2..];
                     if !pkg.is_empty() && !sym.is_empty() {
-                        record(pkg, sym, "array", &mut by_pkg);
+                        record(pkg, sym, &mut by_pkg);
                     }
                 }
             }
@@ -1910,7 +1909,7 @@ impl VMHelper {
                     let (pkg, rest) = name.split_at(idx);
                     let sym = &rest[2..];
                     if !pkg.is_empty() && !sym.is_empty() {
-                        record(pkg, sym, "hash", &mut by_pkg);
+                        record(pkg, sym, &mut by_pkg);
                     }
                 }
             }
@@ -2484,6 +2483,12 @@ impl VMHelper {
         if let Some(alias) = self.glob_handle_alias.get(name) {
             return alias.clone();
         }
+        // A stringified glob (`*main::STDOUT`) names the same handle as the
+        // bareword. Peel the sigil, then the default-package qualifier.
+        if let Some(rest) = name.strip_prefix('*') {
+            let bare = crate::scope::strip_main_prefix(rest).unwrap_or(rest);
+            return self.resolve_io_handle_name(bare);
+        }
         // `print $fh …` stores the handle as "$varname"; resolve it by
         // reading the scalar variable which holds the IO handle name.
         if let Some(var_name) = name.strip_prefix('$') {
@@ -2494,6 +2499,118 @@ impl VMHelper {
             }
         }
         name.to_string()
+    }
+
+    /// Fully qualify a bare typeglob name into the current package, matching
+    /// perl's `*foo` inside `package Foo` naming `*Foo::foo`. Already-qualified
+    /// names pass through.
+    pub(crate) fn qualify_glob_name(&self, name: &str) -> String {
+        if name.contains("::") {
+            name.to_string()
+        } else {
+            format!("{}::{}", self.current_package(), name)
+        }
+    }
+
+    /// The symbol a glob-ish value names, with no sigil: a real glob, a globref
+    /// (`\*foo`), an IO handle, or a plain string (`*foo` written as a name).
+    pub(crate) fn glob_name_of(&self, v: &StrykeValue) -> Option<String> {
+        if let Some(n) = v.as_glob_name() {
+            return Some(n.to_string());
+        }
+        if let Some(r) = v.as_scalar_ref() {
+            let inner = r.read().clone();
+            if let Some(n) = inner.as_glob_name() {
+                return Some(n.to_string());
+            }
+        }
+        let s = v.to_string();
+        if s.is_empty() {
+            return None;
+        }
+        Some(s.strip_prefix('*').unwrap_or(&s).to_string())
+    }
+
+    /// The symbol named by a glob or a globref, or `None` for anything else.
+    /// Unlike [`Self::glob_name_of`] this never falls back to stringification,
+    /// so an ordinary string is not mistaken for a glob.
+    pub(crate) fn glob_referent_name(&self, v: &StrykeValue) -> Option<String> {
+        if let Some(n) = v.as_glob_name() {
+            return Some(n.to_string());
+        }
+        let r = v.as_scalar_ref()?;
+        let inner = r.read().clone();
+        inner.as_glob_name().map(|n| n.to_string())
+    }
+
+    /// The fully-qualified symbol `*{ EXPR }` names. A glob or globref operand
+    /// keeps its own symbol; anything else is a symbolic name (`*{"Foo::import"}`,
+    /// `*{$fh}`) resolved through the IO alias map first so `*{$fh}` still names
+    /// the handle that `$fh` holds.
+    pub(crate) fn glob_value_name(&self, v: &StrykeValue) -> String {
+        if let Some(n) = self.glob_referent_name(v) {
+            return n;
+        }
+        let raw = v.to_string();
+        let resolved = self.resolve_io_handle_name(&raw);
+        self.qualify_glob_name(&resolved)
+    }
+
+    /// `*NAME{THING}` — select one slot out of a typeglob.
+    ///
+    /// Perl's `perlref` table: the container slots yield a reference to the live
+    /// variable (so `*foo{ARRAY}` is `\@foo`) or `undef` when the slot was never
+    /// filled; `NAME` / `PACKAGE` yield plain strings. Stryke has no formats, so
+    /// `FORMAT` is always an empty slot.
+    pub(crate) fn glob_slot(&self, glob: &StrykeValue, slot: &str) -> StrykeValue {
+        let Some(name) = self.glob_name_of(glob) else {
+            return StrykeValue::UNDEF;
+        };
+        let name = self.qualify_glob_name(&name);
+        let (pkg, sym) = match name.rfind("::") {
+            Some(i) => (name[..i].to_string(), name[i + 2..].to_string()),
+            None => ("main".to_string(), name.clone()),
+        };
+        match slot {
+            "NAME" => StrykeValue::string(sym),
+            "PACKAGE" => StrykeValue::string(pkg),
+            "GLOB" => StrykeValue::scalar_ref(Arc::new(RwLock::new(StrykeValue::glob(name)))),
+            // A glob's scalar slot always exists in perl — `*foo{SCALAR}` is
+            // `\$foo` even for a never-assigned `$foo`.
+            "SCALAR" => StrykeValue::scalar_binding_ref(name),
+            "ARRAY" => {
+                if self.scope.any_frame_has_array(&name) {
+                    StrykeValue::array_binding_ref(name)
+                } else {
+                    StrykeValue::UNDEF
+                }
+            }
+            "HASH" => {
+                if self.scope.any_frame_has_hash(&name) {
+                    StrykeValue::hash_binding_ref(name)
+                } else {
+                    StrykeValue::UNDEF
+                }
+            }
+            // `main`'s subs are stored under the bare key, so route through the
+            // same resolver `\&main::f` uses rather than the raw stash map.
+            "CODE" => match self.resolve_sub_by_name(&name) {
+                Some(sub) => StrykeValue::code_ref(sub),
+                None => StrykeValue::UNDEF,
+            },
+            "IO" => {
+                let resolved = self.resolve_io_handle_name(&sym);
+                if self.output_handles.contains_key(&resolved)
+                    || self.input_handles.contains_key(&resolved)
+                    || matches!(resolved.as_str(), "STDIN" | "STDOUT" | "STDERR")
+                {
+                    StrykeValue::io_handle(resolved)
+                } else {
+                    StrykeValue::UNDEF
+                }
+            }
+            _ => StrykeValue::UNDEF,
+        }
     }
 
     /// Stash key for `sub name` / `&name` when `name` is a typeglob basename (`*foo`, `*Pkg::foo`).
@@ -9619,6 +9736,20 @@ impl VMHelper {
         kind: Sigil,
         line: usize,
     ) -> ExecResult {
+        // A glob — or a globref — dereferences through its matching slot:
+        // `@{*Foo::ISA}` is `@Foo::ISA`, `${*Foo::VERSION}` is `$Foo::VERSION`.
+        // Unlike `*Foo::ISA{ARRAY}`, the deref forms name the variable whether or
+        // not it exists yet, so they bind by name rather than going through
+        // [`Self::glob_slot`]'s emptiness test.
+        let val = match self.glob_referent_name(&val) {
+            Some(g) => match kind {
+                Sigil::Scalar => StrykeValue::scalar_binding_ref(g),
+                Sigil::Array => StrykeValue::array_binding_ref(g),
+                Sigil::Hash => StrykeValue::hash_binding_ref(g),
+                Sigil::Typeglob => return Ok(StrykeValue::glob(g)),
+            },
+            None => val,
+        };
         match kind {
             Sigil::Scalar => {
                 if let Some(name) = val.as_scalar_binding_name() {
@@ -9961,6 +10092,10 @@ impl VMHelper {
                 Ok(StrykeValue::string(s.clone()))
             }
             ExprKind::Undef => Ok(StrykeValue::UNDEF),
+            ExprKind::GlobSlot { glob, slot } => {
+                let g = self.eval_expr(glob)?;
+                Ok(self.glob_slot(&g, slot))
+            }
             ExprKind::MagicConst(MagicConstKind::File) => {
                 Ok(StrykeValue::string(self.file.clone()))
             }
@@ -10091,14 +10226,10 @@ impl VMHelper {
                     Ok(pv.scalar_context())
                 }
             }
-            ExprKind::Typeglob(name) => {
-                let n = self.resolve_io_handle_name(name);
-                Ok(StrykeValue::string(n))
-            }
+            ExprKind::Typeglob(name) => Ok(StrykeValue::glob(self.qualify_glob_name(name))),
             ExprKind::TypeglobExpr(e) => {
-                let name = self.eval_expr(e)?.to_string();
-                let n = self.resolve_io_handle_name(&name);
-                Ok(StrykeValue::string(n))
+                let v = self.eval_expr(e)?;
+                Ok(StrykeValue::glob(self.glob_value_name(&v)))
             }
             ExprKind::ArrayElement { array, index } => {
                 // Stryke string-index sugar: bareword `_[N]` parses to an

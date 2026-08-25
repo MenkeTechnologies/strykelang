@@ -1199,6 +1199,18 @@ pub enum ExprKind {
     Typeglob(String),
     /// `*{ EXPR }` — typeglob slot by dynamic name (e.g. `*{$pkg . '::import'}`).
     TypeglobExpr(Box<Expr>),
+    /// `*NAME{THING}` / `*{EXPR}{THING}` — select one slot out of a typeglob and
+    /// return a reference to it (`*foo{ARRAY}` is `\@foo`), or `undef` when the
+    /// slot is empty. `NAME` / `PACKAGE` yield the plain strings instead of refs.
+    /// Perl's `perlref` "Typeglob slots" table is the spec.
+    GlobSlot {
+        /// The typeglob being indexed — `Typeglob`, `TypeglobExpr`, or a
+        /// `Deref { kind: Typeglob }` for the braced form.
+        glob: Box<Expr>,
+        /// Uppercase slot name: `SCALAR` / `ARRAY` / `HASH` / `CODE` / `IO` /
+        /// `GLOB` / `FORMAT` / `NAME` / `PACKAGE`.
+        slot: String,
+    },
 
     // Special forms
     /// `Print` variant.

@@ -654,6 +654,12 @@ pub(crate) enum HeapObject {
     Regex(Arc<PerlCompiledRegex>, String, String),
     Blessed(Arc<BlessedRef>),
     IOHandle(String),
+    /// A perl typeglob — the symbol-table entry itself, named by its
+    /// fully-qualified symbol (`main::v`, `Foo::ISA`), no sigil. A glob is not a
+    /// snapshot of its slots: it *names* the entry, so `*Foo::ISA{ARRAY}` and
+    /// `@{*Foo::ISA}` always see the live array. Stringifies as `*main::v` and
+    /// `ref \*main::v` is `GLOB`, matching perl.
+    Glob(String),
     Atomic(Arc<Mutex<StrykeValue>>),
     Set(Arc<PerlSet>),
     ChannelTx(Arc<Sender<StrykeValue>>),
@@ -1977,6 +1983,22 @@ impl StrykeValue {
     pub fn io_handle(name: String) -> Self {
         Self::from_heap(Arc::new(HeapObject::IOHandle(name)))
     }
+    /// A typeglob naming `name` (fully qualified, no sigil — `main::v`).
+    #[inline]
+    pub fn glob(name: String) -> Self {
+        Self::from_heap(Arc::new(HeapObject::Glob(name)))
+    }
+    /// The symbol a typeglob names, or `None` when this is not a glob.
+    #[inline]
+    pub fn as_glob_name(&self) -> Option<&str> {
+        if !nanbox::is_heap(self.0) {
+            return None;
+        }
+        match unsafe { self.heap_ref() } {
+            HeapObject::Glob(n) => Some(n.as_str()),
+            _ => None,
+        }
+    }
     /// `atomic` — see implementation.
     #[inline]
     pub fn atomic(a: Arc<Mutex<StrykeValue>>) -> Self {
@@ -2601,7 +2623,8 @@ impl StrykeValue {
             | HeapObject::Barrier(_)
             | HeapObject::SqliteConn(_)
             | HeapObject::StructInst(_)
-            | HeapObject::IOHandle(_) => 1.0,
+            | HeapObject::IOHandle(_)
+            | HeapObject::Glob(_) => 1.0,
             _ => 0.0,
         }
     }
@@ -2646,7 +2669,8 @@ impl StrykeValue {
             | HeapObject::Barrier(_)
             | HeapObject::SqliteConn(_)
             | HeapObject::StructInst(_)
-            | HeapObject::IOHandle(_) => 1,
+            | HeapObject::IOHandle(_)
+            | HeapObject::Glob(_) => 1,
             _ => 0,
         }
     }
@@ -2674,7 +2698,7 @@ impl StrykeValue {
             HeapObject::CodeRef(_) => "CODE".to_string(),
             HeapObject::Regex(_, _, _) => "Regexp".to_string(),
             HeapObject::Blessed(b) => b.class.clone(),
-            HeapObject::IOHandle(_) => "GLOB".to_string(),
+            HeapObject::IOHandle(_) | HeapObject::Glob(_) => "GLOB".to_string(),
             HeapObject::Atomic(_) => "ATOMIC".to_string(),
             HeapObject::Set(_) => "Set".to_string(),
             HeapObject::ChannelTx(_) => "PCHANNEL::Tx".to_string(),
@@ -2755,7 +2779,12 @@ impl StrykeValue {
             // itself a reference (`SvROK(SvRV(sv))` in pp_ref): `ref(\\1)`,
             // `ref(\$aref)` and `ref(\$blessed)` are all "REF".
             HeapObject::ScalarRef(r) => {
-                if r.read().is_perl_reference() {
+                // `\*foo` — a ref whose referent is a glob is a GLOB ref, the
+                // shape `Carp::trusts_directly` tests with
+                // `ref \$stash->{$var} eq 'GLOB'`.
+                if r.read().as_glob_name().is_some() {
+                    StrykeValue::string("GLOB".into())
+                } else if r.read().is_perl_reference() {
                     StrykeValue::string("REF".into())
                 } else {
                     StrykeValue::string("SCALAR".into())
@@ -3012,6 +3041,11 @@ impl fmt::Display for StrykeValue {
             HeapObject::Hash(h) => write!(f, "{}/{}", h.len(), h.capacity()),
             HeapObject::ArrayRef(_) | HeapObject::ArrayBindingRef(_) => f.write_str("ARRAY(0x...)"),
             HeapObject::HashRef(_) | HeapObject::HashBindingRef(_) => f.write_str("HASH(0x...)"),
+            // A ref to a glob prints as `GLOB(0x...)`, not `SCALAR(...)` —
+            // the address distinguishes globrefs the way it does coderefs.
+            HeapObject::ScalarRef(r) if r.read().as_glob_name().is_some() => {
+                write!(f, "GLOB(0x{:x})", Arc::as_ptr(r) as *const u8 as usize)
+            }
             HeapObject::ScalarRef(_)
             | HeapObject::ScalarBindingRef(_)
             | HeapObject::CaptureCell(_) => f.write_str("SCALAR(0x...)"),
@@ -3027,6 +3061,7 @@ impl fmt::Display for StrykeValue {
             HeapObject::Regex(_, src, _) => write!(f, "(?:{src})"),
             HeapObject::Blessed(b) => write!(f, "{}=HASH(0x...)", b.class),
             HeapObject::IOHandle(name) => f.write_str(name),
+            HeapObject::Glob(name) => write!(f, "*{name}"),
             HeapObject::Atomic(arc) => write!(f, "{}", arc.lock()),
             HeapObject::Set(s) => {
                 f.write_str("{")?;
@@ -3249,6 +3284,7 @@ pub fn set_member_key(v: &StrykeValue) -> String {
         HeapObject::CodeRef(_) => format!("c:{v}"),
         HeapObject::Regex(_, src, _) => format!("r:{src}"),
         HeapObject::IOHandle(s) => format!("io:{s}"),
+        HeapObject::Glob(s) => format!("glob:{s}"),
         HeapObject::Atomic(arc) => format!("at:{}", set_member_key(&arc.lock())),
         HeapObject::ChannelTx(tx) => format!("chtx:{:p}", Arc::as_ptr(tx)),
         HeapObject::ChannelRx(rx) => format!("chrx:{:p}", Arc::as_ptr(rx)),

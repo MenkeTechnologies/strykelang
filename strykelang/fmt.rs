@@ -764,6 +764,7 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::HashVar(name) => format!("%{}", name),
         ExprKind::Typeglob(name) => format!("*{}", name),
         ExprKind::TypeglobExpr(e) => format!("*{{ {} }}", format_expr(e)),
+        ExprKind::GlobSlot { glob, slot } => format!("{}{{{}}}", format_expr(glob), slot),
         ExprKind::ArrayElement { array, index } => format!("${}[{}]", array, format_expr(index)),
         ExprKind::HashElement { hash, key } => format!("${}{{{}}}", hash, format_expr(key)),
         ExprKind::ArraySlice { array, indices } => format!(

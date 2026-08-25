@@ -7615,10 +7615,17 @@ impl<'a> VM<'a> {
                         self.push(StrykeValue::code_ref(sub));
                         Ok(())
                     }
+                    Op::GlobSlot(slot_idx) => {
+                        let glob = self.pop();
+                        let slot = self.names[*slot_idx as usize].clone();
+                        let out = self.interp.glob_slot(&glob, &slot);
+                        self.push(out);
+                        Ok(())
+                    }
                     Op::LoadDynamicTypeglob => {
-                        let name = self.pop().to_string();
-                        let n = self.interp.resolve_io_handle_name(&name);
-                        self.push(StrykeValue::string(n));
+                        let v = self.pop();
+                        let n = self.interp.glob_value_name(&v);
+                        self.push(StrykeValue::glob(n));
                         Ok(())
                     }
                     Op::CopyTypeglobSlots(lhs_i, rhs_i) => {

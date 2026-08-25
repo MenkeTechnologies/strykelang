@@ -860,6 +860,9 @@ pub enum Op {
     LoadDynamicSubRef,
     /// `*{ EXPR }` — stack: \[stash / glob name string\] → resolved handle string (IO alias map + identity).
     LoadDynamicTypeglob,
+    /// `*glob{THING}` — stack: \[glob\] → the slot's reference, or undef when the
+    /// slot is empty. Name pool index holds the uppercase slot name.
+    GlobSlot(u16),
     /// `*lhs = *rhs` — copy stash slots (sub, scalar, array, hash, IO alias); name pool indices for both sides.
     CopyTypeglobSlots(u16, u16),
     /// `*name = $coderef` — stack: pop value, install subroutine in typeglob, push value back (assignment result).

@@ -37,10 +37,15 @@ type SharedHashEntry = (
 /// the name has the exact `main::ident` shape; `None` otherwise (incl.
 /// `main::Pkg::name`, where `Pkg` is a real subpackage that must keep
 /// its qualified storage key).
+///
+/// The bare name `main::` is the *stash* — `%main::` is `main`'s symbol
+/// table, not a `main::`-qualified variable — so it keeps its own key.
+/// Stripping it yielded the empty name, which is why `keys %main::` came
+/// back empty and `exists $main::{"x"}` was false while `%Foo::` worked.
 #[inline]
 pub(crate) fn strip_main_prefix(name: &str) -> Option<&str> {
     let rest = name.strip_prefix("main::")?;
-    if rest.contains("::") {
+    if rest.is_empty() || rest.contains("::") {
         return None;
     }
     Some(rest)
@@ -2459,6 +2464,18 @@ impl Scope {
     pub fn any_frame_has_hash(&self, name: &str) -> bool {
         canon_main!(name);
         self.frames.iter().any(|f| f.has_hash(name))
+    }
+    /// Returns `true` if ANY frame (including global) declares `@name`.
+    /// Backs `*name{ARRAY}`, which is `undef` for a slot that was never filled.
+    pub fn any_frame_has_array(&self, name: &str) -> bool {
+        canon_main!(name);
+        self.frames.iter().any(|f| f.has_array(name))
+    }
+    /// Returns `true` if ANY frame (including global) declares `$name`.
+    /// Backs `*name{SCALAR}`'s emptiness test.
+    pub fn any_frame_has_scalar(&self, name: &str) -> bool {
+        canon_main!(name);
+        self.frames.iter().any(|f| f.has_scalar(name))
     }
     /// `get_hash` — see implementation.
     pub fn get_hash(&self, name: &str) -> IndexMap<String, StrykeValue> {
