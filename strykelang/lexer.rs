@@ -48,6 +48,14 @@ pub struct Lexer {
     /// [`Self::next_token`] call so identifier-decoding logic can read the
     /// previous-token state without racing against its own writes.
     prev_arrow: bool,
+    /// Set while the token just emitted was a glob sigil `*` (a `*` in operand
+    /// position, not multiplication). The quote-like decoders check it so
+    /// `*q`, `*y`, `*s`, `*m`, `*tr` lex as typeglob names rather than opening
+    /// a quote / substitution / transliteration body.
+    last_was_glob_star: bool,
+    /// One-shot snapshot of [`Self::last_was_glob_star`] for the token being
+    /// decoded — the same shape as [`Self::prev_arrow`].
+    prev_glob_star: bool,
     /// Source path for [`StrykeError`] (e.g. real script or required `.pm` path).
     error_file: String,
     /// When > 0, the lexer treats `m` followed by `/` as a plain identifier
@@ -105,6 +113,8 @@ impl Lexer {
             last_was_term: false,
             last_was_arrow: false,
             prev_arrow: false,
+            last_was_glob_star: false,
+            prev_glob_star: false,
             error_file: file.into(),
             suppress_m_regex: 0,
             last_was_bare_positional: false,
@@ -1797,6 +1807,8 @@ impl Lexer {
         // via `self.prev_arrow` (set up via a one-shot field swap).
         self.prev_arrow = self.last_was_arrow;
         self.last_was_arrow = false;
+        self.prev_glob_star = self.last_was_glob_star;
+        self.last_was_glob_star = false;
         self.last_was_bare_positional = false;
 
         let ch = self.input[self.pos];
@@ -2037,6 +2049,9 @@ impl Lexer {
                 Ok(Token::Minus)
             }
             '*' => {
+                // A `*` in operand position is a typeglob sigil; the name after
+                // it is a symbol, never a quote-like operator.
+                let glob_sigil = !self.last_was_term;
                 self.advance();
                 if self.peek() == Some('*') {
                     self.advance();
@@ -2054,6 +2069,7 @@ impl Lexer {
                     return Ok(Token::MulAssign);
                 }
                 self.last_was_term = false;
+                self.last_was_glob_star = glob_sigil;
                 Ok(Token::Star)
             }
             '%' => {
@@ -2629,7 +2645,7 @@ impl Lexer {
                 match ident.as_str() {
                     "format" => {
                         // `$obj->format` — method call, not format declaration.
-                        if self.prev_arrow {
+                        if self.prev_arrow || self.prev_glob_star {
                             self.last_was_term = true;
                             return Ok(Token::Ident(ident));
                         }
@@ -2719,7 +2735,7 @@ impl Lexer {
                     }
                     "qw" => {
                         // After `->`, `qw` is a method name, not a quote-word list.
-                        if self.prev_arrow {
+                        if self.prev_arrow || self.prev_glob_star {
                             self.last_was_term = true;
                             return Ok(Token::Ident(ident));
                         }
@@ -2749,7 +2765,7 @@ impl Lexer {
                     }
                     "qq" | "q" => {
                         // After `->`, `q` / `qq` are method names, not quote operators.
-                        if self.prev_arrow {
+                        if self.prev_arrow || self.prev_glob_star {
                             self.last_was_term = true;
                             return Ok(Token::Ident(ident));
                         }
@@ -2808,7 +2824,7 @@ impl Lexer {
                     }
                     "qx" => {
                         // After `->`, `qx` is a method name, not a backtick command.
-                        if self.prev_arrow {
+                        if self.prev_arrow || self.prev_glob_star {
                             self.last_was_term = true;
                             return Ok(Token::Ident(ident));
                         }
@@ -2854,7 +2870,7 @@ impl Lexer {
                     }
                     "qr" => {
                         // After `->`, `qr` is a method name, not a quoted regex.
-                        if self.prev_arrow {
+                        if self.prev_arrow || self.prev_glob_star {
                             self.last_was_term = true;
                             return Ok(Token::Ident(ident));
                         }
@@ -2922,7 +2938,7 @@ impl Lexer {
                     }
                     "m" => {
                         // After `->`, `m` is a method name, not a regex match.
-                        if self.prev_arrow {
+                        if self.prev_arrow || self.prev_glob_star {
                             self.last_was_term = true;
                             return Ok(Token::Ident(ident));
                         }
@@ -3021,7 +3037,7 @@ impl Lexer {
                     }
                     "s" => {
                         // `$obj->s` / `$obj->s(...)` — after `->`, `s` is a method name.
-                        if self.prev_arrow {
+                        if self.prev_arrow || self.prev_glob_star {
                             self.last_was_term = true;
                             return Ok(Token::Ident(ident));
                         }
@@ -3135,7 +3151,7 @@ impl Lexer {
                     "tr" | "y" => {
                         // `$obj->tr` / `$obj->y` — after `->`, this is a method name,
                         // not transliteration.
-                        if self.prev_arrow {
+                        if self.prev_arrow || self.prev_glob_star {
                             self.last_was_term = true;
                             return Ok(Token::Ident(ident));
                         }

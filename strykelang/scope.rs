@@ -2460,6 +2460,48 @@ impl Scope {
         self.frames.iter().skip(1).any(|f| f.has_hash(name))
     }
 
+    /// Install `arc` as the storage for `@name` in the global frame, replacing
+    /// whatever was bound there. Backs `*name = \@array`: perl's glob
+    /// assignment makes the two names ONE variable, so a later push through
+    /// either name is visible through the other.
+    pub fn bind_shared_array(
+        &mut self,
+        name: &str,
+        arc: Arc<parking_lot::RwLock<Vec<StrykeValue>>>,
+    ) {
+        canon_main!(name);
+        if let Some(frame) = self.frames.first_mut() {
+            frame.arrays.retain(|(k, _)| k != name);
+            frame.shared_arrays.retain(|(k, _)| k != name);
+            frame.shared_arrays.push((name.to_string(), arc));
+        }
+    }
+
+    /// Install `arc` as the storage for `%name` in the global frame — the hash
+    /// half of [`Self::bind_shared_array`].
+    pub fn bind_shared_hash(
+        &mut self,
+        name: &str,
+        arc: Arc<parking_lot::RwLock<IndexMap<String, StrykeValue>>>,
+    ) {
+        canon_main!(name);
+        if let Some(frame) = self.frames.first_mut() {
+            frame.hashes.retain(|(k, _)| k != name);
+            frame.shared_hashes.retain(|(k, _)| k != name);
+            frame.shared_hashes.push((name.to_string(), arc));
+        }
+    }
+
+    /// Install `cell` as the storage for `$name` in the global frame. The cell is
+    /// the same `Arc` the reference holds, so reads and writes through either
+    /// name reach one value — the scalar half of [`Self::bind_shared_array`].
+    pub fn bind_scalar_cell(&mut self, name: &str, cell: Arc<RwLock<StrykeValue>>) {
+        canon_main!(name);
+        if let Some(frame) = self.frames.first_mut() {
+            frame.set_scalar_raw(name, StrykeValue::capture_cell(cell));
+        }
+    }
+
     /// Returns `true` if ANY frame (including global) declares `%name`.
     pub fn any_frame_has_hash(&self, name: &str) -> bool {
         canon_main!(name);

@@ -2639,20 +2639,20 @@ impl VMHelper {
                 self.subs.remove(&lhs_sub);
             }
         }
-        let sv = self.scope.get_scalar(rhs);
-        self.scope
-            .set_scalar(lhs, sv.clone())
-            .map_err(|e| e.at_line(line))?;
+        // Perl's `*a = *b` ALIASES the slots — `@a` and `@b` become one array —
+        // rather than copying their contents, so a later `push @b` is visible
+        // through `@a`. Route each container slot through the shared-`Arc`
+        // storage both names then point at.
+        let _ = line;
+        let cell = Arc::new(RwLock::new(self.scope.get_scalar(rhs)));
+        self.scope.bind_scalar_cell(rhs, Arc::clone(&cell));
+        self.scope.bind_scalar_cell(lhs, cell);
         let lhs_an = self.stash_array_name_for_package(lhs);
         let rhs_an = self.stash_array_name_for_package(rhs);
-        let av = self.scope.get_array(&rhs_an);
-        self.scope
-            .set_array(&lhs_an, av.clone())
-            .map_err(|e| e.at_line(line))?;
-        let hv = self.scope.get_hash(rhs);
-        self.scope
-            .set_hash(lhs, hv.clone())
-            .map_err(|e| e.at_line(line))?;
+        let av = self.scope.promote_array_to_shared(&rhs_an);
+        self.scope.bind_shared_array(&lhs_an, av);
+        let hv = self.scope.promote_hash_to_shared(rhs);
+        self.scope.bind_shared_hash(lhs, hv);
         match self.glob_handle_alias.get(rhs).cloned() {
             Some(t) => {
                 self.glob_handle_alias.insert(lhs.to_string(), t);
@@ -16149,13 +16149,37 @@ impl VMHelper {
         Err(StrykeError::runtime("Can't assign to arrow array deref on non-array-ref", line).into())
     }
 
-    /// `*name = $coderef` — install subroutine alias (tree [`assign_value`] and VM [`crate::bytecode::Op::TypeglobAssignFromValue`]).
+    /// `*name = VALUE` — install into the slot the value's kind selects.
+    ///
+    /// Perl's rule (perlmod, "Symbol Tables"): a reference fills the slot of its
+    /// own type and leaves every other slot alone, a glob aliases all of them,
+    /// a plain string is a symbolic glob alias, and `undef` is a no-op. The
+    /// install is an alias, not a copy — `*x = \@a` makes `@x` and `@a` one
+    /// array, so a later `push @a` is visible through `@x`.
+    ///
+    /// Shared by the tree [`Self::assign_value`] and the VM
+    /// [`crate::bytecode::Op::TypeglobAssignFromValue`].
     pub(crate) fn assign_typeglob_value(
         &mut self,
         name: &str,
         val: StrykeValue,
         line: usize,
     ) -> ExecResult {
+        // `*x = undef` clears nothing and is not an error in perl.
+        if val.is_undef() {
+            return Ok(StrykeValue::UNDEF);
+        }
+
+        // `*x = *y` / `*x = \*y` — alias every slot.
+        if let Some(rhs) = self.glob_referent_name(&val) {
+            let lhs = self.qualify_glob_name(name);
+            return self
+                .copy_typeglob_slots(&lhs, &rhs, line)
+                .map(|_| StrykeValue::UNDEF)
+                .map_err(|e| e.at_line(line).into());
+        }
+
+        // CODE — the one slot whose storage is the sub table, not the scope.
         let sub = if let Some(c) = val.as_code_ref() {
             Some(c)
         } else if let Some(r) = val.as_scalar_ref() {
@@ -16168,11 +16192,79 @@ impl VMHelper {
             self.subs.insert(lhs_sub, sub);
             return Ok(StrykeValue::UNDEF);
         }
+
+        let target = self.typeglob_storage_name(name);
+
+        if let Some(arc) = val.as_array_ref() {
+            self.scope.bind_shared_array(&target, arc);
+            return Ok(StrykeValue::UNDEF);
+        }
+        if let Some(src) = val.as_array_binding_name() {
+            let arc = self.scope.promote_array_to_shared(&src);
+            self.scope.bind_shared_array(&target, arc);
+            return Ok(StrykeValue::UNDEF);
+        }
+        if let Some(arc) = val.as_hash_ref() {
+            self.scope.bind_shared_hash(&target, arc);
+            return Ok(StrykeValue::UNDEF);
+        }
+        if let Some(src) = val.as_hash_binding_name() {
+            let arc = self.scope.promote_hash_to_shared(&src);
+            self.scope.bind_shared_hash(&target, arc);
+            return Ok(StrykeValue::UNDEF);
+        }
+        if let Some(cell) = val.as_scalar_ref() {
+            self.scope.bind_scalar_cell(&target, cell);
+            return Ok(StrykeValue::UNDEF);
+        }
+        if let Some(src) = val.as_scalar_binding_name() {
+            let cur = self.scope.get_scalar(&src);
+            let cell = Arc::new(RwLock::new(cur));
+            self.scope.bind_scalar_cell(&src, Arc::clone(&cell));
+            self.scope.bind_scalar_cell(&target, cell);
+            return Ok(StrykeValue::UNDEF);
+        }
+        if let Some(handle) = val.as_io_handle_name() {
+            let resolved = self.resolve_io_handle_name(&handle);
+            let short = Self::typeglob_short_name(name);
+            self.glob_handle_alias.insert(short, resolved);
+            return Ok(StrykeValue::UNDEF);
+        }
+
+        // A plain string is a symbolic glob name: `*n = "arr"` aliases `*n` to
+        // `*main::arr`, the same slots `*n = *arr` would.
+        if !val.is_perl_reference() {
+            let lhs = self.qualify_glob_name(name);
+            let rhs = self.qualify_glob_name(&val.to_string());
+            return self
+                .copy_typeglob_slots(&lhs, &rhs, line)
+                .map(|_| StrykeValue::UNDEF)
+                .map_err(|e| e.at_line(line).into());
+        }
+
         Err(StrykeError::runtime(
-            "typeglob assignment requires a subroutine reference (e.g. *foo = \\&bar) or another typeglob (*foo = *bar)",
+            format!("Can't assign a {} reference to a typeglob", val.ref_type()),
             line,
         )
         .into())
+    }
+
+    /// Scope storage key for a typeglob's scalar / array / hash slot. `main`'s
+    /// symbols live under the bare name, every other package under `Pkg::name`.
+    fn typeglob_storage_name(&self, name: &str) -> String {
+        let qualified = self.qualify_glob_name(name);
+        crate::scope::strip_main_prefix(&qualified)
+            .map(str::to_string)
+            .unwrap_or(qualified)
+    }
+
+    /// The IO-alias key for a typeglob: handles are registered under the bare
+    /// symbol, matching `open FH` / `print FH`.
+    fn typeglob_short_name(name: &str) -> String {
+        match name.rfind("::") {
+            Some(i) => name[i + 2..].to_string(),
+            None => name.to_string(),
+        }
     }
 
     fn assign_value(&mut self, target: &Expr, val: StrykeValue) -> ExecResult {
