@@ -220,6 +220,15 @@ impl Parser {
                 }
             }
         }
+        // `*name = ...` installs a sub under `name` at run time, so a later bareword call to it
+        // is an ordinary user-sub call even though no `sub name` appears. Core `Carp` does this
+        // (`*is_utf8 = $sub;` then `is_utf8($arg)` further down) and the name happens to collide
+        // with a stryke extension, which `--compat` would otherwise reject at parse time.
+        for w in tokens.windows(3) {
+            if let (Token::Star, Token::Ident(name), Token::Assign) = (&w[0].0, &w[1].0, &w[2].0) {
+                names.insert(name.clone());
+            }
+        }
         names
     }
     /// `new_with_file` — see implementation.
@@ -9061,6 +9070,23 @@ impl Parser {
                     self.advance();
                     let inner = self.parse_expression()?;
                     self.expect(&Token::RBrace)?;
+                    // `&{EXPR}(ARGS)` CALLS the code ref with ARGS, the same as `&$cr(ARGS)`
+                    // below. Without this the parenthesised list parsed as a separate term and
+                    // the expression yielded the code ref itself.
+                    if matches!(self.peek(), Token::LParen) {
+                        self.advance();
+                        let args = self.parse_arg_list()?;
+                        self.expect(&Token::RParen)?;
+                        return Ok(Expr {
+                            kind: ExprKind::IndirectCall {
+                                target: Box::new(inner),
+                                args,
+                                ampersand: true,
+                                pass_caller_arglist: false,
+                            },
+                            line,
+                        });
+                    }
                     return Ok(Expr {
                         kind: ExprKind::DynamicSubCodeRef(Box::new(inner)),
                         line,
@@ -9773,6 +9799,7 @@ impl Parser {
                         | Token::ArrayVar(_)
                         | Token::HashVar(_)
                         | Token::DerefScalarVar(_)
+                        | Token::ScalarDerefLBrace
                         | Token::HashPercent
                 ) {
                     let inner = self.parse_postfix()?;
@@ -9866,6 +9893,22 @@ impl Parser {
                             kind: ExprKind::ScalarVar(name),
                             line,
                         }),
+                        kind: Sigil::Scalar,
+                    },
+                    line,
+                })
+            }
+            // `${ EXPR }` — block scalar deref with a general expression body. The lexer only
+            // emits this token when the body is not a plain variable name (see
+            // `Lexer::braced_scalar_body_is_plain_name`), so the body is parsed here as a full
+            // expression: `${ *$_{SCALAR} }` (Carp), `${ \ $x }`, `${ $h->{cb} }`.
+            Token::ScalarDerefLBrace => {
+                self.advance();
+                let inner = self.parse_expression()?;
+                self.expect(&Token::RBrace)?;
+                Ok(Expr {
+                    kind: ExprKind::Deref {
+                        expr: Box::new(inner),
                         kind: Sigil::Scalar,
                     },
                     line,

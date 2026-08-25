@@ -177,6 +177,7 @@ fn token_source(t: &Token) -> String {
         Label(s) => format!("{s}:"),
         ScalarVar(s) => format!("${s}"),
         DerefScalarVar(s) => format!("$${s}"),
+        ScalarDerefLBrace => "${".into(),
         ArrayVar(s) => format!("@{s}"),
         HashVar(s) => format!("%{s}"),
         ArrayAt => "@".into(),

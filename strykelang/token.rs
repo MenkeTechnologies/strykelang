@@ -24,6 +24,12 @@ pub enum Token {
     ScalarVar(String),
     /// `$$foo` — symbolic scalar deref (inner name is `foo` without sigil).
     DerefScalarVar(String),
+    /// The `${` that opens a **block** scalar deref whose body is a general expression rather
+    /// than a variable name — `${ *$_{SCALAR} }`, `${ \ $x }`, `${ $h->{cb} }`. A body that is
+    /// just a name (`${name}`, `${^GLOBAL_PHASE}`, `${!}`) or `${$ident}` still lexes as a
+    /// single [`Token::ScalarVar`] / [`Token::DerefScalarVar`]; only the expression form emits
+    /// this token, and the body plus its closing `}` then lex as ordinary tokens.
+    ScalarDerefLBrace,
     /// `ArrayVar` variant.
     ArrayVar(String),
     /// `HashVar` variant.
@@ -267,6 +273,7 @@ impl Token {
                 | Token::BacktickString(_)
                 | Token::ScalarVar(_)
                 | Token::DerefScalarVar(_)
+                | Token::ScalarDerefLBrace
                 | Token::ArrayVar(_)
                 | Token::HashVar(_)
                 | Token::Ident(_)

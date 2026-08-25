@@ -1713,6 +1713,39 @@ impl Lexer {
         }
     }
 
+    /// Look ahead from a `$`-follows-`{` position (`self.pos` is the `{`) without consuming:
+    /// `true` when the braced body is a plain variable name, so the old single-token path in
+    /// [`Self::read_variable_name`] handles it — `${name}`, `${Foo::bar}`, `${^GLOBAL_PHASE}`,
+    /// `${!}`, and the `${$ident}` symbolic-deref form. `false` for anything else, which is a
+    /// general expression body and lexes as `${` + tokens + `}` (see [`Token::ScalarDerefLBrace`]).
+    ///
+    /// A name run is `[A-Za-z0-9_:^$]+`; a punctuation variable is one char from Perl's
+    /// punctuation set. Either must be followed (modulo spaces) by the closing `}`.
+    fn braced_scalar_body_is_plain_name(&self) -> bool {
+        const PUNCT: &str = "!@$&*+;',\"\\|?/<>.0123456789~%-=()[]{}";
+        let mut i = self.pos + 1;
+        let at = |i: usize| self.input.get(i).copied();
+        while at(i).is_some_and(|c| c == ' ' || c == '\t') {
+            i += 1;
+        }
+        let start = i;
+        while at(i).is_some_and(|c| c.is_alphanumeric() || c == '_' || c == ':' || c == '^' || c == '$')
+        {
+            i += 1;
+        }
+        if i == start {
+            // Single punctuation variable (`${!}`, `${0}` is covered by the run above).
+            match at(i) {
+                Some(c) if PUNCT.contains(c) => i += 1,
+                _ => return false,
+            }
+        }
+        while at(i).is_some_and(|c| c == ' ' || c == '\t') {
+            i += 1;
+        }
+        at(i) == Some('}')
+    }
+
     /// `${$name}` / `${$Foo::bar}` — when the braced body is a plain scalar `$identifier`, Perl treats it
     /// like `$$name` (scalar deref). The naive lexer otherwise yields a bogus [`Token::ScalarVar`] name
     /// containing a leading `$` (e.g. Try::Tiny's `${$code_ref}`).
@@ -1787,6 +1820,17 @@ impl Lexer {
                         self.last_was_term = true;
                         return Ok(Token::ScalarVar("$$".to_string()));
                     }
+                }
+                // `${ EXPR }` — a *block* scalar deref whose body is not a variable name.
+                // `read_variable_name` treats everything up to the first `}` as the name, which
+                // silently truncates any body containing a brace (`${ *$_{SCALAR} }` became the
+                // name ` *$_{SCALAR` and left the outer `}` dangling — the parse error that
+                // stopped `Carp` loading). Emit `${` on its own and let the body and its closing
+                // brace lex as ordinary tokens.
+                if self.peek() == Some('{') && !self.braced_scalar_body_is_plain_name() {
+                    self.advance(); // `{`
+                    self.last_was_term = false;
+                    return Ok(Token::ScalarDerefLBrace);
                 }
                 let name = self.read_variable_name();
                 if name.is_empty() {
@@ -2903,7 +2947,13 @@ impl Lexer {
                                 self.last_was_term = true;
                                 return Ok(Token::Ident(ident));
                             }
-                            if matches!(d, ';' | ',' | ')' | ']' | '}' | '>' | ':' | '\n') {
+                            // `:` is a legal Perl match delimiter (`$s =~ m:^/(.*)/$:`, used by
+                            // core `Exporter::Heavy`), so it only ends the bareword reading in
+                            // stryke-native mode, where `a:b` ranges and `label:` make a bareword
+                            // `m` followed by `:` the likelier parse.
+                            let ends_bareword = matches!(d, ';' | ',' | ')' | ']' | '}' | '>' | '\n')
+                                || (d == ':' && !crate::compat_mode());
+                            if ends_bareword {
                                 self.pos = start_pos;
                                 self.line = start_line;
                                 self.last_was_term = true;
