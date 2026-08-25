@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -1408,33 +1409,53 @@ impl Scope {
     /// direct `$_ = …` assignments and existing `$_<` consumers see the
     /// expected key. The `_0<+` form is the alias, written in lockstep by
     /// `declare_topic_slot`. For slot N ≥ 1 the canonical key is `_N<+`.
+    ///
+    /// Every user sub call rolls the whole chain once per bound slot
+    /// ([`Self::set_closure_args`] → [`Self::shift_slot_chain`]), and each roll
+    /// asks for eleven keys. Building them with `format!` put ~22 heap
+    /// allocations on every Perl sub call — 99% of the call's profile in a
+    /// 2M-iteration `add($t, 1)` loop. Slots 0-9 at levels 0-5 (everything a
+    /// real program binds) come from the static table below; only a sub with
+    /// eleven or more positional slots allocates.
     #[inline]
-    fn topic_slot_key(slot: usize, level: usize) -> String {
+    fn topic_slot_key(slot: usize, level: usize) -> Cow<'static, str> {
         debug_assert!(level <= 5);
+        #[rustfmt::skip]
+        const KEYS: [[&str; 6]; 10] = [
+            ["_",  "_<",  "_<<",  "_<<<",  "_<<<<",  "_<<<<<"],
+            ["_1", "_1<", "_1<<", "_1<<<", "_1<<<<", "_1<<<<<"],
+            ["_2", "_2<", "_2<<", "_2<<<", "_2<<<<", "_2<<<<<"],
+            ["_3", "_3<", "_3<<", "_3<<<", "_3<<<<", "_3<<<<<"],
+            ["_4", "_4<", "_4<<", "_4<<<", "_4<<<<", "_4<<<<<"],
+            ["_5", "_5<", "_5<<", "_5<<<", "_5<<<<", "_5<<<<<"],
+            ["_6", "_6<", "_6<<", "_6<<<", "_6<<<<", "_6<<<<<"],
+            ["_7", "_7<", "_7<<", "_7<<<", "_7<<<<", "_7<<<<<"],
+            ["_8", "_8<", "_8<<", "_8<<<", "_8<<<<", "_8<<<<<"],
+            ["_9", "_9<", "_9<<", "_9<<<", "_9<<<<", "_9<<<<<"],
+        ];
+        if let Some(key) = KEYS.get(slot).and_then(|row| row.get(level)) {
+            return Cow::Borrowed(key);
+        }
         if slot == 0 {
-            if level == 0 {
-                "_".to_string()
-            } else {
-                format!("_{}", "<".repeat(level))
-            }
-        } else if level == 0 {
-            format!("_{}", slot)
+            Cow::Owned(format!("_{}", "<".repeat(level)))
         } else {
-            format!("_{}{}", slot, "<".repeat(level))
+            Cow::Owned(format!("_{}{}", slot, "<".repeat(level)))
         }
     }
 
     /// Mirror key for slot 0 (`_0` / `_0<` / `_0<<` / ...) — the explicit-zero
     /// alias of the bare form. Returns `None` for slot N ≥ 1 (no alias).
     #[inline]
-    fn topic_slot_alias_key(slot: usize, level: usize) -> Option<String> {
+    fn topic_slot_alias_key(slot: usize, level: usize) -> Option<Cow<'static, str>> {
         if slot != 0 {
             return None;
         }
-        Some(if level == 0 {
-            "_0".to_string()
-        } else {
-            format!("_0{}", "<".repeat(level))
+        #[rustfmt::skip]
+        const ALIASES: [&str; 6] =
+            ["_0", "_0<", "_0<<", "_0<<<", "_0<<<<", "_0<<<<<"];
+        Some(match ALIASES.get(level) {
+            Some(key) => Cow::Borrowed(key),
+            None => Cow::Owned(format!("_0{}", "<".repeat(level))),
         })
     }
 
