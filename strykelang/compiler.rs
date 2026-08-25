@@ -66,6 +66,33 @@ pub fn expr_tail_is_list_sensitive(expr: &Expr) -> bool {
     }
 }
 
+/// True when `return EXPR`'s operand is syntactically a list, so the operand is
+/// evaluated in list context. Perl decides this dynamically from the caller's
+/// `wantarray`; stryke approximates it from the operand's shape.
+///
+/// A ternary counts when either arm does: `return $n ? (a => 1, b => 2) : ()`
+/// otherwise evaluated its arms in scalar context, and the comma operator
+/// collapsed the pair list to its last element. `Carp::caller_info` returns
+/// exactly that shape.
+pub(crate) fn return_operand_is_list_shaped(e: &Expr) -> bool {
+    match &e.kind {
+        ExprKind::Range { .. }
+        | ExprKind::SliceRange { .. }
+        | ExprKind::ArrayVar(_)
+        | ExprKind::List(_)
+        | ExprKind::HashVar(_)
+        | ExprKind::HashSlice { .. }
+        | ExprKind::HashKvSlice { .. }
+        | ExprKind::ArraySlice { .. } => true,
+        ExprKind::Ternary {
+            then_expr,
+            else_expr,
+            ..
+        } => return_operand_is_list_shaped(then_expr) || return_operand_is_list_shaped(else_expr),
+        _ => false,
+    }
+}
+
 /// True when one `{…}` entry expands to multiple hash keys (`qw/a b/`, a list literal with 2+
 /// elems, or a list-context `..` range like `'a'..'c'`).
 pub(crate) fn hash_slice_key_expr_is_multi_key(k: &Expr) -> bool {
@@ -1856,9 +1883,7 @@ impl Compiler {
                         self.chunk.patch_jump_here(end);
                     }
                     StmtKind::Block(block) => {
-                        self.chunk.emit(Op::PushFrame, stmt.line);
-                        self.emit_block_value(block, stmt.line)?;
-                        self.chunk.emit(Op::PopFrame, stmt.line);
+                        self.emit_bare_block_value(stmt, block)?;
                     }
                     StmtKind::StmtGroup(block) => {
                         self.emit_block_value(block, stmt.line)?;
@@ -3517,20 +3542,10 @@ impl Compiler {
                     // side scalar coercion (Op::CallSub in scalar slot) takes the
                     // last element from the returned list — matching Perl's
                     // `return (1, 2, 3)` semantics. (BUG-010)
-                    match &expr.kind {
-                        ExprKind::Range { .. }
-                        | ExprKind::SliceRange { .. }
-                        | ExprKind::ArrayVar(_)
-                        | ExprKind::List(_)
-                        | ExprKind::HashVar(_)
-                        | ExprKind::HashSlice { .. }
-                        | ExprKind::HashKvSlice { .. }
-                        | ExprKind::ArraySlice { .. } => {
-                            self.compile_expr_ctx(expr, WantarrayCtx::List)?;
-                        }
-                        _ => {
-                            self.compile_expr(expr)?;
-                        }
+                    if return_operand_is_list_shaped(expr) {
+                        self.compile_expr_ctx(expr, WantarrayCtx::List)?;
+                    } else {
+                        self.compile_expr(expr)?;
                     }
                     self.chunk.emit(Op::ReturnValue, line);
                 } else {
@@ -3631,9 +3646,34 @@ impl Compiler {
                 self.chunk.patch_jump_to(j, body_start);
             }
             StmtKind::Block(block) => {
-                self.chunk.emit(Op::PushFrame, line);
-                self.compile_block_inner(block)?;
-                self.chunk.emit(Op::PopFrame, line);
+                // A bare block is a loop that runs once (perlsyn): `last` and
+                // `next` leave it, `redo` re-enters it. `Carp::short_error_loc`
+                // is written that way, so this is not a corner case.
+                //
+                // The redo target is the `PushFrame` itself and the loop's entry
+                // depth is the depth *before* it, so `last` / `next` / `redo`
+                // each emit the one `PopFrame` that tears the block's frame down
+                // and `redo` gets a fresh frame on re-entry.
+                let entry_frame_depth = self.frame_depth;
+                let body_start_ip = self.chunk.len();
+                self.emit_push_frame(line);
+                self.loop_stack.push(LoopCtx {
+                    label: stmt.label.clone(),
+                    entry_frame_depth,
+                    entry_try_depth: self.try_depth,
+                    body_start_ip,
+                    break_jumps: vec![],
+                    continue_jumps: vec![],
+                });
+                let res = self.compile_block_inner(block);
+                let ctx = self.loop_stack.pop().expect("bare block loop ctx");
+                res?;
+                self.emit_pop_frame(line);
+                // `next` has nothing left to iterate, so it lands where `last`
+                // does — just past the block.
+                for j in ctx.break_jumps.into_iter().chain(ctx.continue_jumps) {
+                    self.chunk.patch_jump_here(j);
+                }
             }
             StmtKind::StmtGroup(block) => {
                 self.compile_block_no_frame(block)?;
@@ -3940,6 +3980,49 @@ impl Compiler {
         Ok(())
     }
 
+    /// A bare block in value position — a program's or sub's last statement.
+    ///
+    /// It is still a once-through loop (perlsyn), so `last` / `next` / `redo`
+    /// inside it must resolve. The loop-control paths jump past the value the
+    /// block would have produced, so they land on a `LoadUndef` and every path
+    /// converges with exactly one value on the stack.
+    fn emit_bare_block_value(
+        &mut self,
+        stmt: &Statement,
+        block: &Block,
+    ) -> Result<(), CompileError> {
+        let entry_frame_depth = self.frame_depth;
+        let body_start_ip = self.chunk.len();
+        self.emit_push_frame(stmt.line);
+        self.loop_stack.push(LoopCtx {
+            label: stmt.label.clone(),
+            entry_frame_depth,
+            entry_try_depth: self.try_depth,
+            body_start_ip,
+            break_jumps: vec![],
+            continue_jumps: vec![],
+        });
+        let res = self.emit_block_value(block, stmt.line);
+        let ctx = self.loop_stack.pop().expect("bare block loop ctx");
+        res?;
+        self.emit_pop_frame(stmt.line);
+        let exits: Vec<usize> = ctx
+            .break_jumps
+            .into_iter()
+            .chain(ctx.continue_jumps)
+            .collect();
+        if exits.is_empty() {
+            return Ok(());
+        }
+        let skip = self.chunk.emit(Op::Jump(0), stmt.line);
+        for j in exits {
+            self.chunk.patch_jump_here(j);
+        }
+        self.chunk.emit(Op::LoadUndef, stmt.line);
+        self.chunk.patch_jump_here(skip);
+        Ok(())
+    }
+
     /// Compile a block that leaves its last expression's value on the stack.
     /// Used for if/unless as the last statement (implicit return).
     fn emit_block_value(&mut self, block: &Block, line: usize) -> Result<(), CompileError> {
@@ -3955,9 +4038,7 @@ impl Compiler {
                         self.compile_expr(expr)?;
                     }
                     StmtKind::Block(inner) => {
-                        self.chunk.emit(Op::PushFrame, stmt.line);
-                        self.emit_block_value(inner, stmt.line)?;
-                        self.chunk.emit(Op::PopFrame, stmt.line);
+                        self.emit_bare_block_value(stmt, inner)?;
                     }
                     StmtKind::StmtGroup(inner) => {
                         self.emit_block_value(inner, stmt.line)?;
@@ -9334,6 +9415,59 @@ impl Compiler {
                     let tmp = self
                         .compile_var_declarations(decls, line, is_my)?
                         .expect("multi-decl list assignment reports its temp array");
+                    self.emit_op(Op::ArrayLen(tmp), line, Some(root));
+                } else if decls.len() == 1
+                    && decls[0].initializer.is_some()
+                    && matches!(keyword.as_str(), "my" | "our")
+                    && matches!(decls[0].sigil, Sigil::Array | Sigil::Hash)
+                {
+                    // `while (my %i = caller_info(++$i))` — an aggregate assignment
+                    // in scalar context yields the number of elements the
+                    // right-hand side produced, so the loop ends when the list
+                    // comes back empty. That is what `Carp::long_error_loc` walks
+                    // its caller frames with.
+                    let is_my = keyword == "my";
+                    let decl = &decls[0];
+                    let frozen = is_my && decl.frozen;
+                    self.compile_expr_ctx(
+                        decl.initializer.as_ref().expect("checked above"),
+                        WantarrayCtx::List,
+                    )?;
+                    let tmp = self.chunk.intern_name("__list_assign_tmp__");
+                    self.emit_declare_array(tmp, line, false);
+                    self.chunk.emit(Op::GetArrayFromIndex(tmp, 0), line);
+                    match decl.sigil {
+                        Sigil::Array => {
+                            let stash = if is_my {
+                                self.qualify_stash_array_name(&decl.name)
+                            } else {
+                                self.qualify_stash_array_name_full(&decl.name)
+                            };
+                            let name_idx = self.chunk.intern_name(&stash);
+                            self.emit_declare_array(name_idx, line, frozen);
+                            if !is_my {
+                                if let Some(layer) = self.scope_stack.last_mut() {
+                                    layer.declared_arrays.insert(decl.name.clone());
+                                    layer.declared_our_arrays.insert(decl.name.clone());
+                                }
+                            }
+                        }
+                        _ => {
+                            let stash = if is_my {
+                                decl.name.clone()
+                            } else {
+                                self.qualify_stash_hash_name_full(&decl.name)
+                            };
+                            let name_idx = self.chunk.intern_name(&stash);
+                            self.emit_declare_hash(name_idx, line, frozen);
+                            if !is_my {
+                                if let Some(layer) = self.scope_stack.last_mut() {
+                                    layer.declared_hashes.insert(decl.name.clone());
+                                    layer.declared_our_hashes.insert(decl.name.clone());
+                                }
+                            }
+                        }
+                    }
                     self.emit_op(Op::ArrayLen(tmp), line, Some(root));
                 } else {
                     return Err(CompileError::Unsupported(

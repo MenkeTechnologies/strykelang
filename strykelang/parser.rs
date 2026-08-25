@@ -1303,7 +1303,18 @@ impl Parser {
                         line,
                     };
                     // `{ … } if EXPR` / `{ … } unless EXPR` — same postfix rule as `do { } if …` (not `if (`).
-                    self.parse_stmt_postfix_modifier(stmt)?
+                    //
+                    // Perl 5 has no such form: a bare block is a complete
+                    // statement, so `{ … } if EXPR` is a syntax error and the
+                    // keyword after `}` always starts a NEW statement. Under
+                    // `--compat` a following `for` / `if` must therefore be left
+                    // alone — swallowing it turned `{ … }\nfor my $k (…) { … }`
+                    // into one statement.
+                    if crate::compat_mode() {
+                        stmt
+                    } else {
+                        self.parse_stmt_postfix_modifier(stmt)?
+                    }
                 }
             }
             _ => {
@@ -20540,7 +20551,10 @@ impl Parser {
             } else {
                 args.push(self.parse_assign_expr_stop_at_pipe()?);
             }
-            if !self.eat(&Token::Comma) {
+            // `=>` is a comma that quotes the bareword to its left, so it
+            // separates a list operator's arguments exactly like `,`:
+            // `_fetch_sub utf8 => 'is_utf8'` passes two arguments, not one.
+            if !self.eat(&Token::Comma) && !self.eat(&Token::FatArrow) {
                 break;
             }
         }
