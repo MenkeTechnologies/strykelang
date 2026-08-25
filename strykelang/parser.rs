@@ -11808,7 +11808,7 @@ impl Parser {
                         line,
                     })
                 } else if crate::compat_mode()
-                    && matches!(self.peek(), Token::Ident(ref name) if !Self::is_known_bareword(name) && !is_post_style_decl(name) && name != "varsync")
+                    && matches!(self.peek(), Token::Ident(ref name) if (!Self::is_known_bareword(name) || matches!(self.peek_at(1), Token::PackageSep)) && !is_post_style_decl(name) && name != "varsync")
                 {
                     // Perl's `sort SUBNAME LIST`: a bareword directly after `sort`
                     // is *always* the comparator's name — never the head of the
@@ -11826,12 +11826,32 @@ impl Parser {
                     // through to its expression path, which then swallowed the
                     // list and left the statement's `;` unexpected. Outside
                     // `--compat` the stryke spellings are unchanged.
-                    let name = match self.peek().clone() {
+                    let mut name = match self.peek().clone() {
                         Token::Ident(n) => n,
                         _ => unreachable!("guarded by the matches! above"),
                     };
                     let name_line = self.peek_line();
                     self.advance();
+                    // `sort Pkg::cmp LIST` — the lexer always splits a qualified
+                    // name into Ident / PackageSep / Ident, so stitch the tail
+                    // back on. Without it, `sort Foo::bylen @l` died with
+                    // "Unexpected token PackageSep" before it ever ran.
+                    while matches!(self.peek(), Token::PackageSep) {
+                        self.advance();
+                        match self.peek().clone() {
+                            Token::Ident(seg) => {
+                                self.advance();
+                                name.push_str("::");
+                                name.push_str(&seg);
+                            }
+                            tok => {
+                                return Err(self.syntax_err(
+                                    format!("expected a name after `::` in sort SUBNAME, got {tok:?}"),
+                                    self.peek_line(),
+                                ));
+                            }
+                        }
+                    }
                     let block = Self::bareword_cmp_call_block(name, name_line);
                     let _ = self.eat(&Token::Comma);
                     let terminated = matches!(
