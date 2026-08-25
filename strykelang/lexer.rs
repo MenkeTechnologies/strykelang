@@ -74,6 +74,20 @@ pub struct Lexer {
     /// parser's own newline-is-a-boundary rule (`next_is_new_statement_start`);
     /// suppressed under `--compat`, where Perl requires `;` to end a statement.
     saw_bare_newline: bool,
+    /// Heredoc bodies queued for the line currently being lexed. See
+    /// [`Lexer::read_heredoc_body`] and [`Lexer::cross_newline`].
+    heredoc_skip: Option<HeredocSkip>,
+}
+
+/// Where lexing resumes after the heredoc bodies attached to one source line.
+#[derive(Clone, Copy)]
+struct HeredocSkip {
+    /// Index of the newline ending the line that carried the `<<TAG`(s).
+    newline: usize,
+    /// Index to resume lexing from once that newline is consumed.
+    resume: usize,
+    /// Newlines inside the skipped region, so `line` stays accurate.
+    lines: usize,
 }
 
 impl Lexer {
@@ -96,6 +110,7 @@ impl Lexer {
             last_was_bare_positional: false,
             bare_positional_indices: std::collections::HashSet::new(),
             saw_bare_newline: false,
+            heredoc_skip: None,
         }
     }
 
@@ -189,11 +204,31 @@ impl Lexer {
         let ch = self.input.get(self.pos).copied();
         if let Some(c) = ch {
             if c == '\n' {
-                self.line += 1;
+                self.cross_newline();
+            } else {
+                self.pos += 1;
             }
-            self.pos += 1;
         }
         ch
+    }
+
+    /// Step over the newline at `pos`, jumping past any heredoc bodies queued
+    /// for the line that newline ends.
+    ///
+    /// Every site that consumes a `\n` routes through here so a stacked
+    /// `<<"A" . <<"B"` lands on the line after B's terminator, with `line`
+    /// counting every skipped body line.
+    fn cross_newline(&mut self) {
+        self.line += 1;
+        if let Some(skip) = self.heredoc_skip {
+            if skip.newline == self.pos {
+                self.heredoc_skip = None;
+                self.pos = skip.resume;
+                self.line += skip.lines;
+                return;
+            }
+        }
+        self.pos += 1;
     }
 
     fn skip_whitespace_and_comments(&mut self) {
@@ -210,14 +245,15 @@ impl Lexer {
                 self.pos += 2;
             } else if ch.is_whitespace() {
                 if ch == '\n' {
-                    self.line += 1;
                     // A bare newline (the `\`-continuation case is handled
                     // above and never reaches here) marks a statement boundary
                     // in stryke mode. Record it so `next_token` can drop
                     // term-context for the token that starts the next line.
                     self.saw_bare_newline = true;
+                    self.cross_newline();
+                } else {
+                    self.pos += 1;
                 }
-                self.pos += 1;
             } else {
                 break;
             }
@@ -231,9 +267,10 @@ impl Lexer {
             let ch = self.input[self.pos];
             if ch.is_whitespace() {
                 if ch == '\n' {
-                    self.line += 1;
+                    self.cross_newline();
+                } else {
+                    self.pos += 1;
                 }
-                self.pos += 1;
             } else {
                 break;
             }
@@ -1380,22 +1417,44 @@ impl Lexer {
         Ok((tag, quoted, indented))
     }
 
+    /// Read the body that belongs to a `<<TAG` just consumed at `pos`.
+    ///
+    /// The body does NOT start at `pos`: it starts after the end of the line
+    /// carrying the tag, and everything between the tag and that end is still
+    /// code that has to lex — `my $x = <<"A" . <<"B";` stacks two bodies after
+    /// one line of code. So scan the body out of the buffer without moving
+    /// `pos`, and record where lexing should resume; [`Self::cross_newline`]
+    /// performs the jump when it reaches the line's newline. A second `<<TAG`
+    /// on the same line continues from where the first body ended, which is
+    /// what puts the bodies in source order.
     fn read_heredoc_body(&mut self, tag: &str, indented: bool) -> StrykeResult<String> {
-        // Read until we find a line that is exactly the tag (or, for indented heredocs,
-        // a line whose trimmed content equals the tag).
+        let unterminated =
+            |lex: &Self| lex.syntax_err(format!("Unterminated heredoc (looking for '{tag}')"), lex.line);
+
+        let newline = self.input[self.pos..]
+            .iter()
+            .position(|&c| c == '\n')
+            .map_or(self.input.len(), |off| self.pos + off);
+        let pending = self.heredoc_skip.filter(|s| s.newline == newline);
+        let scan_start = pending.map_or_else(
+            || (newline + 1).min(self.input.len()),
+            |s| s.resume,
+        );
+
         let mut lines: Vec<String> = Vec::new();
-        // First, skip to end of current line
-        while let Some(ch) = self.peek() {
-            if ch == '\n' {
-                self.advance();
-                break;
-            }
-            self.advance();
-        }
         let mut terminator_indent: Option<usize> = None;
+        let mut cursor = scan_start;
         loop {
-            let _line_start = self.pos;
-            let line = self.read_while(|c| c != '\n');
+            if cursor >= self.input.len() {
+                return Err(unterminated(self));
+            }
+            let line_end = self.input[cursor..]
+                .iter()
+                .position(|&c| c == '\n')
+                .map_or(self.input.len(), |off| cursor + off);
+            let line: String = self.input[cursor..line_end].iter().collect();
+            let at_eof = line_end >= self.input.len();
+            cursor = (line_end + 1).min(self.input.len());
             if line.trim() == tag {
                 // For indented heredocs, the terminator's leading whitespace determines
                 // how much to strip from all body lines.
@@ -1404,19 +1463,21 @@ impl Lexer {
                 }
                 break;
             }
-            lines.push(line);
-            if self.peek() == Some('\n') {
-                self.advance();
-            } else if self.pos >= self.input.len() {
-                return Err(self.syntax_err(
-                    format!("Unterminated heredoc (looking for '{tag}')"),
-                    self.line,
-                ));
+            if at_eof {
+                return Err(unterminated(self));
             }
+            lines.push(line);
         }
-        if self.peek() == Some('\n') {
-            self.advance();
-        }
+
+        let skipped_lines = self.input[scan_start..cursor]
+            .iter()
+            .filter(|&&c| c == '\n')
+            .count();
+        self.heredoc_skip = Some(HeredocSkip {
+            newline,
+            resume: cursor,
+            lines: pending.map_or(0, |s| s.lines) + skipped_lines,
+        });
         // For indented heredocs (<<~), strip leading whitespace from each line,
         // up to the amount of indentation on the terminator line.
         if indented {
