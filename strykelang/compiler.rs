@@ -4175,6 +4175,16 @@ impl Compiler {
                     self.emit_op(Op::MakeArray(0), line, Some(root));
                 } else {
                     self.compile_expr_ctx(source, WantarrayCtx::List)?;
+                    // `(EXPR)[...]` slices a LIST, and any single value is a
+                    // one-element list: `("solo")[0]` is "solo", `(%h)[0,1]`
+                    // slices the flattened hash, and `($aref)[0]` is the ref
+                    // itself. Without this the source had to already be a list
+                    // or `ArrowArraySlice` failed with "Can't use arrow deref
+                    // on non-array-ref" — which any sub returning a scalar in
+                    // list context did. `MakeArray` applies Perl's list-literal
+                    // flattening: a plain list stays flat, a hash expands to
+                    // key/value pairs, and a reference stays a single element.
+                    self.emit_op(Op::MakeArray(1), line, Some(root));
                     for index_expr in indices {
                         self.compile_array_slice_index_expr(index_expr)?;
                     }
