@@ -567,8 +567,13 @@ impl Compiler {
                 return bare.to_string();
             }
         }
-        // Unbound bare name in a non-main package: assume package stash.
-        if !self.current_package.is_empty() && self.current_package != "main" {
+        // Unbound bare name in a non-main package: assume package stash — except for the names
+        // Perl keeps in `main` regardless of package (`@ARGV` inside `package Foo` is
+        // `@main::ARGV`, not `@Foo::ARGV`).
+        if !self.current_package.is_empty()
+            && self.current_package != "main"
+            && !Self::scalar_name_forced_to_main(bare)
+        {
             return self.qualify_stash_array_name_full(bare);
         }
         bare.to_string()
@@ -588,7 +593,12 @@ impl Compiler {
                 return bare.to_string();
             }
         }
-        if !self.current_package.is_empty() && self.current_package != "main" {
+        // Same `main`-only exemption as the array path: `%ENV` / `%SIG` inside `package Foo`
+        // are `%main::ENV` / `%main::SIG`.
+        if !self.current_package.is_empty()
+            && self.current_package != "main"
+            && !Self::scalar_name_forced_to_main(bare)
+        {
             return self.qualify_stash_hash_name_full(bare);
         }
         bare.to_string()
@@ -604,6 +614,46 @@ impl Compiler {
             format!("main::{}", name)
         } else {
             format!("{}::{}", pkg, name)
+        }
+    }
+
+    /// Names that stay in `main::` no matter which package is in effect: every punctuation
+    /// variable (`$!`, `$@`, `$/`, `$1`, `$0`, `$^W`, `$#name`), the topic chain (`$_` and the
+    /// stryke `$_0` / `$_1` / `$_<` slots), and the globals Perl documents as forced to `main`
+    /// (`%ENV`, `@ARGV`, `@INC`, `%SIG`, the standard handles).
+    ///
+    /// `a` / `b` are listed because [`crate::scope::Scope::set_sort_pair`] writes those two bare
+    /// names from 39 call sites that carry no package, so a package-qualified read would see an
+    /// undef pair in every in-package `sort { $a <=> $b }`.
+    ///
+    /// Used by the `local` and array/hash package-stash fallbacks. The **scalar** fallback
+    /// deliberately does not qualify at all: `Compiler::scope_stack`'s `declared_scalars` is not
+    /// authoritative at every read site — the shift-only / `my ($x) = @_` stack-args paths leave
+    /// the name untracked and rely on the bare fallback, so qualifying it turns `my $self =
+    /// shift` inside a package sub into a package global that reads back undef.
+    fn scalar_name_forced_to_main(name: &str) -> bool {
+        if name == "_"
+            || (name.len() > 1
+                && name.starts_with('_')
+                && name[1..].chars().all(|c| c.is_ascii_digit() || c == '<'))
+        {
+            return true;
+        }
+        match name.chars().next() {
+            Some(c) if !(c.is_alphabetic() || c == '_') => true,
+            _ => matches!(
+                name,
+                "ENV"
+                    | "ARGV"
+                    | "ARGVOUT"
+                    | "INC"
+                    | "SIG"
+                    | "STDIN"
+                    | "STDOUT"
+                    | "STDERR"
+                    | "a"
+                    | "b"
+            ),
         }
     }
 
@@ -632,7 +682,12 @@ impl Compiler {
     /// For `local $x`, qualify to package stash since local only works on package variables.
     /// Special vars (like `$/`, `$\`, `$,`, `$"`, or `^X` caret vars) are not qualified.
     fn intern_scalar_for_local(&mut self, bare: &str) -> u16 {
-        if VMHelper::is_special_scalar_name_for_set(bare) || bare.starts_with('^') {
+        // `local $_` inside `package Foo` localises `$main::_`, not `$Foo::_`; the same holds
+        // for every punctuation variable and the always-`main` names.
+        if VMHelper::is_special_scalar_name_for_set(bare)
+            || bare.starts_with('^')
+            || Self::scalar_name_forced_to_main(bare)
+        {
             self.chunk.intern_name(bare)
         } else {
             let s = self.qualify_stash_scalar_name(bare);
@@ -9348,7 +9403,13 @@ impl Compiler {
             ExprKind::HashVar(name) => {
                 self.check_strict_hash_access(name, line)?;
                 self.check_hash_mutable(name, line)?;
-                let idx = self.chunk.intern_name(name);
+                // Resolve the storage name the same way the READ side does. Interning the raw
+                // name here sent `package Foo; %m = (k => "v");` to `%main::m` while every read
+                // of `$m{k}` resolved to `%Foo::m`, so the hash read back empty inside its own
+                // package. `ExprKind::ArrayVar` above already goes through its storage-name
+                // helper; this is the same thing for hashes.
+                let stash = self.hash_storage_name_for_ops(name);
+                let idx = self.chunk.intern_name(&stash);
                 self.emit_op(Op::SetHash(idx), line, ast);
                 if keep {
                     self.emit_op(Op::GetHash(idx), line, ast);
