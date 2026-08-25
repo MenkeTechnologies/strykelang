@@ -14456,6 +14456,27 @@ impl Parser {
                     kind: ExprKind::ScalarVar("_".into()),
                     line: line_topic,
                 }]
+            } else if crate::compat_mode() && matches!(self.peek(), Token::LParen) {
+                // Perl: a list operator IMMEDIATELY followed by `(` takes those parens as its
+                // COMPLETE argument list — `print ("a"), "b"` prints only `a`, and
+                // `print (1+2)*3` prints `3` and then multiplies print's return value. Anything
+                // after the `)` belongs to the surrounding expression, in void context. The
+                // spacing is irrelevant: perl(1) treats `print(...)` and `print (...)` alike.
+                // Parsing the whole comma list instead made this print `ab`.
+                //
+                // stryke-native mode keeps the grouping reading, where `p (…), …` is a plain
+                // parenthesised first argument rather than Perl's list-operator gotcha.
+                self.advance(); // (
+                // Parse the FULL expression grammar inside the parens, not just a comma list:
+                // `print (1 and 2)` is legal Perl and `and` binds looser than the comma, so an
+                // arg-list parse stops at `1` and then chokes on `and`. A top-level comma list
+                // flattens into the argument vector; anything else is a single argument.
+                let inner = self.parse_expression()?;
+                self.expect(&Token::RParen)?;
+                match inner.kind {
+                    ExprKind::List(items) => items,
+                    _ => vec![inner],
+                }
             } else {
                 self.parse_list_until_terminator_allow_pipe()?
             };
