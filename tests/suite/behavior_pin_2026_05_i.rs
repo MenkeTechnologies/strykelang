@@ -387,15 +387,18 @@ fn s_e_flag_with_uc_call_works() {
 // ── %- multi-capture named hash returns only the last match today ───────────
 
 #[test]
-fn percent_minus_multi_capture_returns_only_last_today() {
-    // BUG-056: `%-` should accumulate all named captures across `/g`. Stryke
-    // exposes only the last one.
+fn percent_minus_holds_the_match_that_ran() {
+    // BUG-056, closed. The pin expected "456" (the LAST word) on the theory that
+    // `%-` accumulates across `/g`. It does not: in scalar context `//g` matches
+    // ONCE, from `pos`, so `%-` holds that one match's capture.
+    //   perl -e '"abc 123 def 456" =~ /(?<wd>\w+)/g; print join(",", @{$-{wd}})'
+    //     ->  abc
     assert_eq!(
         eval_string(
             r#""abc 123 def 456" =~ /(?<wd>\w+)/g;
                join(",", @{$-{wd}})"#
         ),
-        "456"
+        "abc"
     );
 }
 

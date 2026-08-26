@@ -239,13 +239,13 @@ fn pos_advances_with_each_g_match() {
 }
 
 #[test]
-fn pos_outside_while_loop_is_undef_today() {
-    // BUG-038: a single `/g` match outside a `while` loop should leave
-    // `pos($s) == 1`. Stryke leaves it undef. The while-loop form (above)
-    // still produces correct positions.
+fn pos_outside_while_loop_is_defined() {
+    // BUG-038, closed: a single `/g` match outside a `while` loop now leaves
+    // `pos($s)` set, as perl does.
+    //   perl -e 'my $s="abc"; $s =~ /a/g; print defined(pos($s)) ? 1 : 0'  ->  1
     assert_eq!(
         eval_int(r#"my $s = "abc"; $s =~ /a/g; defined(pos($s)) ? 1 : 0"#),
-        0
+        1
     );
 }
 

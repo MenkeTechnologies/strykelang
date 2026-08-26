@@ -60,11 +60,14 @@ fn readonly_module_not_loadable_today() {
 }
 
 #[test]
-fn readonly_bareword_without_use_silently_returns_value() {
-    // From the lib `eval` API, `Readonly my $X => 42` doesn't error — it
-    // appears to return 42 as if `Readonly` were a name-able no-op. CLI
-    // catches it as undefined sub. Pin lib behavior.
-    assert_eq!(eval_int(r#"Readonly my $X => 42"#), 42);
+fn readonly_bareword_without_use_is_rejected() {
+    // The lib `eval` API used to return 42 here, as if `Readonly` were a
+    // name-able no-op, while the CLI rejected it. Both reject it now, which is
+    // what perl does without the module loaded:
+    //   perl -e 'Readonly my $X => 42'
+    //     ->  syntax error at -e line 1, near "Readonly my "
+    use stryke::error::ErrorKind;
+    assert_eq!(eval_err_kind(r#"Readonly my $X => 42"#), ErrorKind::Runtime);
 }
 
 // ── `use warnings` is parseable but doesn't emit warnings today ────────────

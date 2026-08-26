@@ -3031,8 +3031,13 @@ fn anon_array_ref_arrow_access_reads_index() {
 
 #[test]
 fn regex_negative_lookbehind_global_count_differs_by_prefix() {
+    // `$s =~ /…/g` in NUMERIC context is scalar context: one match attempt from
+    // `pos`, so the value is the boolean 0 or 1 — not a count of every match.
+    // The 2 this once expected was reading it as list context.
+    //   perl -e 'my $s = "cba"; print 0 + ($s =~ /(?<!b)a/g)'  ->  0
+    //   perl -e 'my $s = "aca"; print 0 + ($s =~ /(?<!b)a/g)'  ->  1
     assert_eq!(eval_int(r#"my $s = "cba"; 0 + ($s =~ /(?<!b)a/g)"#), 0);
-    assert_eq!(eval_int(r#"my $s = "aca"; 0 + ($s =~ /(?<!b)a/g)"#), 2);
+    assert_eq!(eval_int(r#"my $s = "aca"; 0 + ($s =~ /(?<!b)a/g)"#), 1);
 }
 
 #[test]

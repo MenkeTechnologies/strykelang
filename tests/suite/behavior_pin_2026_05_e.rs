@@ -146,22 +146,13 @@ fn heredoc_double_quoted_interpolates() {
 }
 
 #[test]
-fn multiple_heredocs_on_same_line_not_supported_today() {
-    // BUG-034: `print <<A, <<B;` should accept two terminators on one line,
-    // each consuming its own body. Stryke parses the second body as code.
-    use stryke::error::ErrorKind;
-    let kind = eval_err_kind("print <<A, <<B;\nA1\nA\nB1\nB\n");
-    assert!(
-        matches!(
-            kind,
-            ErrorKind::Runtime
-                | ErrorKind::Type
-                | ErrorKind::Syntax
-                | ErrorKind::UndefinedSubroutine
-        ),
-        "expected error, got {:?}",
-        kind
-    );
+fn multiple_heredocs_on_same_line_each_consume_their_body() {
+    // BUG-034, closed: two terminators on one line, each consuming its own body,
+    // so the program runs instead of erroring. The bodies go to stdout, which
+    // this harness does not capture — `print` yields 1, so a successful eval IS
+    // the assertion. What lands on stdout is pinned by the CLI:
+    //   printf 'print <<A, <<B;\nA1\nA\nB1\nB\n' | perl   ->  "A1\nB1\n"
+    assert_eq!(eval_int("print <<A, <<B;\nA1\nA\nB1\nB\n"), 1);
 }
 
 // ── q / qq / qr / qw ─────────────────────────────────────────────────────────
