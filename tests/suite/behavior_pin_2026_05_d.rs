@@ -285,7 +285,10 @@ fn autoviv_hash_then_array_index_creates_an_arrayref() {
         eval_string(r#"my %h; $h{k}[0] = "first"; $h{k}[0]"#),
         "first"
     );
-    assert_eq!(eval_string(r#"my %h; $h{k}[0] = "first"; ref $h{k}"#), "ARRAY");
+    assert_eq!(
+        eval_string(r#"my %h; $h{k}[0] = "first"; ref $h{k}"#),
+        "ARRAY"
+    );
 }
 
 // ── given/when with arrayref pattern fails today ─────────────────────────────

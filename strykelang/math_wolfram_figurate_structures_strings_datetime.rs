@@ -373,7 +373,7 @@ fn builtin_fenwick_build(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         let mut idx = i + 1;
         while idx <= n {
             bit[idx] += x;
-            idx += idx & idx.wrapping_neg();
+            idx += idx.isolate_lowest_one();
         }
     }
     Ok(StrykeValue::array(bit.into_iter().map(StrykeValue::float).collect()))
@@ -389,7 +389,7 @@ fn builtin_fenwick_query(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut s = 0.0_f64;
     while i > 0 && i < bit.len() {
         s += bit[i];
-        i -= i & i.wrapping_neg();
+        i -= i.isolate_lowest_one();
     }
     Ok(StrykeValue::float(s))
 }

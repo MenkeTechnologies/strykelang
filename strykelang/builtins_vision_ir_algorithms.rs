@@ -1497,7 +1497,7 @@ pub fn fenwick_update(args: &[StrykeValue]) -> StrykeValue {
         while idx < n {
             let cur = t.read()[idx].to_int();
             t.write()[idx] = StrykeValue::integer(cur + delta);
-            idx += idx & idx.wrapping_neg();
+            idx += idx.isolate_lowest_one();
         }
     }
     tree
@@ -1511,7 +1511,7 @@ pub fn fenwick_query_prefix(args: &[StrykeValue]) -> StrykeValue {
         let t_read = t.read();
         while idx > 0 {
             sum += t_read[idx].to_int();
-            idx -= idx & idx.wrapping_neg();
+            idx -= idx.isolate_lowest_one();
         }
     }
     StrykeValue::integer(sum)

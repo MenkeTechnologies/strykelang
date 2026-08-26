@@ -200,6 +200,11 @@ struct LoopCtx {
     continue_jumps: Vec<usize>,
 }
 /// `Compiler` — see fields for layout.
+/// The `my`/`our` declarations visible to each phase block, one list per phase
+/// in `BEGIN`, `UNITCHECK`, `CHECK`, `INIT` order — the shape both
+/// `collect_phase_*_predecls` build and `phase_visible_my` reads.
+type PhasePredecls = [Vec<Vec<(Sigil, String)>>; 4];
+
 pub struct Compiler {
     /// `chunk` field.
     pub chunk: Chunk,
@@ -734,7 +739,7 @@ impl Compiler {
     /// source order (grouped by phase) and would otherwise not see an `our` declared earlier
     /// in the main body. Perl: `our $x; BEGIN { $x }` is fine; `BEGIN { $x } our $x;` errors —
     /// hence the textual-position accumulation rather than a whole-program union.
-    fn collect_phase_our_predecls(program: &Program) -> [Vec<Vec<(Sigil, String)>>; 4] {
+    fn collect_phase_our_predecls(program: &Program) -> PhasePredecls {
         let mut acc: Vec<(Sigil, String)> = Vec::new();
         let mut begin = Vec::new();
         let mut unitcheck = Vec::new();
@@ -770,9 +775,7 @@ impl Compiler {
     ///
     /// Returns the per-phase lists plus the union of every name any phase block can see,
     /// sigil-prefixed (`$x` / `@a` / `%h`) for [`Compiler::phase_visible_my`].
-    fn collect_phase_my_predecls(
-        program: &Program,
-    ) -> ([Vec<Vec<(Sigil, String)>>; 4], HashSet<String>) {
+    fn collect_phase_my_predecls(program: &Program) -> (PhasePredecls, HashSet<String>) {
         let mut acc: Vec<(Sigil, String)> = Vec::new();
         let mut begin = Vec::new();
         let mut unitcheck = Vec::new();
@@ -940,7 +943,8 @@ impl Compiler {
         if crate::builtins::is_perl5_core_name(dispatch_name) {
             return false;
         }
-        self.declared_subs.contains(&self.qualify_sub_key(dispatch_name))
+        self.declared_subs
+            .contains(&self.qualify_sub_key(dispatch_name))
     }
 
     /// Decl-site stash key — always qualifies to `Pkg::name` (or bare in
@@ -1099,9 +1103,7 @@ impl Compiler {
                     self.emit_op(Op::ArrowHashAutoviv(want), line, Some(expr));
                     Ok(())
                 }
-                DerefKind::Array
-                    if arrow_deref_arrow_subscript_is_plain_scalar_index(index) =>
-                {
+                DerefKind::Array if arrow_deref_arrow_subscript_is_plain_scalar_index(index) => {
                     self.compile_autoviv_base(base, 1)?;
                     self.compile_expr(index)?;
                     self.emit_op(Op::ArrowArrayAutoviv(want), line, Some(expr));
@@ -8778,8 +8780,7 @@ impl Compiler {
                 // scalar use: a bare `$s =~ /x/g;` statement, `my $ok = ($s =~
                 // /x/g)`, a `\G` walk. Those left `pos()` undef and made `\G`
                 // unusable. Context is known here, so decide it here.
-                let iterating_g =
-                    flags.contains('g') && (*scalar_g || ctx != WantarrayCtx::List);
+                let iterating_g = flags.contains('g') && (*scalar_g || ctx != WantarrayCtx::List);
                 let pos_key_idx = if iterating_g {
                     if let ExprKind::ScalarVar(n) = &expr.kind {
                         let stor = self.scalar_storage_name_for_ops(n);

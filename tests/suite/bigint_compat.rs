@@ -109,7 +109,9 @@ fn native_mode_still_overflows_to_zero() {
 fn bigint_pragma_equality_with_string() {
     // Cross-type compare works because Display and PartialEq are wired up.
     assert_eq!(
-        run_compat(r#"use bigint; my $x = 2 ** 64; print $x eq "18446744073709551616" ? "y" : "n""#),
+        run_compat(
+            r#"use bigint; my $x = 2 ** 64; print $x eq "18446744073709551616" ? "y" : "n""#
+        ),
         "y"
     );
     // Perl says "n" here — `2**64` is an NV, so it stringifies as

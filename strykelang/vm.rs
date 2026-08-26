@@ -7748,7 +7748,10 @@ impl<'a> VM<'a> {
                         let key = self.pop().to_string();
                         let r = self.pop();
                         let line = self.line();
-                        let v = vm_interp_result(self.interp.autoviv_arrow_hash(r, &key, *want, line), line)?;
+                        let v = vm_interp_result(
+                            self.interp.autoviv_arrow_hash(r, &key, *want, line),
+                            line,
+                        )?;
                         self.push(v);
                         Ok(())
                     }
@@ -7756,7 +7759,10 @@ impl<'a> VM<'a> {
                         let i = self.pop().to_int();
                         let r = self.pop();
                         let line = self.line();
-                        let v = vm_interp_result(self.interp.autoviv_arrow_array(r, i, *want, line), line)?;
+                        let v = vm_interp_result(
+                            self.interp.autoviv_arrow_array(r, i, *want, line),
+                            line,
+                        )?;
                         self.push(v);
                         Ok(())
                     }
@@ -8021,9 +8027,7 @@ impl<'a> VM<'a> {
                         // `undef` under `--compat`.
                         if op == 't' {
                             let v = match self.interp.tty_fd_for_operand(&path) {
-                                Some(fd) => {
-                                    StrykeValue::perl_bool(crate::perl_fs::fd_is_tty(fd))
-                                }
+                                Some(fd) => StrykeValue::perl_bool(crate::perl_fs::fd_is_tty(fd)),
                                 None if crate::compat_mode() => StrykeValue::UNDEF,
                                 None => StrykeValue::perl_bool(false),
                             };

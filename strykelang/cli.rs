@@ -1213,7 +1213,11 @@ fn run(full_argv: &[String]) -> i32 {
     INVOKED_AS.with(|n| {
         *n.borrow_mut() = full_argv
             .first()
-            .map(|a| Path::new(a).file_name().map_or(a.clone(), |b| b.to_string_lossy().into_owned()))
+            .map(|a| {
+                Path::new(a)
+                    .file_name()
+                    .map_or(a.clone(), |b| b.to_string_lossy().into_owned())
+            })
             .unwrap_or_default();
     });
 
@@ -4050,10 +4054,8 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
     // topical buckets) and the trailing "Other" hover-entry chapter
     // would overflow any terminal. Their counts are summarized as one
     // tail line; full breakdown lives in the TOC (`t`).
-    let major_chapters: std::collections::HashSet<&str> = crate::lsp::DOC_CATEGORIES
-        .iter()
-        .map(|(c, _)| *c)
-        .collect();
+    let major_chapters: std::collections::HashSet<&str> =
+        crate::lsp::DOC_CATEGORIES.iter().map(|(c, _)| *c).collect();
     let mut major_topics = 0usize;
     let mut minor_topics = 0usize;
     let mut minor_chapter_count = 0usize;

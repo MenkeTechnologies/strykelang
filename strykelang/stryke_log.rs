@@ -205,7 +205,6 @@ fn format_local(secs: i64) -> String {
 }
 
 pub fn log_at(lvl: Level, tag: &str, msg: &str) {
-
     if !enabled(lvl) {
         return;
     }
@@ -225,7 +224,7 @@ pub fn log_at(lvl: Level, tag: &str, msg: &str) {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis())
         .unwrap_or(0);
-    let stamp = format_local(( ts / 1000) as i64);
+    let stamp = format_local((ts / 1000) as i64);
     let millis = (ts % 1000) as u32;
     if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(&path) {
         let _ = writeln!(
@@ -393,12 +392,19 @@ mod tests {
         let bytes = stamp.as_bytes();
         assert_eq!(stamp.len(), 23, "unexpected stamp width: {stamp:?}");
         assert!(
-            bytes[4] == b'-' && bytes[7] == b'-' && bytes[10] == b' '
-                && bytes[13] == b':' && bytes[16] == b':' && bytes[19] == b'.',
+            bytes[4] == b'-'
+                && bytes[7] == b'-'
+                && bytes[10] == b' '
+                && bytes[13] == b':'
+                && bytes[16] == b':'
+                && bytes[19] == b'.',
             "not a `YYYY-MM-DD HH:MM:SS.mmm` stamp: {stamp:?}"
         );
         let year: i32 = stamp[..4].parse().expect("year is numeric");
-        assert!(year >= 2026, "stamp reads {year}, so the clock was not consulted");
+        assert!(
+            year >= 2026,
+            "stamp reads {year}, so the clock was not consulted"
+        );
         let _ = std::fs::remove_file(&tmp);
         clear_log_env();
     }

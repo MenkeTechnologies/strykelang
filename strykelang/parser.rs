@@ -12053,7 +12053,9 @@ impl Parser {
                             }
                             tok => {
                                 return Err(self.syntax_err(
-                                    format!("expected a name after `::` in sort SUBNAME, got {tok:?}"),
+                                    format!(
+                                        "expected a name after `::` in sort SUBNAME, got {tok:?}"
+                                    ),
                                     self.peek_line(),
                                 ));
                             }
@@ -14571,10 +14573,10 @@ impl Parser {
                 // stryke-native mode keeps the grouping reading, where `p (…), …` is a plain
                 // parenthesised first argument rather than Perl's list-operator gotcha.
                 self.advance(); // (
-                // Parse the FULL expression grammar inside the parens, not just a comma list:
-                // `print (1 and 2)` is legal Perl and `and` binds looser than the comma, so an
-                // arg-list parse stops at `1` and then chokes on `and`. A top-level comma list
-                // flattens into the argument vector; anything else is a single argument.
+                                // Parse the FULL expression grammar inside the parens, not just a comma list:
+                                // `print (1 and 2)` is legal Perl and `and` binds looser than the comma, so an
+                                // arg-list parse stops at `1` and then chokes on `and`. A top-level comma list
+                                // flattens into the argument vector; anything else is a single argument.
                 let inner = self.parse_expression()?;
                 self.expect(&Token::RParen)?;
                 match inner.kind {

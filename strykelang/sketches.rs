@@ -482,8 +482,9 @@ impl CmsSketch {
             return None;
         }
         let mut counters = Vec::with_capacity((width as usize) * (depth as usize));
-        for chunk in bytes[16..].chunks_exact(4) {
-            counters.push(u32::from_le_bytes(chunk.try_into().ok()?));
+        // `as_chunks` hands back `&[u8; 4]` already, so the bytes go straight in.
+        for chunk in bytes[16..].as_chunks::<4>().0 {
+            counters.push(u32::from_le_bytes(*chunk));
         }
         Some(Self {
             counters,

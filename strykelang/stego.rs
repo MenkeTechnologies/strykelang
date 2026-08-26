@@ -123,7 +123,7 @@ pub fn png_hide(png_bytes: &[u8], envelope: &[u8]) -> Result<Vec<u8>, String> {
     let (w, h) = (rgba.width(), rgba.height());
     let raw: &mut [u8] = rgba.as_mut();
     let mut bit_idx = 0usize;
-    'outer: for px in raw.chunks_exact_mut(4) {
+    'outer: for px in raw.as_chunks_mut::<4>().0 {
         for c in &mut px[0..3] {
             if bit_idx >= bits_needed {
                 break 'outer;

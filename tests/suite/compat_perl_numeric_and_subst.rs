@@ -91,7 +91,10 @@ fn integral_nv_operands_make_add_sub_mul_produce_integers() {
     assert_eq!(compat("print 1e15 + 0"), "1000000000000000");
     assert_eq!(compat("print 1e15 - 0"), "1000000000000000");
     assert_eq!(compat("print 1e15 * 1"), "1000000000000000");
-    assert_eq!(compat("my $x = 1e15; $x += 0; print $x"), "1000000000000000");
+    assert_eq!(
+        compat("my $x = 1e15; $x += 0; print $x"),
+        "1000000000000000"
+    );
     // Division has no such step.
     assert_eq!(compat("print 1e15 / 1"), "1e+15");
     // Neither does stringification on its own.
@@ -141,11 +144,17 @@ fn a_literal_backslash_is_not_a_case_escape() {
     // `s/x/a\\Ub/` is a backslash then `Ub`, not `\U` applied to `b`. The two
     // are the same character sequence after naive unescaping, which is why the
     // lexer has to keep `\\` doubled for the replacement layer.
-    assert_eq!(compat(r#"my $s = "x"; $s =~ s/x/a\\Ub/; print $s"#), r"a\Ub");
+    assert_eq!(
+        compat(r#"my $s = "x"; $s =~ s/x/a\\Ub/; print $s"#),
+        r"a\Ub"
+    );
     assert_eq!(compat(r#"my $s = "x"; $s =~ s/x/a\\b/; print $s"#), r"a\b");
     assert_eq!(compat(r#"my $s = "x"; $s =~ s/x/\\/; print $s"#), r"\");
     assert_eq!(compat(r#"my $s = "x"; $s =~ s/x/\\n/; print $s"#), r"\n");
-    assert_eq!(compat(r#"my $s = "x"; $s =~ s{x}{a\\Ub}; print $s"#), r"a\Ub");
+    assert_eq!(
+        compat(r#"my $s = "x"; $s =~ s{x}{a\\Ub}; print $s"#),
+        r"a\Ub"
+    );
 }
 
 #[test]
@@ -175,10 +184,7 @@ fn each_visits_every_pair_once_then_returns_the_empty_list() {
         ),
         "a=1,b=2,c=3"
     );
-    assert_eq!(
-        compat(r#"my %e; my @r = each %e; print scalar(@r)"#),
-        "0"
-    );
+    assert_eq!(compat(r#"my %e; my @r = each %e; print scalar(@r)"#), "0");
 }
 
 #[test]

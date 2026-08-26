@@ -15454,7 +15454,9 @@ impl VMHelper {
     /// "not a CODE reference" error rather than a bogus empty hash.
     fn fresh_autoviv_container(want: DerefKind) -> Option<StrykeValue> {
         match want {
-            DerefKind::Hash => Some(StrykeValue::hash_ref(Arc::new(RwLock::new(IndexMap::new())))),
+            DerefKind::Hash => Some(StrykeValue::hash_ref(Arc::new(
+                RwLock::new(IndexMap::new()),
+            ))),
             DerefKind::Array => Some(StrykeValue::array_ref(Arc::new(RwLock::new(Vec::new())))),
             DerefKind::Call => None,
         }
@@ -15578,7 +15580,9 @@ impl VMHelper {
             return Ok(fresh);
         }
         if let Some(name) = container.as_hash_binding_name() {
-            return self.autoviv_hash_elem(&name, key, want, line).map_err(Into::into);
+            return self
+                .autoviv_hash_elem(&name, key, want, line)
+                .map_err(Into::into);
         }
         self.read_arrow_hash_element(container, key, line)
     }
@@ -15622,7 +15626,9 @@ impl VMHelper {
             return Ok(fresh);
         }
         if let Some(name) = container.as_array_binding_name() {
-            return self.autoviv_array_elem(&name, idx, want, line).map_err(Into::into);
+            return self
+                .autoviv_array_elem(&name, idx, want, line)
+                .map_err(Into::into);
         }
         self.read_arrow_array_element(container, idx, line)
     }
@@ -15688,12 +15694,10 @@ impl VMHelper {
                     DerefKind::Hash => {
                         let k = self.eval_expr(index)?.to_string();
                         self.autoviv_arrow_hash(container, &k, code, line)
-                            .map_err(Into::into)
                     }
                     DerefKind::Array => {
                         let i = self.eval_expr(index)?.to_int();
                         self.autoviv_arrow_array(container, i, code, line)
-                            .map_err(Into::into)
                     }
                     DerefKind::Call => self.eval_expr(expr),
                 }

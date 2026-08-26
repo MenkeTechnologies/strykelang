@@ -42291,30 +42291,41 @@ fn builtin_setpriority(args: &[StrykeValue], line: usize) -> StrykeResult<Stryke
     }
 }
 
-/// The `getpw*` return list, exactly as perl's `pp_gpwent` builds it:
-/// `(name, passwd, uid, gid, quota, comment, gcos, dir, shell, expire)` — ten
-/// elements on every platform.
+/// The `getpw*` return list, as perl's `pp_gpwent` builds it:
+/// `(name, passwd, uid, gid, quota, comment, gcos, dir, shell, expire)` — TEN
+/// elements where the platform has `pw_expire`, and nine where it does not.
 ///
-/// `quota`/`comment`/`expire` are the BSD `pw_change`/`pw_class`/`pw_expire`
-/// fields where the platform has them (perl's `PWCHANGE`/`PWCLASS`/`PWEXPIRE`
-/// probes) and `undef` where it does not, which is what perl leaves in those
-/// slots when the `#ifdef`s all miss.
+/// The `#ifdef` ladders in `pp_sys.c` are not uniform, and the difference is
+/// observable (measured: `scalar(getpwent())` is 10 under perl on macOS and 9
+/// under perl on Linux):
+///
+/// * quota — `pw_change`, else `pw_quota`, else `pw_age`, else `PL_sv_no`.
+///   The last is the EMPTY STRING, not `undef`, so the slot is always
+///   defined and always present.
+/// * comment — `pw_class`, else `pw_comment`, else `PL_sv_no`. Same shape.
+/// * expire — `pw_expire` and nothing at all otherwise: when the field is
+///   missing perl pushes NO element, which is what shortens the list to nine.
 #[cfg(unix)]
 fn passwd_entry_list(pw: &PasswdEntry) -> Vec<StrykeValue> {
-    vec![
+    // `PL_sv_no` stringifies to "" — a defined, false value.
+    let sv_no = || StrykeValue::string(String::new());
+    let mut out = vec![
         StrykeValue::string(pw.name.clone()),
         StrykeValue::string(pw.passwd.clone()),
         StrykeValue::integer(pw.uid as i64),
         StrykeValue::integer(pw.gid as i64),
-        pw.change.map_or(StrykeValue::UNDEF, StrykeValue::integer),
+        pw.change.map_or_else(sv_no, StrykeValue::integer),
         pw.class
             .as_ref()
-            .map_or(StrykeValue::UNDEF, |c| StrykeValue::string(c.clone())),
+            .map_or_else(sv_no, |c| StrykeValue::string(c.clone())),
         StrykeValue::string(pw.gecos.clone()),
         StrykeValue::string(pw.dir.clone()),
         StrykeValue::string(pw.shell.clone()),
-        pw.expire.map_or(StrykeValue::UNDEF, StrykeValue::integer),
-    ]
+    ];
+    if let Some(expire) = pw.expire {
+        out.push(StrykeValue::integer(expire));
+    }
+    out
 }
 
 #[cfg(unix)]
@@ -42334,6 +42345,55 @@ struct PasswdEntry {
     expire: Option<i64>,
 }
 
+/// The shadow password for `name`, when this process may read it.
+///
+/// perl's `pp_gpwent` looks the entry up with `getspnam()` wherever the system
+/// has it and uses `sp_pwdp` in place of the `x`/`*` placeholder that the
+/// public passwd database carries (`pp_sys.c`: "If we have getspnam(), we try
+/// to dig up the shadow password ... If we are underprivileged, the shadow
+/// interface will set the errno to EACCES or similar, and return a null
+/// pointer. If this happens, we will use the dummy password"). Without this
+/// the second field disagreed with perl on any Linux where the lookup is
+/// permitted.
+///
+/// `getspnam_r` rather than `getspnam`: same answer, and it does not hand back
+/// a pointer into a shared static.
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+fn shadow_password(name: &str) -> Option<String> {
+    let cname = std::ffi::CString::new(name).ok()?;
+    let mut sp: libc::spwd = unsafe { std::mem::zeroed() };
+    let mut result: *mut libc::spwd = std::ptr::null_mut();
+    let mut buf = vec![0u8; 4096];
+    let rc = unsafe {
+        libc::getspnam_r(
+            cname.as_ptr(),
+            &mut sp,
+            buf.as_mut_ptr().cast::<libc::c_char>(),
+            buf.len(),
+            &mut result,
+        )
+    };
+    if rc != 0 || result.is_null() {
+        return None;
+    }
+    let pwdp = unsafe { (*result).sp_pwdp };
+    if pwdp.is_null() {
+        return None;
+    }
+    Some(
+        unsafe { CStr::from_ptr(pwdp) }
+            .to_string_lossy()
+            .into_owned(),
+    )
+}
+
+/// No shadow interface here: the platform's passwd field is the answer, which
+/// is what perl compiles to when `HAS_GETSPNAM` misses.
+#[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+fn shadow_password(_name: &str) -> Option<String> {
+    None
+}
+
 #[cfg(unix)]
 fn extract_passwd(pw: &libc::passwd) -> PasswdEntry {
     let s = |p: *const libc::c_char| -> String {
@@ -42344,8 +42404,9 @@ fn extract_passwd(pw: &libc::passwd) -> PasswdEntry {
     };
     // The change/class/expire trio exists only on the BSD-derived `struct
     // passwd` (Apple, FreeBSD, DragonFly, OpenBSD, NetBSD). Elsewhere — glibc,
-    // musl — perl's PWCHANGE/PWCLASS/PWEXPIRE probes miss and the slots stay
-    // undef, which `None` reproduces.
+    // musl — perl's PWCHANGE/PWCLASS/PWEXPIRE probes miss; `None` carries that
+    // to `passwd_entry_list`, which is where the difference between perl's
+    // empty-string quota/comment slots and its ABSENT expire slot lives.
     #[cfg(any(
         target_vendor = "apple",
         target_os = "freebsd",
@@ -42366,9 +42427,13 @@ fn extract_passwd(pw: &libc::passwd) -> PasswdEntry {
         target_os = "netbsd"
     )))]
     let (change, class, expire): (Option<i64>, Option<String>, Option<i64>) = (None, None, None);
+    let name = s(pw.pw_name);
+    // perl reaches for the shadow entry first and falls back to the public
+    // field when it cannot have it.
+    let passwd = shadow_password(&name).unwrap_or_else(|| s(pw.pw_passwd));
     PasswdEntry {
-        name: s(pw.pw_name),
-        passwd: s(pw.pw_passwd),
+        name,
+        passwd,
         uid: pw.pw_uid,
         gid: pw.pw_gid,
         change,

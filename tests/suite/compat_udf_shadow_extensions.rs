@@ -57,7 +57,10 @@ fn compat_perl_core_builtin_still_wins() {
     // Perl itself does NOT let a plain `sub length { … }` override the named
     // operator (that needs `use subs` / `CORE::GLOBAL`), so `--compat` must not
     // either. Both of these print the builtin's answer under stock perl.
-    assert_eq!(compat_eval(r#"sub length { 99 } print length("abcd");"#), "4");
+    assert_eq!(
+        compat_eval(r#"sub length { 99 } print length("abcd");"#),
+        "4"
+    );
     assert_eq!(compat_eval(r#"sub uc { "X" } print uc("ab");"#), "AB");
 }
 

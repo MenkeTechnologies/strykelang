@@ -1438,18 +1438,19 @@ impl Lexer {
     /// on the same line continues from where the first body ended, which is
     /// what puts the bodies in source order.
     fn read_heredoc_body(&mut self, tag: &str, indented: bool) -> StrykeResult<String> {
-        let unterminated =
-            |lex: &Self| lex.syntax_err(format!("Unterminated heredoc (looking for '{tag}')"), lex.line);
+        let unterminated = |lex: &Self| {
+            lex.syntax_err(
+                format!("Unterminated heredoc (looking for '{tag}')"),
+                lex.line,
+            )
+        };
 
         let newline = self.input[self.pos..]
             .iter()
             .position(|&c| c == '\n')
             .map_or(self.input.len(), |off| self.pos + off);
         let pending = self.heredoc_skip.filter(|s| s.newline == newline);
-        let scan_start = pending.map_or_else(
-            || (newline + 1).min(self.input.len()),
-            |s| s.resume,
-        );
+        let scan_start = pending.map_or_else(|| (newline + 1).min(self.input.len()), |s| s.resume);
 
         let mut lines: Vec<String> = Vec::new();
         let mut terminator_indent: Option<usize> = None;
@@ -1739,7 +1740,8 @@ impl Lexer {
             i += 1;
         }
         let start = i;
-        while at(i).is_some_and(|c| c.is_alphanumeric() || c == '_' || c == ':' || c == '^' || c == '$')
+        while at(i)
+            .is_some_and(|c| c.is_alphanumeric() || c == '_' || c == ':' || c == '^' || c == '$')
         {
             i += 1;
         }
@@ -2967,8 +2969,9 @@ impl Lexer {
                             // core `Exporter::Heavy`), so it only ends the bareword reading in
                             // stryke-native mode, where `a:b` ranges and `label:` make a bareword
                             // `m` followed by `:` the likelier parse.
-                            let ends_bareword = matches!(d, ';' | ',' | ')' | ']' | '}' | '>' | '\n')
-                                || (d == ':' && !crate::compat_mode());
+                            let ends_bareword =
+                                matches!(d, ';' | ',' | ')' | ']' | '}' | '>' | '\n')
+                                    || (d == ':' && !crate::compat_mode());
                             if ends_bareword {
                                 self.pos = start_pos;
                                 self.line = start_line;

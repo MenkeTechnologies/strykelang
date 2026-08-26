@@ -369,10 +369,7 @@ fn upper_case_escape_in_substitution_applies_per_match() {
         "FOO!"
     );
     // A literal backslash before `U` is not a case escape.
-    assert_eq!(
-        eval_string(r#"my $s = "x"; $s =~ s/x/a\\Ub/; $s"#),
-        "a\\Ub"
-    );
+    assert_eq!(eval_string(r#"my $s = "x"; $s =~ s/x/a\\Ub/; $s"#), "a\\Ub");
 }
 
 #[test]

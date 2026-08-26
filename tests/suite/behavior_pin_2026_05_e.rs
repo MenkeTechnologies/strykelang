@@ -107,10 +107,7 @@ fn dollar_amp_expands_to_the_matched_substring() {
         eval_string(r#"my $s = "abc 123"; $s =~ s/(\d+)/$&/g; $s"#),
         "abc 123"
     );
-    assert_eq!(
-        eval_string(r#"my $s = "xy"; $s =~ s/x/[$&]/; $s"#),
-        "[x]y"
-    );
+    assert_eq!(eval_string(r#"my $s = "xy"; $s =~ s/x/[$&]/; $s"#), "[x]y");
 }
 
 #[test]

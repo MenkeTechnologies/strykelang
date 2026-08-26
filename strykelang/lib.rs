@@ -71,10 +71,6 @@ pub mod capture;
 /// `cli` submodule: the command line, callable as a library.
 pub mod cli;
 pub mod cli_runners;
-/// `hosted` submodule: running stryke inside another process.
-pub mod hosted;
-/// `repl` submodule.
-pub mod repl;
 /// `cluster` submodule.
 pub mod cluster;
 /// `compiler` submodule.
@@ -117,6 +113,8 @@ pub mod fusevm_native;
 pub mod getopts;
 /// `god` submodule.
 pub mod god;
+/// `hosted` submodule: running stryke inside another process.
+pub mod hosted;
 mod jit;
 mod jwt;
 /// `kvstore` submodule.
@@ -192,6 +190,8 @@ pub mod provenance;
 pub mod pwatch;
 /// `remote_wire` submodule.
 pub mod remote_wire;
+/// `repl` submodule.
+pub mod repl;
 /// `rust_ffi` submodule.
 pub mod rust_ffi;
 /// `rust_sugar` submodule.
