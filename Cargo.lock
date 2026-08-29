@@ -1871,6 +1871,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "fusevm"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23f5f4e548b877296d0b8fe32f655812233f898e2a8a6aad02dc5e9cd98f676b"
+dependencies = [
+ "base64",
+ "bincode",
+ "chrono",
+ "cranelift-codegen",
+ "cranelift-frontend",
+ "cranelift-jit",
+ "cranelift-module",
+ "cranelift-native",
+ "cranelift-object",
+ "glob",
+ "libc",
+ "serde",
+ "sha2",
+ "tracing",
+]
+
+[[package]]
 name = "futures-channel"
 version = "0.3.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5101,7 +5123,7 @@ dependencies = [
  "errno",
  "fancy-regex 0.14.0",
  "flate2",
- "fusevm",
+ "fusevm 0.25.0",
  "git2",
  "glob",
  "hex",
@@ -7040,7 +7062,7 @@ dependencies = [
  "dirs 5.0.1",
  "fancy-regex 0.18.0",
  "filetime",
- "fusevm",
+ "fusevm 0.23.0",
  "glob",
  "hostname",
  "indexmap",
