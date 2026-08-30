@@ -3304,8 +3304,29 @@ impl<'a> VM<'a> {
                 } else if !name.contains("::")
                     && matches!(
                         name,
+                        // Short aliases must be listed here too. This set is a
+                        // second copy of the gate in
+                        // `vm_helper.rs::call_named_sub`, and the two had
+                        // drifted: `chk fst med rd shuf std uq var win zp`
+                        // were reachable through the interpreter but not
+                        // through the bytecode VM. Most resolved anyway via
+                        // their own `try_builtin` arms (`"first" | "fst"`,
+                        // `"stddev" | "std"`), which hid the gap until `win`
+                        // and `zp` -- which have no such arm -- failed with
+                        // "Undefined subroutine" despite being documented in
+                        // the README alias table.
                         "uniq"
+                            | "uq"
                             | "distinct"
+                            | "chk"
+                            | "fst"
+                            | "med"
+                            | "rd"
+                            | "shuf"
+                            | "std"
+                            | "var"
+                            | "win"
+                            | "zp"
                             | "uniqstr"
                             | "uniqint"
                             | "uniqnum"

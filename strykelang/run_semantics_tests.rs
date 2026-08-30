@@ -6280,3 +6280,104 @@ fn deque_is_constructed_empty_and_grows_from_both_ends() {
         "deque() takes no arguments — update the LSP entry if that changes"
     );
 }
+
+// `set`, `heap` and `deque` are the three collection constructors dispatched
+// by hand in the compiler (compiler.rs) and the interpreter (vm_helper.rs)
+// rather than through `try_builtin`, so `build.rs` cannot see any of them and
+// each needs explicit registration. `set` and `heap` had it; `deque` did not,
+// which left it callable but absent from `%all` and the linter snapshot while
+// carrying a full LSP doc entry. Asserting the family together means the next
+// constructor added to those hand-written arms cannot be registered halfway.
+#[test]
+fn collection_constructors_are_registered_as_one_family() {
+    let category = rs(r#"$b{heap}"#);
+    assert!(!category.is_empty(), "`heap` must carry a category");
+
+    for name in ["set", "heap", "deque"] {
+        assert_eq!(
+            rs(&format!(r#"exists $all{{{name}}} ? "yes" : "no""#)),
+            "yes",
+            "`{name}` must be in %all — it is dispatched by hand in \
+             compiler.rs / vm_helper.rs, so build.rs cannot register it \
+             automatically"
+        );
+        assert_eq!(
+            rs(&format!(r#"$b{{{name}}}"#)),
+            category,
+            "`{name}` must share the category of its sibling constructors"
+        );
+    }
+
+    // Each one still constructs its own distinct type.
+    assert_eq!(rs(r#"my $s = set(); ref($s)"#), "Set");
+    assert_eq!(rs(r#"my $q = deque(); ref($q)"#), "Deque");
+}
+
+// The list-builtin dispatch gate exists twice — once in
+// `vm_helper.rs::call_named_sub` for the interpreter, once in `vm.rs` for the
+// bytecode VM — and the two copies had drifted by ten names: `chk fst med rd
+// shuf std uq var win zp` were reachable through the interpreter but not
+// through the VM. Most of them resolved anyway through their own `try_builtin`
+// arms (`"first" | "fst"`, `"stddev" | "std"`), which masked the divergence;
+// only `win` and `zp`, which have no such arm, actually failed — with
+// "Undefined subroutine" despite being documented in the README alias table.
+//
+// Reading both gates out of the sources keeps them honest: a name added to one
+// copy and not the other fails here rather than in a user's script.
+#[test]
+fn both_list_builtin_gates_admit_the_same_names() {
+    fn gate_names(src: &str, start_marker: &str, end_marker: &str) -> Vec<String> {
+        let start = src
+            .find(start_marker)
+            .unwrap_or_else(|| panic!("gate start `{start_marker}` not found — update the test"));
+        let rest = &src[start..];
+        let end = rest
+            .find(end_marker)
+            .unwrap_or_else(|| panic!("gate end `{end_marker}` not found — update the test"));
+        let mut names = Vec::new();
+        let mut chunk = &rest[..end];
+        while let Some(open) = chunk.find('"') {
+            let after = &chunk[open + 1..];
+            let Some(close) = after.find('"') else { break };
+            let name = &after[..close];
+            if !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+                names.push(name.to_string());
+            }
+            chunk = &after[close + 1..];
+        }
+        names.sort();
+        names.dedup();
+        names
+    }
+
+    let interp = gate_names(
+        include_str!("vm_helper.rs"),
+        r#""uniq" | "distinct" | "uq" | "uniqstr""#,
+        "call_bare_list_builtin",
+    );
+    let vm = gate_names(
+        include_str!("vm.rs"),
+        r#""uniq"
+                            | "uq""#,
+        "call_bare_list_builtin",
+    );
+
+    assert!(
+        interp.len() > 40 && vm.len() > 40,
+        "gate extraction broke: interpreter={} vm={} names",
+        interp.len(),
+        vm.len()
+    );
+
+    let missing_from_vm: Vec<&String> = interp.iter().filter(|n| !vm.contains(n)).collect();
+    assert!(
+        missing_from_vm.is_empty(),
+        "names the interpreter dispatches but the bytecode VM does not: {missing_from_vm:?} — \
+         add them to the matches! gate in vm.rs"
+    );
+
+    // And the spellings that exposed the drift keep working end to end.
+    assert_eq!(ri(r#"med(1, 2, 3)"#), 2);
+    assert_eq!(ri(r#"scalar(zp([1, 2], [3, 4]))"#), 2);
+    assert_eq!(ri(r#"sm(1, 2, 3)"#), 6);
+}

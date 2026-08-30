@@ -308,6 +308,7 @@ mod range_perl;
 mod readline_list_context;
 mod readme_stryke_commands;
 mod reduce_pin;
+mod readme_alias_table;
 mod reflection;
 mod reflection_extension;
 mod reflection_pin;

@@ -15328,8 +15328,8 @@ impl Parser {
             | "compact" | "concat" | "chain" | "reject" | "grepv" | "flatten" | "set"
             | "min_by" | "max_by" | "sort_by" | "tally"
             | "each_with_index" | "count" | "cnt" |"len" | "group_by" | "chunk_by"
-            | "zip" | "chunk" | "chunked" | "sliding_window" | "windowed"
-            | "enumerate" | "with_index" | "shuffle" | "shuffled"| "heap"
+            | "zip" | "zp" | "chunk" | "chunked" | "sliding_window" | "windowed" | "win"
+            | "enumerate" | "with_index" | "shuffle" | "shuffled"| "heap" | "deque"
             | "take_while" | "drop_while" | "skip_while" | "tap" | "peek" | "partition"
             | "zip_with" | "count_by" | "skip" | "first_or"
             // ── cli / argv ──────────────────────────────────────────────────

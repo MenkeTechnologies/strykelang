@@ -1789,10 +1789,10 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   |-------|----------|-------|----------|-------|----------|
   | **Thread/Pipe** | | **String** | | **Case** | |
   | `~>` | `thread` | `tm` | `trim` | `sc` | `snake_case` |
-  | `p` | `len` | `length` | `cc` | `camel_case` |
+  | `p` | `len` | | `length` | `cc` | `camel_case` |
   | `pr` | `print` | `ufc` | `ucfirst` | `kc` | `kebab_case` |
   | | | `lfc` | `lcfirst` | `qm` | `quotemeta` |
-  | **List** | | `rev` | |
+  | **List** | | | `rev` | | |
   | `gr` | `grep` | `ch` | `chars` | **Serialize** | |
   | `so` | `sort` | `ln` | `lines` | `tj` | `to_json` |
   | `rd` | `reduce` | `wd` | `words` | `ty` | `to_yaml` |

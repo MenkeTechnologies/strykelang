@@ -2625,6 +2625,7 @@ CORE::depreciation_linear
 CORE::depth_of_field_far
 CORE::depth_of_field_near
 CORE::deq
+CORE::deque
 CORE::derangement_count
 CORE::derangements
 CORE::deroman
@@ -6349,6 +6350,7 @@ CORE::mean_tone_freq
 CORE::mearth
 CORE::measure
 CORE::mechanism_design_obj
+CORE::med
 CORE::medfilt
 CORE::medfilt_1d
 CORE::median
@@ -11122,6 +11124,7 @@ CORE::wilcoxon_signed_rank
 CORE::williams_r
 CORE::wilson_test
 CORE::wilson_theta_step
+CORE::win
 CORE::win_probability
 CORE::wincirc
 CORE::wind_chill
@@ -11353,6 +11356,7 @@ CORE::zipmap
 CORE::ziv_lempel_estimate
 CORE::zlexcount
 CORE::zodiac_sign
+CORE::zp
 CORE::zpexpand
 CORE::zpk2sos_step
 CORE::zpk2tf_step
@@ -13878,6 +13882,7 @@ depreciation_linear
 depth_of_field_far
 depth_of_field_near
 deq
+deque
 derangement_count
 derangements
 deroman
@@ -17620,6 +17625,7 @@ mean_tone_freq
 mearth
 measure
 mechanism_design_obj
+med
 medfilt
 medfilt_1d
 median
@@ -22411,6 +22417,7 @@ wilcoxon_signed_rank
 williams_r
 wilson_test
 wilson_theta_step
+win
 win_probability
 wincirc
 wind_chill
@@ -22646,6 +22653,7 @@ zipmap
 ziv_lempel_estimate
 zlexcount
 zodiac_sign
+zp
 zpexpand
 zpk2sos_step
 zpk2tf_step

@@ -3788,7 +3788,7 @@ pub(crate) fn try_builtin(
         "exp2" => Some(builtin_exp2(interp, args)),
         "percent" | "pct" => Some(builtin_percent(args)),
         "inverse" => Some(builtin_inverse(interp, args)),
-        "median" => Some(builtin_median(args)),
+        "median" | "med" => Some(builtin_median(args)),
         "mode_val" => Some(builtin_mode_val(args)),
         "variance" => Some(builtin_variance(args)),
         // More string
