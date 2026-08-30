@@ -6047,3 +6047,174 @@ fn every_bareword_dispatch_spelling_is_known_to_the_toolchain() {
         );
     }
 }
+
+// `%p` (primaries) is documented as the inverse of `%a` (aliases), but it was
+// built from `BUILTIN_ARMS` alone while `%a` merges `BUILTIN_ARMS` *and*
+// `SYNTACTIC_ALIASES`. The syntactic spellings were therefore one-way:
+// `$a{uq}` resolved to `uniq` while `$p{uniq}` came back empty, so anything
+// enumerating a builtin's spellings through `%p` — `s docs`, LSP completion —
+// silently missed `l`, `gr`, `j`, `k`, `uq`, `pr` and 25 others.
+//
+// Only the forward direction is asserted. The reverse is deliberately not
+// total: `aliases_hash_map` skips an alias that is also a primary in its own
+// right (`head`, `skip`, `cp`, `spit` are all `%b` primaries), so those appear
+// as co-spellings in `%p` without ever being `%a` keys.
+#[test]
+fn primaries_hash_is_the_inverse_of_aliases_hash() {
+    let report = rs(r#"
+        my $missing = 0;
+        my $total = 0;
+        my @sample;
+        for my $alias (sort keys %a) {
+            $total++;
+            my $primary = $a{$alias};
+            my $found = 0;
+            for my $spelling (@{ $p{$primary} // [] }) {
+                $found = 1 if $spelling eq $alias;
+            }
+            next if $found;
+            $missing++;
+            push @sample, "$alias->$primary" if len(@sample) < 10;
+        }
+        "$total|$missing|" . join(",", @sample)
+    "#);
+
+    let mut parts = report.splitn(3, '|');
+    let total: usize = parts.next().unwrap_or("0").parse().expect("total");
+    let missing: &str = parts.next().unwrap_or("?");
+    let sample = parts.next().unwrap_or("");
+
+    assert!(
+        total > 600,
+        "expected the alias table to be populated, saw {total} entries"
+    );
+    assert_eq!(
+        missing, "0",
+        "{missing} of {total} `%a` aliases are absent from `%p` — \
+         primaries_hash_map must merge SYNTACTIC_ALIASES the way \
+         aliases_hash_map does. Sample: {sample}"
+    );
+
+    // Spot-check the two spellings that exposed the gap.
+    assert!(
+        rs(r#"join ",", sort @{ $p{uniq} }"#).contains("uq"),
+        "`uq` must appear among uniq's spellings in %p"
+    );
+    assert!(
+        rs(r#"join ",", sort @{ $p{print} }"#).contains("pr"),
+        "`pr` must appear among print's spellings in %p"
+    );
+}
+
+// `lsp_completion_words` emits a `CORE::name` spelling for every bare callable,
+// and `parse_named_expr` strips that prefix so the arms below see the bare
+// name. The snapshot therefore promises `CORE::sl`, `CORE::uq`, `CORE::fc` and
+// the rest resolve — a promise nothing checked. Newly registered spellings are
+// the interesting case: the prefix is stripped before dispatch, so a name that
+// works bare must work prefixed, with the same result.
+#[test]
+fn core_prefix_dispatches_identically_for_registered_aliases() {
+    for (prefixed, bare) in [
+        (r#"join ",", CORE::uq(1, 1, 2)"#, r#"join ",", uq(1, 1, 2)"#),
+        (r#"CORE::ufc("abc")"#, r#"ufc("abc")"#),
+        (r#"CORE::lfc("ABC")"#, r#"lfc("ABC")"#),
+        (r#"CORE::fc("ABC")"#, r#"fc("ABC")"#),
+        (r#"CORE::ucfirst("abc")"#, r#"ucfirst("abc")"#),
+    ] {
+        assert_eq!(
+            rs(prefixed),
+            rs(bare),
+            "`{prefixed}` and `{bare}` must dispatch identically"
+        );
+    }
+
+    // Spot-check the values themselves, so the test cannot pass by both forms
+    // being equally broken.
+    assert_eq!(rs(r#"CORE::ufc("abc")"#), "Abc");
+    assert_eq!(rs(r#"CORE::lfc("ABC")"#), "aBC");
+    assert_eq!(rs(r#"CORE::fc("ABC")"#), "abc");
+    assert_eq!(ri(r#"my $x = 1; CORE::def($x) ? 1 : 0"#), 1);
+}
+
+// `%perl_compats` and `%extensions` are documented as partitioning
+// `%builtins`. The existing pin compares sizes, which a same-sized overlap and
+// gap would satisfy; this one checks membership element by element. It matters
+// because names do move between the two tables — `carp` / `cluck` / `confess`
+// / `croak` were filed as extensions before being recognized as Perl-provided
+// and moved to the core side.
+#[test]
+fn perl_compats_and_extensions_are_elementwise_disjoint() {
+    let report = rs(r#"
+        my $both = 0;
+        my $neither = 0;
+        my @sample;
+        for my $name (sort keys %stryke::builtins) {
+            my $core = exists $stryke::perl_compats{$name} ? 1 : 0;
+            my $ext  = exists $stryke::extensions{$name} ? 1 : 0;
+            if ($core && $ext) {
+                $both++;
+                push @sample, "both:$name" if len(@sample) < 10;
+            }
+            if (!$core && !$ext) {
+                $neither++;
+                push @sample, "neither:$name" if len(@sample) < 10;
+            }
+        }
+        "$both|$neither|" . join(",", @sample)
+    "#);
+
+    let mut parts = report.splitn(3, '|');
+    let both = parts.next().unwrap_or("?");
+    let neither = parts.next().unwrap_or("?");
+    let sample = parts.next().unwrap_or("");
+
+    assert_eq!(
+        both, "0",
+        "{both} builtin(s) are in BOTH %perl_compats and %extensions — \
+         a name belongs to is_perl5_core or stryke_extension_name, never \
+         both. Sample: {sample}"
+    );
+    assert_eq!(
+        neither, "0",
+        "{neither} builtin(s) are in NEITHER table, so --compat cannot \
+         classify them. Sample: {sample}"
+    );
+}
+
+// `qr` carries two unrelated meanings and both are correct. Bare `qr` is
+// Perl's quote-regex operator, handled by the lexer before any bareword
+// dispatch, so `qr(...)` builds a pattern with `(` `)` as delimiters. The
+// `CORE::` prefix bypasses that lexing and reaches the QR-code builtin, where
+// `qr` is an alias of `qr_ascii` (builtins.rs) and is registered under
+// crypto / encoding in stryke_extension_name.
+//
+// This looks like a naming mistake and is not one. Pinned so a cleanup that
+// removes either half fails loudly: dropping the alias would break
+// `CORE::qr`, and treating bare `qr` as the builtin would break every `qr//`
+// in existence.
+#[test]
+fn qr_is_the_quote_operator_bare_and_the_qr_code_builtin_under_core() {
+    // Bare: quote-regex. `qr(abc)` uses the parens as delimiters, and the
+    // result matches as a pattern.
+    assert_eq!(ri(r#"my $re = qr/abc/; ("xabcx" =~ $re) ? 1 : 0"#), 1);
+    assert!(
+        rs(r#"my $re = qr(abc); "$re""#).contains("abc"),
+        "bare `qr` must build a pattern, not call a builtin"
+    );
+
+    // Prefixed: the QR-code renderer, byte-identical to its primary spelling.
+    let via_core = rs(r#"CORE::qr("hi")"#);
+    let via_primary = rs(r#"qr_ascii("hi")"#);
+    assert!(
+        via_primary.len() > 100,
+        "expected a rendered QR block, got {} bytes",
+        via_primary.len()
+    );
+    assert_eq!(
+        via_core, via_primary,
+        "`CORE::qr` must reach the same builtin as `qr_ascii`"
+    );
+
+    // The two meanings must stay distinct.
+    assert_ne!(rs(r#"my $re = qr(hi); "$re""#), via_primary);
+}

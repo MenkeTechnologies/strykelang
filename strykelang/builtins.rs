@@ -280,6 +280,21 @@ pub fn primaries_hash_map() -> indexmap::IndexMap<String, StrykeValue> {
             entry.push(StrykeValue::string(alias.to_string()));
         }
     }
+    // `%p` is documented as the inverse of `%a`, so it needs the same two
+    // sources `aliases_hash_map` merges. Reading only `BUILTIN_ARMS` left the
+    // syntactic aliases (`l`, `gr`, `j`, `k`, `uq`, `pr`, …) one-way: `$a{uq}`
+    // resolved to `uniq` while `$p{uniq}` came back empty. Pinned by
+    // `primaries_hash_is_the_inverse_of_aliases_hash`.
+    for (alias, primary) in SYNTACTIC_ALIASES {
+        let entry = buckets.entry((*primary).to_string()).or_default();
+        if entry
+            .iter()
+            .any(|existing| existing.to_string() == **alias)
+        {
+            continue;
+        }
+        entry.push(StrykeValue::string((*alias).to_string()));
+    }
     buckets
         .into_iter()
         .map(|(primary, aliases)| {
