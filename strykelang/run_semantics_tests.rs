@@ -6218,3 +6218,65 @@ fn qr_is_the_quote_operator_bare_and_the_qr_code_builtin_under_core() {
     // The two meanings must stay distinct.
     assert_ne!(rs(r#"my $re = qr(hi); "$re""#), via_primary);
 }
+
+// `vector_angle` returns DEGREES, as its implementation doc says
+// (builtins_extended.rs: "angle between vectors in degrees"). The LSP hover
+// entry claimed radians and showed `~1.5708 (π/2)` as the expected output for
+// perpendicular vectors, so anyone trusting the doc was off by a factor of
+// ~57. It also named the alias `vangle`, which does not exist — the registered
+// alias is `vang` (builtins.rs). Pinned here so the unit can never drift from
+// the documentation again without a test failing.
+#[test]
+fn vector_angle_returns_degrees_under_both_spellings() {
+    // Four reference angles. In radians these would be 1.5708 / 0.7854 / 0 /
+    // 3.1416, so the assertions discriminate the two units unambiguously.
+    assert_eq!(ri(r#"vector_angle([1, 0], [0, 1])"#), 90);
+    assert_eq!(ri(r#"vector_angle([1, 0], [1, 1])"#), 45);
+    assert_eq!(ri(r#"vector_angle([1, 0], [1, 0])"#), 0);
+    assert_eq!(ri(r#"vector_angle([1, 0], [-1, 0])"#), 180);
+
+    // `vang` is the registered alias and must agree with the primary.
+    assert_eq!(rs(r#"vang([1, 0], [0, 1])"#), rs(r#"vector_angle([1, 0], [0, 1])"#));
+    assert_eq!(rs(r#"$a{vang}"#), "vector_angle");
+}
+
+// `deque` takes no arguments. Its LSP entry documented `deque LIST` — "create
+// a double-ended queue initialized with the given elements" — and its example
+// opened with `deque(1, 2, 3)`, which fails outright:
+//   VM compile error (unsupported): deque() takes no arguments
+// So the documented constructor never worked. The real API is an empty
+// constructor plus the push/pop pair, pinned here alongside the corrected doc.
+#[test]
+fn deque_is_constructed_empty_and_grows_from_both_ends() {
+    assert_eq!(
+        ri(r#"
+            my $q = deque();
+            $q->push_back(1);
+            $q->push_back(2);
+            $q->push_front(0);
+            $q->pop_front
+        "#),
+        0
+    );
+    assert_eq!(
+        ri(r#"
+            my $q = deque();
+            $q->push_back(1);
+            $q->push_back(2);
+            $q->push_front(0);
+            $q->pop_back
+        "#),
+        2
+    );
+    assert_eq!(
+        ri(r#"my $q = deque(); $q->push_back(7); $q->push_back(8); $q->len"#),
+        2
+    );
+
+    // The list-taking form the doc used to advertise is genuinely rejected;
+    // if it ever starts working, the doc should describe it again.
+    assert!(
+        run(r#"my $q = deque(1, 2, 3); $q->len"#).is_err(),
+        "deque() takes no arguments — update the LSP entry if that changes"
+    );
+}
