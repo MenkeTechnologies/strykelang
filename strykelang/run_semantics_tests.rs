@@ -5789,3 +5789,182 @@ fn unary_barewords_are_all_available_as_bare_thread_stages() {
     // parenthesized form, which supplies the remaining arguments.
     assert_eq!(rs(r#"~> ((1, 2, 3)) join(",")"#), "1,2,3");
 }
+
+// Data-driven cover for `KEYWORD_BUILTIN_ALIASES` (parser.rs) — the two-column
+// table `build.rs` reads to fill `%aliases`. Registering a spelling in the
+// parser's dispatch arms makes it *parse*; this table is what makes it *known*,
+// and the two drifted apart: `ufc`, `lfc` and `def` were callable while
+// `static_analysis` still reported them as undefined subs, because only `uf`
+// and `lf` had rows here. The hand-maintained list in
+// `tests/suite/syntactic_alias_reflection_pin.rs` could not catch that — it
+// listed the same spellings the table did. Walking the real table closes the
+// loop: a future alias added to a dispatch arm but not here fails immediately.
+#[test]
+fn every_keyword_builtin_alias_is_registered_and_known() {
+    let snapshot: std::collections::HashSet<&str> =
+        include_str!("lsp_completion_words.txt")
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            .collect();
+
+    let table = crate::parser::Parser::KEYWORD_BUILTIN_ALIASES;
+    assert!(
+        table.len() >= 26,
+        "alias table shrank to {} rows — entries are never removed",
+        table.len()
+    );
+
+    for (alias, primary) in table {
+        // The linter resolves bare calls against this snapshot; a missing row
+        // means the LSP underlines code that runs fine.
+        assert!(
+            snapshot.contains(alias),
+            "`{alias}` is in KEYWORD_BUILTIN_ALIASES but not in \
+             lsp_completion_words.txt — regenerate the snapshot \
+             (builtins.rs::builtin_lsp_completion_words)"
+        );
+        // The primary has to be known too, or `%a` points at a dead name.
+        assert!(
+            snapshot.contains(primary),
+            "`{alias}` aliases `{primary}`, which is not in the snapshot"
+        );
+        // `%a` is generated from this table, so every row must round-trip.
+        assert_eq!(
+            rs(&format!(r#"$a{{{alias}}}"#)),
+            *primary,
+            "%a must map `{alias}` to `{primary}`"
+        );
+    }
+}
+
+// The alias table must not collide with itself or with the names it points at:
+// a row whose alias is also a primary would make `%a` ambiguous, and two rows
+// claiming the same alias would silently let the later one win.
+#[test]
+fn keyword_builtin_alias_table_is_unambiguous() {
+    let table = crate::parser::Parser::KEYWORD_BUILTIN_ALIASES;
+
+    let mut seen = std::collections::HashSet::new();
+    for (alias, _) in table {
+        assert!(
+            seen.insert(*alias),
+            "`{alias}` appears twice in KEYWORD_BUILTIN_ALIASES"
+        );
+    }
+
+    let primaries: std::collections::HashSet<&str> =
+        table.iter().map(|(_, p)| *p).collect();
+    for (alias, _) in table {
+        assert!(
+            !primaries.contains(alias),
+            "`{alias}` is both an alias and a primary — `%a` cannot resolve it"
+        );
+    }
+}
+
+// The `=~`-swallowing rule generalized across the named-unary family. Each row
+// is discriminating: the two candidate parses give different answers, so a
+// precedence regression cannot pass silently.
+//
+// Every row uses a *succeeding* match on purpose. A failing match would make
+// the assertions depend on how false is spelled, and stryke and perl disagree
+// there: `my $m = ("ABC" =~ /b/)` gives `0` in stryke and `""` in perl, so
+// `length $m` is 1 vs 0. That divergence is in the match operator's return
+// value, not in precedence, and pinning it here would conflate the two.
+//
+// Verified identical in both languages, e.g.
+//   perl -e 'print length "ABC" =~ /B/'   -> 1   (length "ABC" would be 3)
+//   perl -e 'print ord "ABC" =~ /A/'      -> 49  (ord "ABC" would be 65)
+#[test]
+fn named_unary_family_all_swallow_the_match_bind() {
+    // The match succeeds -> 1, so each unary operates on "1" rather than on
+    // the string literal. The commented value is what the other parse yields.
+    assert_eq!(ri(r#"length "ABC" =~ /B/;"#), 1); // vs 3
+    assert_eq!(ri(r#"uc "abc" =~ /b/;"#), 1); // vs "ABC"
+    assert_eq!(ri(r#"ord "ABC" =~ /A/;"#), 49); // vs 65
+    assert_eq!(ri(r#"ucfirst "abc" =~ /b/;"#), 1); // vs "Abc"
+    assert_eq!(ri(r#"int "5" =~ /5/;"#), 1); // vs 5
+    assert_eq!(ri(r#"abs "-5" =~ /5/;"#), 1); // vs 5
+    assert_eq!(ri(r#"hex "ff" =~ /f/;"#), 1); // vs 255
+
+    // Parenthesizing the argument gives the other parse for every one of them.
+    assert_eq!(ri(r#"length("ABC");"#), 3);
+    assert_eq!(rs(r#"uc("abc");"#), "ABC");
+    assert_eq!(ri(r#"ord("ABC");"#), 65);
+    assert_eq!(rs(r#"ucfirst("abc");"#), "Abc");
+    assert_eq!(ri(r#"int("5");"#), 5);
+    assert_eq!(ri(r#"abs("-5");"#), 5);
+    assert_eq!(ri(r#"hex("ff");"#), 255);
+}
+
+/// Extract the match-arm name literals from one `fn` in `parser.rs`, given the
+/// function's signature line. Mirrors what `build.rs` already does to the same
+/// file, so the tables stay a single source of truth instead of being copied
+/// into a test that drifts alongside them.
+fn parser_fn_arm_names(signature: &str) -> Vec<String> {
+    let src = include_str!("parser.rs");
+    let start = src
+        .find(signature)
+        .unwrap_or_else(|| panic!("`{signature}` not found in parser.rs — update the test"));
+    let body = &src[start + signature.len()..];
+    // Functions are indented four spaces; the next one ends this body.
+    let end = body.find("\n    fn ").unwrap_or(body.len());
+    let mut names = Vec::new();
+    for line in body[..end].lines() {
+        let trimmed = line.trim_start();
+        if !trimmed.starts_with('"') || !line.contains("=>") {
+            continue;
+        }
+        let head = &line[..line.find("=>").expect("checked above")];
+        let mut rest = head;
+        while let Some(open) = rest.find('"') {
+            let after = &rest[open + 1..];
+            let Some(close) = after.find('"') else { break };
+            let name = &after[..close];
+            if !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+                names.push(name.to_string());
+            }
+            rest = &after[close + 1..];
+        }
+    }
+    names.sort();
+    names.dedup();
+    assert!(
+        names.len() > 100,
+        "extracted only {} names from `{signature}` — the arm shape changed \
+         and this test is no longer reading the table",
+        names.len()
+    );
+    names
+}
+
+// Every spelling the `~>` stage table accepts has to be a name the rest of the
+// toolchain knows. `sl` was stage-only and missing everywhere else; auditing
+// the whole table the same way then turned up `fc`, `ing`, `swa` and
+// `reversed` in the same state — callable, but absent from `%all`, `%b` and
+// the linter snapshot, so the LSP would flag them and `--compat` would not
+// gate them. Reading the real table means the next such spelling fails here
+// instead of waiting for someone to hit it in a script.
+#[test]
+fn every_thread_stage_spelling_is_known_to_the_toolchain() {
+    let snapshot: std::collections::HashSet<&str> = include_str!("lsp_completion_words.txt")
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .collect();
+
+    let missing: Vec<String> = parser_fn_arm_names(
+        "fn thread_apply_bare_func(&self, name: &str, arg: Expr, line: usize)",
+    )
+    .into_iter()
+    .filter(|n| !snapshot.contains(n.as_str()))
+    .collect();
+
+    assert!(
+        missing.is_empty(),
+        "`~>` stage spellings missing from lsp_completion_words.txt: {missing:?} — \
+         register them (stryke_extension_name / is_perl5_core / \
+         KEYWORD_BUILTIN_ALIASES in parser.rs) and regenerate the snapshot"
+    );
+}

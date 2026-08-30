@@ -3355,6 +3355,7 @@ CORE::farmhash_64
 CORE::farthest_insertion_step
 CORE::fb
 CORE::fbm_noise_2d
+CORE::fc
 CORE::fcntl
 CORE::fcp
 CORE::fcsv
@@ -4833,6 +4834,7 @@ CORE::infinite_well_energy
 CORE::information_bottleneck_step
 CORE::information_gain
 CORE::information_ratio
+CORE::ing
 CORE::ingest
 CORE::init_list
 CORE::initial_bearing
@@ -8672,6 +8674,7 @@ CORE::reverse_list
 CORE::reverse_str
 CORE::reverse_transcribe
 CORE::reverse_words
+CORE::reversed
 CORE::revwords
 CORE::rexp
 CORE::reynolds_full_number
@@ -10042,6 +10045,7 @@ CORE::svals
 CORE::sw
 CORE::sw_align
 CORE::sw_score
+CORE::swa
 CORE::swallow
 CORE::swamee_jain_factor
 CORE::swampland_distance_check
@@ -14597,6 +14601,7 @@ farmhash_64
 farthest_insertion_step
 fb
 fbm_noise_2d
+fc
 fcntl
 fcp
 fcsv
@@ -16083,6 +16088,7 @@ infinite_well_energy
 information_bottleneck_step
 information_gain
 information_ratio
+ing
 ingest
 init_list
 initial_bearing
@@ -19934,6 +19940,7 @@ reverse_list
 reverse_str
 reverse_transcribe
 reverse_words
+reversed
 revwords
 rexp
 reynolds_full_number
@@ -21307,6 +21314,7 @@ svals
 sw
 sw_align
 sw_score
+swa
 swallow
 swamee_jain_factor
 swampland_distance_check

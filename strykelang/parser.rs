@@ -15069,7 +15069,7 @@ impl Parser {
             | "keys" | "values" | "each"
             // ── string ──────────────────────────────────────────────────
             | "chomp" | "chop" | "chr" | "ord" | "hex" | "oct"
-            | "lc" | "uc" | "lcfirst" | "ucfirst"
+            | "lc" | "uc" | "lcfirst" | "ucfirst" | "fc"
             | "length" | "substr" | "index" | "rindex"
             | "sprintf" | "printf" | "print" | "say"
             | "pos" | "quotemeta" | "study"
@@ -15199,7 +15199,7 @@ impl Parser {
             // Pinned by reflection::exprkind_special_builtins_present_in_
             // reflection_registry. Section label kept under 40 chars
             // per build.rs:parse_section_header's length cap.)
-            | "burp" | "god" | "swallow" | "ingest"
+            | "burp" | "god" | "swallow" | "swa" | "ingest" | "ing"
             // ── core value aliases ─────────────────────────────────────────
             // `null` → `undef` (JS/SQL spelling), normalized in
             // parse_named_expr; listed here so the reflection registry and
@@ -15820,7 +15820,7 @@ impl Parser {
             | "__stryke_rust_compile"
             | "vec_set_value"
             // ── short aliases ───────────────────────────────────────────────
-            | "p" | "rev"
+            | "p" | "rev" | "reversed"
             // ── trivial numeric / predicate builtins ────────────────────────
             | "even" | "odd" | "zero" | "nonzero"
             | "positive" | "pos_n" | "negative" | "neg_n"
