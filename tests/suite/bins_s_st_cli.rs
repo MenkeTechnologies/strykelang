@@ -192,3 +192,57 @@ fn s_and_st_produce_identical_output_for_same_script() {
          st: {st_out:?}"
     );
 }
+
+// ─── The binaries own their process ─────────────────────────────────
+
+/// A binary must not run its command line in `hosted` mode.
+///
+/// `cli::run_owned` and `cli::run_argv` differ only in whether
+/// `hosted::run` wraps the call, and everything downstream keys off
+/// that flag: `hosted::exit` unwinds a panic instead of calling
+/// `process::exit`, and `cli::run`'s `!is_hosted()` guard skips
+/// restoring the default SIGPIPE disposition. Both are wrong for a
+/// binary, and the release profile's `panic = "abort"` turns the first
+/// into SIGABRT — `s -e 'exit(3)'` left status 134 instead of 3 and
+/// `s pkg install .` aborted after printing its success line.
+///
+/// SIGPIPE is the half of that regression a debug-profile test can
+/// see: with `run_argv` the reset is skipped, SIGPIPE stays at the
+/// SIG_IGN the Rust runtime installs, and writing to a closed pipe
+/// becomes a "failed printing to stdout" panic rather than the quiet
+/// death every Unix filter dies. Assert the signal, which is only
+/// reachable when the process was never hosted.
+#[test]
+#[cfg(unix)]
+fn a_closed_pipe_kills_the_binary_with_sigpipe() {
+    use std::io::Read;
+    use std::os::unix::process::ExitStatusExt;
+
+    // SIGPIPE is 13 on every POSIX platform stryke targets; `libc` is a
+    // normal dependency, not a dev one, so it is out of reach here.
+    const SIGPIPE: i32 = 13;
+
+    // Far more than one pipe buffer, so the write outlives the reader.
+    let mut child = Command::new(bin("s"))
+        .args(["-e", "for $i (1..2000000) { p $i }"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn s");
+
+    // Read a little so the child is definitely mid-write, then drop the
+    // read end — that is `s ... | head` in one call.
+    let mut stdout = child.stdout.take().expect("piped stdout");
+    let mut head = [0u8; 64];
+    let _ = stdout.read(&mut head);
+    drop(stdout);
+
+    let status = child.wait().expect("wait for s");
+    assert_eq!(
+        status.signal(),
+        Some(SIGPIPE),
+        "expected death by SIGPIPE, got {status:?} — the binary is running \
+         hosted, so cli::run skipped the SIG_DFL reset"
+    );
+}

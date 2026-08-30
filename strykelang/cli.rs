@@ -1186,6 +1186,27 @@ pub fn run_argv(argv: &[String]) -> i32 {
     crate::hosted::run(|| run(argv))
 }
 
+/// The same command line, for a caller that owns the process — the `stryke`,
+/// `st` and `s` binaries.
+///
+/// This is [`run_argv`] without [`hosted::run`], and the difference is not a
+/// nicety. Hosted mode carries an `exit` out of the command line layer by
+/// unwinding a [`panic_any`](std::panic::panic_any) that `hosted::run` catches,
+/// which needs an unwinding runtime; `[profile.release]` in `Cargo.toml` sets
+/// `panic = "abort"`, so in a release binary that unwind is an abort instead.
+/// Routing the binaries through `run_argv` therefore turned every one of the
+/// command line's exits into SIGABRT: `s -e 'exit(3)'` left status 134 rather
+/// than 3, and `s pkg install .` aborted after it had already done the work and
+/// printed its success line. The `!is_hosted()` guard in [`run`] that restores
+/// the default SIGPIPE disposition was suppressed for the same reason, so
+/// `s '...' | head` died on a broken-pipe panic instead of quietly.
+///
+/// A binary is not a host: it may `exit` straight out of the process, which is
+/// what `hosted::exit` does when this flag is clear. Hosts keep [`run_argv`].
+pub fn run_owned(argv: &[String]) -> i32 {
+    run(argv)
+}
+
 thread_local! {
     /// The name this invocation was made under — argv[0]'s basename.
     ///
