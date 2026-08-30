@@ -5541,3 +5541,251 @@ fn plus_brace_with_nested_map_etl_pattern() {
         "a=1,b=2,c=2,e=1"
     );
 }
+
+// `c` / `cat` / `slurp` are named unary operators, so `=~` binds tighter than
+// their argument: `c "$path" =~ /re/` parses as `c("$path" =~ /re/)`, slurps the
+// match result (`""` on failure, `1` on success) and dies with
+// "slurp: No such file or directory". Perl parses `lc "ABC" =~ /b/` the same
+// way, so this precedence is compat-correct and must not drift — the tests below
+// pin both the surprising parse and the two spellings that avoid it.
+#[test]
+fn named_unary_slurp_binds_looser_than_match() {
+    let dir = std::env::temp_dir();
+    let path = dir.join("stryke_named_unary_slurp_prec");
+    std::fs::write(&path, b"needle\n").expect("write temp");
+    let ps = path.to_string_lossy();
+
+    // Bare `c "PATH" =~ /re/`: the match runs first and yields `""`, so the
+    // slurp gets an empty path and fails. The failure text is what makes this
+    // parse discoverable in the wild.
+    let e = run(&format!(r#"c "{ps}" =~ /needle/;"#)).expect_err("slurp of match result");
+    assert_eq!(e.kind, ErrorKind::Runtime);
+    assert!(
+        e.to_string().contains("slurp:"),
+        "expected a slurp failure, got: {e}"
+    );
+
+    // Parenthesizing the argument delimits the named unary, so the slurp reads
+    // the file and the match sees its contents.
+    assert_eq!(ri(&format!(r#"c("{ps}") =~ /needle/ ? 1 : 0;"#)), 1);
+
+    // Binding first is the other spelling; both must agree.
+    assert_eq!(
+        ri(&format!(
+            r#"my $bytes = c "{ps}"; $bytes =~ /needle/ ? 1 : 0;"#
+        )),
+        1
+    );
+
+    std::fs::remove_file(&path).ok();
+}
+
+// The precedence is a property of the named-unary parse, not of any one
+// spelling or of statement-modifier position: all four bareword spellings
+// (`c`, `cat`, `slurp`, `sl`) share one argument path
+// (`parse_one_arg_or_default`, parser.rs:12624), and `if` / `unless` modifiers
+// and plain `if` blocks all parse the operand identically.
+#[test]
+fn named_unary_slurp_precedence_holds_for_every_alias_and_position() {
+    let dir = std::env::temp_dir();
+    let path = dir.join("stryke_named_unary_slurp_alias");
+    std::fs::write(&path, b"needle\n").expect("write temp");
+    let ps = path.to_string_lossy();
+
+    for src in [
+        format!(r#"cat "{ps}" =~ /needle/;"#),
+        format!(r#"slurp "{ps}" =~ /needle/;"#),
+        format!(r#"sl "{ps}" =~ /needle/;"#),
+        format!(r#"say "x" unless c "{ps}" =~ /needle/;"#),
+        format!(r#"say "x" if c "{ps}" =~ /needle/;"#),
+        format!(r#"if (c "{ps}" =~ /needle/) {{ say "x" }}"#),
+    ] {
+        let e = run(&src).expect_err(&format!("expected slurp failure for: {src}"));
+        assert!(
+            e.to_string().contains("slurp:"),
+            "expected a slurp failure for `{src}`, got: {e}"
+        );
+    }
+
+    // The paren form works in every one of those positions.
+    assert_eq!(
+        rs(&format!(
+            r#"my $hit = ""; $hit = "yes" if cat("{ps}") =~ /needle/; $hit"#
+        )),
+        "yes"
+    );
+
+    std::fs::remove_file(&path).ok();
+}
+
+// The same precedence rule, checked against a named unary that cannot fail, so
+// the parse is observable as a value rather than as an error. Perl agrees:
+// `perl -e 'print( (lc "ABC" =~ /b/) ? "match" : "no" )'` prints `no`, because
+// `"ABC" =~ /b/` is false, `lc("")` is `""`, and `""` is false. Were `lc` to
+// bind its argument first, `lc("ABC")` would be `"abc"` and the match would hit.
+#[test]
+fn named_unary_lc_binds_looser_than_match_like_perl() {
+    assert_eq!(ri(r#"(lc "ABC" =~ /b/) ? 1 : 0;"#), 0);
+    assert_eq!(ri(r#"(lc("ABC") =~ /b/) ? 1 : 0;"#), 1);
+}
+
+// The `=~` trap is one half of the named-unary precedence rule; the other half
+// is that the same operators bind *tighter* than comparison. Every expectation
+// below was cross-checked against system perl, which produces the identical
+// result for each line:
+//   perl -e 'print((lc "ABC" =~ /b/) ? "T" : "F")'        -> F
+//   perl -e 'my $x="abc"; print length $x + 1'            -> 1
+//   perl -e 'print lc "AB" . "CD"'                        -> abcd
+//   perl -e 'my $x="abcde"; print((length $x < 5)?"T":"F")' -> F
+#[test]
+fn named_unary_binds_looser_than_additive_tighter_than_comparison() {
+    // Additive/concat swallowed into the argument: `length($x + 1)` is
+    // `length(1)` (string "abc" numifies to 0), not `length($x) + 1`.
+    assert_eq!(ri(r#"my $x = "abc"; length $x + 1;"#), 1);
+    assert_eq!(ri(r#"my $x = "abc"; length($x) + 1;"#), 4);
+
+    // `.` is additive-level too, so it lands inside the argument.
+    assert_eq!(rs(r#"lc "AB" . "CD";"#), "abcd");
+
+    // Comparison is looser, so it stays outside: `(length $x) < 5` is false for
+    // a 5-character string. Were `<` swallowed the argument would be a boolean
+    // and `length` of it would be 0 or 1, making the expression true.
+    assert_eq!(ri(r#"my $x = "abcde"; (length $x < 5) ? 1 : 0;"#), 0);
+    assert_eq!(ri(r#"my $x = "abcd"; (length $x < 5) ? 1 : 0;"#), 1);
+}
+
+// `!~` sits at the same precedence as `=~`, so it is swallowed identically —
+// both for a total unary like `lc` and for `c`, where the swallowed operand
+// turns into a slurp of the match result.
+#[test]
+fn named_unary_negated_bind_is_swallowed_like_match_bind() {
+    // `lc("ABC" !~ /b/)` is `lc(1)` — true. The other parse, `lc("ABC") !~ /b/`,
+    // would be false, so this discriminates the two.
+    assert_eq!(ri(r#"(lc "ABC" !~ /b/) ? 1 : 0;"#), 1);
+    assert_eq!(ri(r#"(lc("ABC") !~ /b/) ? 1 : 0;"#), 0);
+
+    let dir = std::env::temp_dir();
+    let path = dir.join("stryke_named_unary_negated_bind");
+    std::fs::write(&path, b"needle\n").expect("write temp");
+    let ps = path.to_string_lossy();
+
+    let e = run(&format!(r#"c "{ps}" !~ /needle/;"#)).expect_err("slurp of !~ result");
+    assert!(
+        e.to_string().contains("slurp:"),
+        "expected a slurp failure, got: {e}"
+    );
+    assert_eq!(ri(&format!(r#"c("{ps}") !~ /needle/ ? 1 : 0;"#)), 0);
+
+    std::fs::remove_file(&path).ok();
+}
+
+// End-to-end shape of the pattern that surfaced this: glob a directory, slurp
+// each hit inside the loop, and filter on a `unless ... =~` modifier. With the
+// argument parenthesized the loop variable reaches the slurp on every
+// iteration, so exactly the non-matching file is collected.
+#[test]
+fn slurp_in_loop_over_glob_sees_each_loop_variable() {
+    let dir = std::env::temp_dir().join("stryke_slurp_loop_glob");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("mkdir temp");
+    std::fs::write(dir.join("a.txt"), b"needle\n").expect("write a");
+    std::fs::write(dir.join("b.txt"), b"other\n").expect("write b");
+    let ds = dir.to_string_lossy().to_string();
+
+    let src = r#"
+        my $bad = "";
+        for my $f (sort glob("DIR/*.txt")) { $bad = $f unless c($f) =~ /needle/ }
+        $bad
+    "#
+    .replace("DIR", &ds);
+    assert_eq!(rs(&src), dir.join("b.txt").to_string_lossy());
+
+    // Binding before the modifier is the other working spelling.
+    let bound = r#"
+        my $bad = "";
+        for my $f (sort glob("DIR/*.txt")) { my $b = c "$f"; $bad = $f unless $b =~ /needle/ }
+        $bad
+    "#
+    .replace("DIR", &ds);
+    assert_eq!(rs(&bound), dir.join("b.txt").to_string_lossy());
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+// A `~>` thread stage takes its operand from the pipeline rather than from a
+// following expression, so the named-unary swallow cannot happen there: the
+// slurp always reads the threaded path. This is the third working spelling
+// alongside `c(...)` and bind-first. All four spellings are accepted in both
+// positions; the two dispatch tables (stage parser.rs:3445, bareword
+// parser.rs:12624) used to disagree, with `sl` stage-only and `cat` / `c`
+// bareword-only.
+#[test]
+fn slurp_as_thread_stage_takes_the_threaded_path() {
+    let dir = std::env::temp_dir();
+    let path = dir.join("stryke_slurp_thread_stage");
+    std::fs::write(&path, b"needle\n").expect("write temp");
+    let ps = path.to_string_lossy();
+
+    assert_eq!(ri(&format!(r#"~> ("{ps}") slurp length"#)), 7);
+    assert_eq!(ri(&format!(r#"~> ("{ps}") sl length"#)), 7);
+    assert_eq!(ri(&format!(r#"~> ("{ps}") cat length"#)), 7);
+    assert_eq!(ri(&format!(r#"~> ("{ps}") c length"#)), 7);
+    assert_eq!(
+        ri(&format!(r#"(~> ("{ps}") slurp) =~ /needle/ ? 1 : 0"#)),
+        1
+    );
+
+    std::fs::remove_file(&path).ok();
+}
+
+// The bareword table (`parse_named_expr`) and the `~>` stage table
+// (`thread_apply_bare_func`) are two independent dispatch lists, so a spelling
+// added to one and not the other becomes position-dependent. A sweep of every
+// stage-table name found five that were undefined subroutines as barewords —
+// `sl`, `def`, `ufc`, `lfc`, `uq`. All five now resolve in both positions, and
+// each is pinned against its canonical spelling here so the tables cannot drift
+// apart again unnoticed.
+#[test]
+fn short_aliases_resolve_as_barewords_and_as_thread_stages() {
+    // `def` / `defined` — note `defined` uses the shift-level argument parser,
+    // so the alias must land on the same arm to inherit that precedence.
+    assert_eq!(ri(r#"my $x = 1; (def $x) ? 1 : 0;"#), 1);
+    assert_eq!(ri(r#"my $x; (def $x) ? 1 : 0;"#), 0);
+    assert_eq!(ri(r#"my %h = (k => 0); (def $h{k} && $h{k} > 0) ? 1 : 0;"#), 0);
+
+    // `ufc` / `lfc` — the stage table already spelled them this way.
+    assert_eq!(rs(r#"ufc("abc");"#), "Abc");
+    assert_eq!(rs(r#"lfc("ABC");"#), "aBC");
+
+    // `uq` / `uniq`.
+    assert_eq!(rs(r#"join ",", uq(1, 1, 2, 2, 3);"#), "1,2,3");
+
+    // Every alias in both positions agrees with its canonical spelling.
+    assert_eq!(rs(r#"~> ("abc") ufc"#), rs(r#"ucfirst("abc")"#));
+    assert_eq!(rs(r#"~> ("ABC") lfc"#), rs(r#"lcfirst("ABC")"#));
+    assert_eq!(
+        rs(r#"join ",", (~> ((1, 1, 2)) uq)"#),
+        rs(r#"join ",", uniq(1, 1, 2)"#)
+    );
+}
+
+// Sweeping the other direction — every bareword name whose arm parses a single
+// operand (`parse_one_arg_or_default` / `parse_named_unary_arg`), checked as a
+// bare `~>` stage — left exactly three that fell through the stage table's
+// generic `FuncCall` default and died as undefined subroutines: `c`, `cat` and
+// `await`. Multi-operand names (`join`, `split`, …) are correctly absent from
+// the bare-stage table; they take the parenthesized stage form instead, which
+// this test also pins so the distinction stays deliberate.
+#[test]
+fn unary_barewords_are_all_available_as_bare_thread_stages() {
+    assert_eq!(ri(r#"my $t = async { 40 + 2 }; ~> ($t) await"#), 42);
+    assert_eq!(ri(r#"my $t = spawn { 40 + 2 }; ~> ($t) await"#), 42);
+    assert_eq!(
+        ri(r#"my $t = async { 40 + 2 }; ~> ($t) await"#),
+        ri(r#"my $t = async { 40 + 2 }; await $t"#)
+    );
+
+    // A multi-operand builtin has no bare-stage meaning and keeps requiring the
+    // parenthesized form, which supplies the remaining arguments.
+    assert_eq!(rs(r#"~> ((1, 2, 3)) join(",")"#), "1,2,3");
+}

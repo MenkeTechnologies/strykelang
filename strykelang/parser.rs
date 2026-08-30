@@ -3441,8 +3441,13 @@ impl Parser {
                 name: "columns".to_string(),
                 args: vec![arg],
             },
+            // Async — `~> ($task) await` resolves the threaded future. The
+            // bareword table has `await` as a unary (parser.rs:12613); without
+            // this arm the stage fell through to the generic `FuncCall` default
+            // and died with "Undefined subroutine &await".
+            "await" => ExprKind::Await(Box::new(arg)),
             // File functions
-            "slurp" | "sl" => ExprKind::Slurp(Box::new(arg)),
+            "slurp" | "sl" | "cat" | "c" => ExprKind::Slurp(Box::new(arg)),
             "swallow" | "swa" => ExprKind::Swallow(Box::new(arg)),
             "ingest" | "ing" => ExprKind::Ingest(Box::new(arg)),
             "burp" => ExprKind::Burp(Box::new(arg)),
@@ -10713,7 +10718,7 @@ impl Parser {
                     line,
                 })
             }
-            "defined" => {
+            "defined" | "def" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
@@ -11122,7 +11127,7 @@ impl Parser {
                     line,
                 })
             }
-            "lcfirst" | "lf" => {
+            "lcfirst" | "lfc" | "lf" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
@@ -11132,7 +11137,7 @@ impl Parser {
                     line,
                 })
             }
-            "ucfirst" | "uf" => {
+            "ucfirst" | "ufc" | "uf" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
@@ -12621,7 +12626,7 @@ impl Parser {
                     line,
                 })
             }
-            "slurp" | "cat" | "c" => {
+            "slurp" | "cat" | "c" | "sl" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
@@ -12946,11 +12951,16 @@ impl Parser {
                     line,
                 })
             }
-            "uniq" | "distinct" => {
+            "uniq" | "distinct" | "uq" => {
+                // `uq` is an alias spelling only (documented in lsp.rs), with no
+                // runtime entry of its own, so it must reach the VM as `uniq`.
+                // `distinct` keeps its own name: it is the streaming form in
+                // `|>` pipelines, not a synonym.
+                let canon = if name == "uq" { "uniq" } else { name.as_str() }.to_string();
                 if self.pipe_supplies_slurped_list_operand() {
                     return Ok(Expr {
                         kind: ExprKind::FuncCall {
-                            name: name.clone(),
+                            name: canon,
                             args: vec![],
                         },
                         line,
@@ -12965,7 +12975,7 @@ impl Parser {
                 }
                 Ok(Expr {
                     kind: ExprKind::FuncCall {
-                        name: name.clone(),
+                        name: canon,
                         args: vec![list],
                     },
                     line,
@@ -15301,7 +15311,7 @@ impl Parser {
             // ── functional / iterator ───────────────────────────────────────
             | "greps" | "par"
             | "fore" | "e" | "ep" | "flat_map" | "flat_maps" | "maps" | "filter" | "fi" | "find_all" | "reduce" | "fold"
-            | "inject" | "collect" | "uniq" | "distinct" | "any" | "all" | "none"
+            | "inject" | "collect" | "uniq" | "distinct" | "uq" | "any" | "all" | "none"
             | "first" | "detect" | "find" | "find_index" | "firstidx" | "first_index"
             | "compact" | "concat" | "chain" | "reject" | "grepv" | "flatten" | "set"
             | "min_by" | "max_by" | "sort_by" | "tally"
@@ -15801,7 +15811,7 @@ impl Parser {
             | "stress_io" | "sio" | "stress_test" | "st"
             | "heat" | "fire" | "fire_and_forget" | "pin"
             // ── I/O extensions ──────────────────────────────────────────────
-            | "slurp" | "cat" | "c" | "capture" | "pager" | "pg" | "less"
+            | "slurp" | "sl" | "cat" | "c" | "capture" | "pager" | "pg" | "less"
             | "stdin"
             // ── internal ────────────────────────────────────────────────────
             | "__stryke_rust_compile"

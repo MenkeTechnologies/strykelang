@@ -3147,6 +3147,7 @@ These are real bumps I hit while building the NAT-traversal stack — surfacing 
 |---|---|---|
 | **Postfix `for` after `printf`/`print`** | `printf "..." for @arr` fails with `Expected LParen, got ArrayVar(...)` | Use explicit block form: `for val $x (@arr) { printf "...", $x }` |
 | **Postfix `if` after `printf`** | Same parse failure as above | Same fix — wrap in explicit `if (...) { ... }` block |
+| **`c"$path" =~ /re/` (named unary + `=~`)** | `slurp: No such file or directory` — the match runs first and the slurp gets `""` | `=~` binds tighter than a named unary's argument, so this parses as `c("$path" =~ /re/)` (same as Perl: `lc "ABC" =~ /b/` is `lc("ABC" =~ /b/)`). Parenthesize — `c($path) =~ /re/` — or bind first: `val $bytes = c"$path"`. Applies to every named unary (`lc`, `uc`, `length`, …), and to `!~` |
 | **`$tx->clone` on pchannel** | "Can't call method on non-object" | Multi-producer channels aren't supported; use a different shape (multiple receivers, or one producer fanning to N consumers) |
 | **String return → provenance lost** | `mark({...}); val $j = to_json(...); provenance($j) → undef` | Wrap the string in a one-key hashref: `mark({ payload => to_json(...) })`. VM re-Arcs scalar string returns, breaking ptr-keyed lookup. Document in [provenance v1 limits](strykelang/provenance.rs#L40). |
 | **`grep { Pkg::fn }` doesn't auto-bind `$_`** | All elements pass / fail uniformly (predicate sees `$path = undef`) | Pass explicitly: `grep { Pkg::fn($_) } @list` |
