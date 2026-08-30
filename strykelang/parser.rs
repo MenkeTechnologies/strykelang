@@ -15176,7 +15176,10 @@ impl Parser {
         ("ss", "substr"),
         ("ix", "index"),
         ("uf", "ucfirst"),
+        ("ufc", "ucfirst"),
         ("lf", "lcfirst"),
+        ("lfc", "lcfirst"),
+        ("def", "defined"),
         ("k", "keys"),
         ("v", "values"),
     ];

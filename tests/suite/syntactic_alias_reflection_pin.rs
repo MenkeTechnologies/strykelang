@@ -73,7 +73,10 @@ fn block_keyword_short_aliases_resolve() {
         ("ss", "substr"),
         ("ix", "index"),
         ("uf", "ucfirst"),
+        ("ufc", "ucfirst"),
         ("lf", "lcfirst"),
+        ("lfc", "lcfirst"),
+        ("def", "defined"),
     ] {
         assert_alias(alias, primary);
     }

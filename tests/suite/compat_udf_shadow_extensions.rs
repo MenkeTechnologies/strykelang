@@ -79,3 +79,67 @@ fn non_compat_mode_still_rejects_redefining_a_builtin() {
         String::from_utf8_lossy(&out.stdout)
     );
 }
+
+/// Run `st --compat -e PROG` expecting failure; return trimmed stderr.
+fn compat_eval_err(prog: &str) -> String {
+    let exe = env!("CARGO_BIN_EXE_st");
+    let out = Command::new(exe)
+        .args(["--compat", "-e", prog])
+        .output()
+        .expect("spawn stryke");
+    assert!(
+        !out.status.success(),
+        "`{prog}` unexpectedly succeeded under --compat\nstdout: {}",
+        String::from_utf8_lossy(&out.stdout),
+    );
+    String::from_utf8_lossy(&out.stderr).trim().to_string()
+}
+
+/// An alias spelling has to be gated exactly like the name it aliases. `sl` and
+/// `uq` were reachable as `~>` stages but missing from `stryke_extension_name`,
+/// so `--compat` — documented as "disable all stryke extensions" — silently
+/// accepted them while rejecting `slurp` / `cat` / `c` / `uniq` / `distinct`.
+#[test]
+fn compat_rejects_alias_spellings_like_their_canonical_names() {
+    for spelling in ["slurp", "sl", "cat", "c"] {
+        let err = compat_eval_err(&format!(r#"my $x = {spelling}("/etc/hosts");"#));
+        assert!(
+            err.contains("stryke extension") && err.contains("--compat"),
+            "`{spelling}` must be gated as a stryke extension, got: {err}"
+        );
+    }
+    for spelling in ["uniq", "distinct", "uq"] {
+        let err = compat_eval_err(&format!(r#"my @x = {spelling}(1, 1, 2);"#));
+        assert!(
+            err.contains("stryke extension") && err.contains("--compat"),
+            "`{spelling}` must be gated as a stryke extension, got: {err}"
+        );
+    }
+}
+
+/// The other half of the gate: with the extension disabled, plain Perl that
+/// defines `sub sl` / `sub uq` must reach its own sub.
+#[test]
+fn compat_user_sub_beats_alias_spelling() {
+    assert_eq!(compat_eval(r#"sub sl { "mine" } print sl();"#), "mine");
+    assert_eq!(compat_eval(r#"sub uq { "mine" } print uq();"#), "mine");
+    assert_eq!(compat_eval(r#"sub c { "mine" } print c();"#), "mine");
+}
+
+/// Default mode keeps the no-shadow invariant for the alias spellings too,
+/// matching `non_compat_mode_still_rejects_redefining_a_builtin` for `all`.
+#[test]
+fn non_compat_mode_rejects_redefining_an_alias_spelling() {
+    let exe = env!("CARGO_BIN_EXE_st");
+    for spelling in ["sl", "uq", "slurp"] {
+        let out = Command::new(exe)
+            .args(["-e", &format!("sub {spelling} {{ 42 }} print {spelling}();")])
+            .output()
+            .expect("spawn stryke");
+        assert!(
+            !out.status.success(),
+            "default mode must reject redefining `{spelling}`, got: {}",
+            String::from_utf8_lossy(&out.stdout)
+        );
+    }
+}

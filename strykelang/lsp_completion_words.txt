@@ -2560,6 +2560,7 @@ CORE::deep_clone
 CORE::deep_equal
 CORE::deep_merge
 CORE::deep_q_target
+CORE::def
 CORE::default_to
 CORE::defaultdict
 CORE::deferred_acceptance
@@ -5773,6 +5774,7 @@ CORE::lewis_dot_count
 CORE::lex_keyword_classify
 CORE::lexicalized_parse
 CORE::lf
+CORE::lfc
 CORE::lfilter_zi_init
 CORE::lfrm
 CORE::lfsr_galois_step
@@ -9518,6 +9520,7 @@ CORE::skip
 CORE::skip_assert
 CORE::skip_test
 CORE::skip_while
+CORE::sl
 CORE::sla
 CORE::slca
 CORE::slcb
@@ -10585,6 +10588,7 @@ CORE::udp_send
 CORE::udp_send_to
 CORE::ue
 CORE::uf
+CORE::ufc
 CORE::ugz
 CORE::uid
 CORE::uin
@@ -13791,6 +13795,7 @@ deep_clone
 deep_equal
 deep_merge
 deep_q_target
+def
 default
 default_to
 defaultdict
@@ -17020,6 +17025,7 @@ lewis_dot_count
 lex_keyword_classify
 lexicalized_parse
 lf
+lfc
 lfilter_zi_init
 lfrm
 lfsr_galois_step
@@ -20777,6 +20783,7 @@ skip
 skip_assert
 skip_test
 skip_while
+sl
 sla
 slca
 slcb
@@ -21850,6 +21857,7 @@ udp_send
 udp_send_to
 ue
 uf
+ufc
 ugz
 uid
 uin

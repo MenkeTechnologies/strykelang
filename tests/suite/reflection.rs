@@ -279,3 +279,39 @@ fn reflection_hashes_have_reasonable_sizes() {
     assert!(eval_int(r#"len(keys %stryke::categories)"#) >= 10);
     assert!(eval_int(r#"len(keys %stryke::primaries)"#) >= 100);
 }
+
+/// Alias spellings must land in the same reflection bucket as the canonical
+/// name they alias, or `%b` / `%a` / `%all` disagree about what the language
+/// offers. `sl` and `uq` were reachable in `~>` stage position but registered
+/// nowhere: absent from `stryke_extension_name`, they skipped `--compat`
+/// gating, user-sub shadowing, and the category extractor that fills these
+/// hashes. Asserted against a sibling spelling rather than a literal bucket so
+/// a future re-categorization moves the whole family together or fails here.
+#[test]
+fn alias_spellings_share_their_canonical_reflection_bucket() {
+    // `%a` maps alias → primary. `uq` aliases `uniq`, exactly as `distinct` does.
+    assert_eq!(eval_string(r#"$a{uq}"#), "uniq");
+    assert_eq!(eval_string(r#"$a{uq}"#), eval_string(r#"$a{distinct}"#));
+
+    // The slurp family is categorized in `%b` rather than `%a`; `sl` must carry
+    // the same category string as the three spellings it sits beside.
+    let slurp_cat = eval_string(r#"$b{slurp}"#);
+    assert!(!slurp_cat.is_empty(), "`slurp` must have a category");
+    for spelling in ["sl", "cat", "c"] {
+        assert_eq!(
+            eval_string(&format!(r#"$b{{{spelling}}}"#)),
+            slurp_cat,
+            "`{spelling}` must share `slurp`'s category — \
+             add it to stryke_extension_name in parser.rs"
+        );
+    }
+
+    // Every spelling of both families is visible in the merged registry.
+    for name in ["slurp", "sl", "cat", "c", "uniq", "uq", "distinct"] {
+        assert_eq!(
+            eval_int(&format!(r#"exists $all{{{name}}} ? 1 : 0"#)),
+            1,
+            "`{name}` must be in %all"
+        );
+    }
+}

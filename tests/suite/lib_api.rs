@@ -167,3 +167,35 @@ fn try_vm_execute_sub_def_visible_to_parse_and_run_string() {
     let v = parse_and_run_string("lib_api_vm_fn() + 1", &mut interp).expect("follow-up");
     assert_eq!(v.to_int(), 42);
 }
+
+/// `lint_program` runs the static analyzer (`lib.rs:897`), which resolves bare
+/// calls against `strykelang/lsp_completion_words.txt`. A spelling the parser
+/// accepts but the snapshot omits gets reported as an undefined sub — the LSP
+/// underlines working code. `sl`, `ufc`, `lfc` and `def` hit exactly that: all
+/// four were made reachable as barewords while the snapshot still listed only
+/// `slurp` / `uf` / `lf` / `defined`. The negative control keeps this from
+/// passing vacuously if the analyzer ever stops checking bare calls.
+#[test]
+fn lint_accepts_alias_spellings_the_parser_resolves() {
+    for src in [
+        r#"use strict; my $b = sl("/etc/hosts"); $b"#,
+        r#"use strict; my $s = ufc("abc"); $s"#,
+        r#"use strict; my $s = lfc("ABC"); $s"#,
+        r#"use strict; my $x = 1; def($x)"#,
+        r#"use strict; my @u = uq(1, 1, 2); @u"#,
+    ] {
+        let p = parse(src).unwrap_or_else(|e| panic!("parse `{src}`: {e}"));
+        let mut interp = VMHelper::new();
+        lint_program(&p, &mut interp)
+            .unwrap_or_else(|e| panic!("lint rejected `{src}`: {e} — regenerate \
+                 lsp_completion_words.txt (see builtins.rs::builtin_lsp_completion_words)"));
+    }
+
+    // Negative control: a name in no table must still be reported.
+    let p = parse(r#"use strict; zzz_not_a_builtin(1);"#).expect("parse");
+    let mut interp = VMHelper::new();
+    assert!(
+        lint_program(&p, &mut interp).is_err(),
+        "lint must still reject a genuinely undefined sub"
+    );
+}
