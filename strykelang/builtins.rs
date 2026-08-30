@@ -406,6 +406,7 @@ pub const KEYWORDS: &[(&str, &str)] = &[
     ("x", "operator"),
     ("xor", "operator"),
     ("y", "quote"),
+    ("yield", "concurrency"),
 ];
 
 /// `%keywords` (`%k`) — stryke language keyword name → category

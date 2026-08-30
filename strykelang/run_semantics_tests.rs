@@ -5902,7 +5902,7 @@ fn named_unary_family_all_swallow_the_match_bind() {
 /// function's signature line. Mirrors what `build.rs` already does to the same
 /// file, so the tables stay a single source of truth instead of being copied
 /// into a test that drifts alongside them.
-fn parser_fn_arm_names(signature: &str) -> Vec<String> {
+fn parser_fn_arm_names(signature: &str, min_names: usize) -> Vec<String> {
     let src = include_str!("parser.rs");
     let start = src
         .find(signature)
@@ -5930,10 +5930,13 @@ fn parser_fn_arm_names(signature: &str) -> Vec<String> {
     }
     names.sort();
     names.dedup();
+    // Anti-no-op guard: each caller states the floor it expects, so a change
+    // to the arm shape that silently stops matching fails here instead of
+    // turning the audit into a vacuous pass over an empty list.
     assert!(
-        names.len() > 100,
-        "extracted only {} names from `{signature}` — the arm shape changed \
-         and this test is no longer reading the table",
+        names.len() >= min_names,
+        "extracted only {} names from `{signature}` (expected >= {min_names}) — \
+         the arm shape changed and this test is no longer reading the table",
         names.len()
     );
     names
@@ -5956,6 +5959,7 @@ fn every_thread_stage_spelling_is_known_to_the_toolchain() {
 
     let missing: Vec<String> = parser_fn_arm_names(
         "fn thread_apply_bare_func(&self, name: &str, arg: Expr, line: usize)",
+        150,
     )
     .into_iter()
     .filter(|n| !snapshot.contains(n.as_str()))
@@ -5967,4 +5971,79 @@ fn every_thread_stage_spelling_is_known_to_the_toolchain() {
          register them (stryke_extension_name / is_perl5_core / \
          KEYWORD_BUILTIN_ALIASES in parser.rs) and regenerate the snapshot"
     );
+}
+
+// The `|>` pipe table is the third bareword dispatch surface, and it gets the
+// same treatment as the `~>` stage table: every spelling it accepts must be a
+// name the linter and the LSP know. It is clean today; the test is here so it
+// stays that way when someone adds a stage.
+#[test]
+fn every_pipe_forward_spelling_is_known_to_the_toolchain() {
+    let snapshot: std::collections::HashSet<&str> = include_str!("lsp_completion_words.txt")
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .collect();
+
+    let missing: Vec<String> =
+        parser_fn_arm_names(
+            "fn pipe_forward_apply(&self, lhs: Expr, rhs: Expr, line: usize)",
+            20,
+        )
+            .into_iter()
+            .filter(|n| !snapshot.contains(n.as_str()))
+            .collect();
+
+    assert!(
+        missing.is_empty(),
+        "`|>` spellings missing from lsp_completion_words.txt: {missing:?}"
+    );
+}
+
+// Same audit over the bareword table itself — the largest of the three, and
+// the one that had the most drift: `carp`, `cluck`, `confess`, `croak`,
+// `crypt`, `rewinddir`, `seekdir`, `telldir`, `fetch_url`, `thread`, `t`, `pr`
+// and `yield` were all callable while absent from `%all` and the snapshot,
+// because each parses to a dedicated `ExprKind` and so never reaches the
+// `try_builtin` arms that `build.rs` scans.
+//
+// `exponential` and `linear` are the only legitimate absences: they are the
+// modes of `retry { … } times => N, backoff => MODE`, matched as bare idents
+// inside that clause and undefined as subs anywhere else. Verified:
+//   stryke -e 'exponential()' -> Undefined subroutine &exponential
+#[test]
+fn every_bareword_dispatch_spelling_is_known_to_the_toolchain() {
+    /// Clause-position keywords: parsed inside `retry`'s `backoff =>`, never
+    /// callable. Anything else showing up here is a registration gap.
+    const CLAUSE_ONLY: &[&str] = &["exponential", "linear"];
+
+    let snapshot: std::collections::HashSet<&str> = include_str!("lsp_completion_words.txt")
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .collect();
+
+    let missing: Vec<String> =
+        parser_fn_arm_names("fn parse_named_expr(&mut self, mut name: String)", 150)
+            .into_iter()
+            .filter(|n| !snapshot.contains(n.as_str()) && !CLAUSE_ONLY.contains(&n.as_str()))
+            .collect();
+
+    assert!(
+        missing.is_empty(),
+        "bareword spellings missing from lsp_completion_words.txt: {missing:?} — \
+         these parse to dedicated ExprKinds, so build.rs cannot see them; \
+         register each in is_perl5_core / stryke_extension_name / \
+         KEYWORD_BUILTIN_ALIASES (parser.rs) or KEYWORDS (builtins.rs), \
+         then regenerate the snapshot"
+    );
+
+    // The exclusions must stay genuinely uncallable, or the allowlist is
+    // hiding a real gap.
+    for name in CLAUSE_ONLY {
+        assert!(
+            run(&format!("{name}();")).is_err(),
+            "`{name}` is allowlisted as clause-only but resolves as a call"
+        );
+    }
 }

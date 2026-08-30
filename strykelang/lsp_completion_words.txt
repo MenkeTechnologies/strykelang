@@ -1322,6 +1322,7 @@ CORE::carlson_rj
 CORE::carmichael_lambda
 CORE::carmichael_q
 CORE::carnot_efficiency
+CORE::carp
 CORE::carrying_capacity_from_data
 CORE::cart_n
 CORE::cartan_determinant_a2
@@ -1783,6 +1784,7 @@ CORE::closing_2d
 CORE::clp
 CORE::clpi
 CORE::cls
+CORE::cluck
 CORE::cluster
 CORE::cluster_attack_rate
 CORE::cluster_slots
@@ -1969,6 +1971,7 @@ CORE::cone_surface
 CORE::cone_surface_area
 CORE::cone_volume
 CORE::conevol
+CORE::confess
 CORE::confidence_interval
 CORE::confint
 CORE::confint_lm
@@ -2197,6 +2200,7 @@ CORE::critical_angle
 CORE::critical_damping
 CORE::critical_density
 CORE::critical_density_si
+CORE::croak
 CORE::cron_next_fire
 CORE::crop_factor
 CORE::cross_correlation
@@ -2217,6 +2221,7 @@ CORE::crt
 CORE::crt_arbitrary
 CORE::crt_general
 CORE::crustal_density_depth
+CORE::crypt
 CORE::crystal_field_ligand
 CORE::csc
 CORE::csd_xy
@@ -3390,6 +3395,7 @@ CORE::fetch
 CORE::fetch_async
 CORE::fetch_async_json
 CORE::fetch_json
+CORE::fetch_url
 CORE::fetch_url_tool
 CORE::fetch_val
 CORE::ffact
@@ -8050,6 +8056,7 @@ CORE::ppo_clip_term
 CORE::ppois
 CORE::ppool
 CORE::ppt
+CORE::pr
 CORE::prandtl_number
 CORE::prandtl_number_step
 CORE::pratt_parse_step
@@ -8676,6 +8683,7 @@ CORE::reverse_transcribe
 CORE::reverse_words
 CORE::reversed
 CORE::revwords
+CORE::rewinddir
 CORE::rexp
 CORE::reynolds_full_number
 CORE::reynolds_number
@@ -9222,6 +9230,7 @@ CORE::sector_area
 CORE::sects
 CORE::seeded_rng
 CORE::seek
+CORE::seekdir
 CORE::seg_sum
 CORE::segment_distance_point
 CORE::segment_intersection
@@ -10080,6 +10089,7 @@ CORE::sysseek
 CORE::system
 CORE::syswrite
 CORE::syt_count
+CORE::t
 CORE::t1ha
 CORE::t_digest
 CORE::t_digest_new
@@ -10184,6 +10194,7 @@ CORE::tee_iter
 CORE::teei
 CORE::teleport
 CORE::tell
+CORE::telldir
 CORE::tema
 CORE::temp_dir
 CORE::tempdir
@@ -10252,6 +10263,7 @@ CORE::thomas
 CORE::thomas_tridiag_solve
 CORE::thompson_beta_choose
 CORE::thompson_sample_beta
+CORE::thread
 CORE::thread_count
 CORE::three_j_symbol
 CORE::three_opt_delta
@@ -12556,6 +12568,7 @@ carlson_rj
 carmichael_lambda
 carmichael_q
 carnot_efficiency
+carp
 carrying_capacity_from_data
 cart_n
 cartan_determinant_a2
@@ -13019,6 +13032,7 @@ closing_2d
 clp
 clpi
 cls
+cluck
 cluster
 cluster_attack_rate
 cluster_slots
@@ -13206,6 +13220,7 @@ cone_surface
 cone_surface_area
 cone_volume
 conevol
+confess
 confidence_interval
 confint
 confint_lm
@@ -13436,6 +13451,7 @@ critical_angle
 critical_damping
 critical_density
 critical_density_si
+croak
 cron_next_fire
 crop_factor
 cross_correlation
@@ -13456,6 +13472,7 @@ crt
 crt_arbitrary
 crt_general
 crustal_density_depth
+crypt
 crystal_field_ligand
 csc
 csd_xy
@@ -14636,6 +14653,7 @@ fetch
 fetch_async
 fetch_async_json
 fetch_json
+fetch_url
 fetch_url_tool
 fetch_val
 ffact
@@ -19313,6 +19331,7 @@ ppo_clip_term
 ppois
 ppool
 ppt
+pr
 prandtl_number
 prandtl_number_step
 pratt_parse_step
@@ -19942,6 +19961,7 @@ reverse_transcribe
 reverse_words
 reversed
 revwords
+rewinddir
 rexp
 reynolds_full_number
 reynolds_number
@@ -20489,6 +20509,7 @@ sector_area
 sects
 seeded_rng
 seek
+seekdir
 seg_sum
 segment_distance_point
 segment_intersection
@@ -21349,6 +21370,7 @@ sysseek
 system
 syswrite
 syt_count
+t
 t1ha
 t_digest
 t_digest_new
@@ -21453,6 +21475,7 @@ tee_iter
 teei
 teleport
 tell
+telldir
 tema
 temp_dir
 tempdir
@@ -21521,6 +21544,7 @@ thomas
 thomas_tridiag_solve
 thompson_beta_choose
 thompson_sample_beta
+thread
 thread_count
 three_j_symbol
 three_opt_delta
@@ -22550,6 +22574,7 @@ yellow
 yellow_bold
 yen_k_shortest
 yesterday
+yield
 yield_to_maturity
 yielddisc
 yieldmat

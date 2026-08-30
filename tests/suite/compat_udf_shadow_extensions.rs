@@ -143,3 +143,50 @@ fn non_compat_mode_rejects_redefining_an_alias_spelling() {
         );
     }
 }
+
+/// `--compat` disables *stryke extensions*, not standard Perl. Carp ships with
+/// every perl install, so `croak` / `carp` / `confess` / `cluck` are ordinary
+/// Perl and must keep working — `perl -e 'use Carp; croak "boom"'` prints
+/// `boom at -e line 1.`, and so does stryke under `--compat`.
+///
+/// Regression guard: these four are parsed to dedicated `ExprKind`s, so they
+/// need explicit registration to reach the reflection registry at all. Filing
+/// them under `stryke_extension_name` (the obvious-looking home, next to the
+/// other ExprKind-special builtins) got them registered but also made
+/// `--compat` reject them, turning working Perl into a parse error. They
+/// belong in `is_perl5_core` beside `die` / `warn`.
+#[test]
+fn compat_accepts_perl_provided_diagnostics() {
+    for name in ["croak", "carp", "confess", "cluck"] {
+        let exe = env!("CARGO_BIN_EXE_st");
+        let out = Command::new(exe)
+            .args(["--compat", "-e", &format!(r#"{name}("boom");"#)])
+            .output()
+            .expect("spawn stryke");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(
+            stderr.contains("boom"),
+            "`{name}` must run under --compat (Carp is standard Perl, not a \
+             stryke extension — register it in is_perl5_core, not \
+             stryke_extension_name), got: {stderr}"
+        );
+        assert!(
+            !stderr.contains("stryke extension"),
+            "`{name}` must not be gated by --compat, got: {stderr}"
+        );
+    }
+}
+
+/// The other side of that line: names stryke actually invented stay gated, so
+/// moving the Carp family out of the extension list cannot be "fixed" by
+/// emptying the list.
+#[test]
+fn compat_still_rejects_genuine_stryke_extensions() {
+    for name in ["thread", "fetch_url", "swa", "ing", "reversed"] {
+        let err = compat_eval_err(&format!(r#"{name}("x");"#));
+        assert!(
+            err.contains("stryke extension") && err.contains("--compat"),
+            "`{name}` is a stryke invention and must stay gated, got: {err}"
+        );
+    }
+}

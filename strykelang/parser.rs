@@ -15070,6 +15070,7 @@ impl Parser {
             // ── string ──────────────────────────────────────────────────
             | "chomp" | "chop" | "chr" | "ord" | "hex" | "oct"
             | "lc" | "uc" | "lcfirst" | "ucfirst" | "fc"
+            | "crypt"
             | "length" | "substr" | "index" | "rindex"
             | "sprintf" | "printf" | "print" | "say"
             | "pos" | "quotemeta" | "study"
@@ -15091,6 +15092,7 @@ impl Parser {
             | "stat" | "lstat" | "rename" | "unlink" | "utime"
             | "mkdir" | "rmdir" | "chdir" | "chmod" | "chown"
             | "glob" | "opendir" | "readdir" | "closedir"
+            | "rewinddir" | "seekdir" | "telldir"
             | "link" | "readlink" | "symlink"
             // ── ipc ─────────────────────────────────────────────────────
             | "fcntl" | "flock" | "ioctl" | "pipe" | "dbmopen" | "dbmclose"
@@ -15099,7 +15101,10 @@ impl Parser {
             | "semctl" | "semget" | "semop"
             | "shmctl" | "shmget" | "shmread" | "shmwrite"
             // ── process / system ────────────────────────────────────────
-            | "system" | "exec" | "exit" | "die" | "warn" | "dump"
+            | "system" | "exec" | "exit" | "die" | "warn"
+            // Carp ships with every perl install, so `use Carp; croak "x"` is
+            // ordinary Perl -- these must not be gated by --compat.
+            | "carp" | "cluck" | "confess" | "croak" | "dump"
             | "fork" | "wait" | "waitpid" | "kill" | "syscall" | "alarm" | "sleep"
             | "chroot" | "times" | "umask" | "reset"
             | "getpgrp" | "setpgrp" | "getppid"
@@ -15175,6 +15180,8 @@ impl Parser {
         ("un", "unshift"),
         ("ss", "substr"),
         ("ix", "index"),
+        ("pr", "print"),
+        ("t", "thread"),
         ("uf", "ucfirst"),
         ("ufc", "ucfirst"),
         ("lf", "lcfirst"),
@@ -15200,6 +15207,8 @@ impl Parser {
             // reflection_registry. Section label kept under 40 chars
             // per build.rs:parse_section_header's length cap.)
             | "burp" | "god" | "swallow" | "swa" | "ingest" | "ing"
+            // ── async / network ───────────────────────────────────────────
+            | "fetch_url" | "thread"
             // ── core value aliases ─────────────────────────────────────────
             // `null` → `undef` (JS/SQL spelling), normalized in
             // parse_named_expr; listed here so the reflection registry and
