@@ -98,7 +98,7 @@ Demos: [`p2p_chat.stk`](examples/p2p_chat.stk) / [`p2p_chat_v2.stk`](examples/p2
 - **Three-tier regex** — Rust [`regex`](https://docs.rs/regex) → [`fancy-regex`](https://docs.rs/fancy-regex) (backrefs) → [`pcre2`](https://docs.rs/pcre2) (PCRE-only verbs).
 - **Bytecode VM + JIT** — match-dispatch interpreter with Cranelift block + linear-sub JIT (`strykelang/vm.rs`, `strykelang/jit.rs`).
 - **Rayon parallelism** — every parallel builtin uses work-stealing across all cores.
-- **10,493 standard library primaries** in `%b` (11,274 keys in `%all` including aliases and keywords) — largest bareword library of any language; clears Wolfram v14.3's high-band estimate (~7,300) by ~3,193
+- **10,506 standard library primaries** in `%b` (11,291 keys in `%all` including aliases and keywords) — largest bareword library of any language; clears Wolfram v14.3's high-band estimate (~7,300) by ~3,206
 - **44 MB single static binary** — `~/.cargo/bin/s` ships every builtin in one file, ~4.3 KB amortized per builtin, ~200&times; denser than Wolfram Engine per builtin/byte, sub-10 ms cold start
 
 ---
@@ -989,7 +989,7 @@ stryke-specific long flags:
 | `--remote-worker` | Persistent cluster worker over stdio ([\[0x10\]](#0x10-distributed-pmap_on--d-over-ssh-cluster)) |
 | `--remote-worker-v1` | Legacy one-shot cluster worker over stdio |
 | `build SCRIPT [-o OUT]` | AOT compile script to standalone binary ([\[0x0D\]](#0x0d-standalone-binaries-stryke-build)) |
-| `doc [TOPIC]` | Interactive reference book with vim-style navigation (`stryke doc`, `stryke doc pmap`, `stryke doc --toc`) |
+| `docs [TOPIC]` | Interactive reference book with vim-style navigation (`stryke docs`, `stryke docs pmap`, `stryke docs --toc`); `help` / `h` are accepted aliases |
 | `serve [PORT] [SCRIPT]` | HTTP server (default port 8000): static files (`stryke serve`), script (`stryke serve 8080 app.stk`), one-liner (`stryke serve 3000 -e 'EXPR'`) |
 | `fmt [-i] FILE...` | Format source files in place or to stdout (`stryke fmt -i .` formats all recursively) |
 | `minify [-i] FILE...` | Strip comments / POD / blank lines and collapse statements onto a single line with `;` separators. Output still parses to the same AST as the input. |
@@ -2258,7 +2258,7 @@ parent runner (1 PID)
 | `--fork` | ~9 ms (`posix_spawn` + dyld + crate static-init) | full | parity / debug |
 | `--inproc` | ~0 ms | shared parent process | hermetic corpora; fastest but tests can corrupt each other |
 
-**Wire protocol** ([`src/cli_runners.rs`](strykelang/cli_runners.rs)) — line-delimited JSON over stdin/stdout pipes:
+**Wire protocol** ([`strykelang/cli_runners.rs`](strykelang/cli_runners.rs)) — line-delimited JSON over stdin/stdout pipes:
 
 ```
 parent → worker stdin : {"path":"/abs/path/test_foo.stk","no_interop":false,"chdir":"/abs/project_root"}
@@ -2709,7 +2709,7 @@ stryke controller --bind 10.0.0.1    # specific interface
 **`eval` example session:**
 
 ```text
-stryke controller v0.17.16
+stryke controller v0.17.54
 > status
 node-01    16   64GB         idle      120s
 node-02    16   64GB         idle      118s
@@ -3465,7 +3465,7 @@ knows about — no separate API surface to learn, just standard hash ops.
 The data is derived at compile time by `build.rs` from the source of truth:
 section-commented groups in `is_perl5_core` / `stryke_extension_name` (for
 categories), `try_builtin` arm names (for aliases), and `doc_for_label_text`
-in `src/lsp.rs` (for descriptions). No hand-maintained list, no stale counts.
+in `strykelang/lsp.rs` (for descriptions). No hand-maintained list, no stale counts.
 
 #### Hashes
 

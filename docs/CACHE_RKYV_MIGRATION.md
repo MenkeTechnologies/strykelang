@@ -155,10 +155,10 @@ The migration didn't add a new world-first capability, but it removed an inconsi
 |---|---|
 | `Cargo.toml` | `+rkyv = "0.7"` (validation, archive_le, size_32). `rusqlite` retained for the user-facing `sqlite()` builtin. |
 | `strykelang/script_cache.rs` | Full rewrite. Was 486 LOC SQLite-backed; now 540 LOC rkyv-backed with the same public surface. |
-| `strykelang/interpreter.rs` | Field rename `sqlite_cache_script_path` → `cache_script_path`. |
+| `strykelang/interpreter.rs` (since renamed to `strykelang/vm_helper.rs`) | Field rename `sqlite_cache_script_path` → `cache_script_path`. |
 | `strykelang/main.rs`, `lib.rs` | Comment updates; field-rename ripple. |
 | `strykelang/builtins.rs` | `cacheview` outer `Mutex<>` dropped (internal locking now). Disabled message: `STRYKE_CACHE=0`. |
 | `strykelang/lib_api_extended_tests.rs` | `test_sqlite_cache_save_load` → `test_rkyv_cache_save_load`. |
-| `strykelang/cache_bench.rs` | New. Side-by-side bench harness for the numbers above. |
+| `strykelang/cache_bench.rs` (since moved to `benches/cache_bench.rs`) | New. Side-by-side bench harness for the numbers above. |
 | `README.md` | Section `[0x0F] BYTECODE CACHE (rkyv)` rewritten. CLI examples + feature bullet updated. |
 | `strykelang/pkg/commands.rs` | `s init` scaffold gitignore: dropped `*.stkc`/`*.pec` (stale; cache is global, not per-project). |

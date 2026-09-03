@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.17.54 · 10384 topics · 168 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.17.54 · 10392 topics · 168 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -334,7 +334,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">14</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">8607</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">8615</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-style-guide">
@@ -1010,12 +1010,13 @@ $pool-&gt;join                           # wait for drain
       </article>
       <article class="doc-entry" id="doc-deque">
         <h3><a class="doc-anchor" href="#doc-deque">#</a> <code>deque</code></h3>
-        <p><code>deque LIST</code> — create a double-ended queue initialized with the given elements.</p>
+        <p><code>deque()</code> — create an empty double-ended queue.</p>
         <p>A deque supports efficient O(1) insertion and removal at both ends via <code>-&gt;push_front($val)</code>, <code>-&gt;push_back($val)</code>, <code>-&gt;pop_front</code>, and <code>-&gt;pop_back</code>. It also supports <code>-&gt;len</code> and iteration. Internally backed by a Rust <code>VecDeque</code>, it is ideal for sliding window algorithms, BFS traversals, or any scenario where you need fast access to both ends of a sequence.</p>
-        <pre><code class="lang-perl">val $dq = deque(1, 2, 3)
+        <pre><code class="lang-perl">val $dq = deque()
+$dq-&gt;push_back(1)
 $dq-&gt;push_front(0)
-$dq-&gt;push_back(4)
 p $dq-&gt;pop_front                      # 0
+p $dq-&gt;len                            # 1
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-heap">
@@ -13635,7 +13636,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">8607 topics</p>
+      <p class="chapter-meta">8615 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$!</code></h3>
         <p><code>$!</code> — the OS error from the most recent system call, in stringified form (e.g. <code>&quot;No such file or directory&quot;</code>) or as an <code>errno</code> integer in numeric context. Set by <code>open</code>, <code>close</code>, <code>chdir</code>, <code>read</code>, <code>write</code>, and other syscalls when they fail. The value persists until the next failing call, so always check it *immediately* after the failing operation — intermediate clean Perl code does not touch it, but any subsequent syscall will.</p>
@@ -19561,6 +19562,12 @@ p bond_price(1000, 0.05, 0.06, 10)   # ~926 (discount)
         <pre><code class="lang-perl">p carnot_efficiency $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-carp">
+        <h3><a class="doc-anchor" href="#doc-carp">#</a> <code>carp</code></h3>
+        <p><code>carp</code> — operation <code>carp</code>. Category: *process / system*.</p>
+        <pre><code class="lang-perl">p carp $x
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-carrying-capacity-from-data">
         <h3><a class="doc-anchor" href="#doc-carrying-capacity-from-data">#</a> <code>carrying_capacity_from_data</code></h3>
         <p><code>carrying_capacity_from_data</code> — operation <code>carrying capacity from data</code>. Category: *biology / ecology*.</p>
@@ -21833,6 +21840,12 @@ var $d3 = $dog-&gt;clone()        # deep copy
         <pre><code class="lang-perl">p clpi $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-cluck">
+        <h3><a class="doc-anchor" href="#doc-cluck">#</a> <code>cluck</code></h3>
+        <p><code>cluck</code> — operation <code>cluck</code>. Category: *process / system*.</p>
+        <pre><code class="lang-perl">p cluck $x
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-cluster-attack-rate">
         <h3><a class="doc-anchor" href="#doc-cluster-attack-rate">#</a> <code>cluster_attack_rate</code></h3>
         <p><code>cluster_attack_rate</code> — rate of <code>cluster attack</code>. Category: *epidemiology / public health*.</p>
@@ -23916,6 +23929,12 @@ var $lag = max_index(@$xcor)   # find peak lag
         <h3><a class="doc-anchor" href="#doc-crustal-density-depth">#</a> <code>crustal_density_depth</code></h3>
         <p><code>crustal_density_depth</code> — operation <code>crustal density depth</code>. Category: *geology, seismology, mineralogy*.</p>
         <pre><code class="lang-perl">p crustal_density_depth $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-crypt">
+        <h3><a class="doc-anchor" href="#doc-crypt">#</a> <code>crypt</code></h3>
+        <p><code>crypt</code> — operation <code>crypt</code>. Category: *string*.</p>
+        <pre><code class="lang-perl">p crypt $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-crystal-field-ligand">
@@ -29356,6 +29375,12 @@ class Hybrid extends Dog, Cat { }  # multiple inheritance
         <h3><a class="doc-anchor" href="#doc-fbm-noise-2d">#</a> <code>fbm_noise_2d</code></h3>
         <p><code>fbm_noise_2d(x, y, octaves=4, lacunarity=2, gain=0.5) → number</code> — fractional Brownian motion: sum of octaves of Perlin noise.</p>
       </article>
+      <article class="doc-entry" id="doc-fc">
+        <h3><a class="doc-anchor" href="#doc-fc">#</a> <code>fc</code></h3>
+        <p><code>fc</code> — operation <code>fc</code>. Category: *string*.</p>
+        <pre><code class="lang-perl">p fc $x
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-fcntl">
         <h3><a class="doc-anchor" href="#doc-fcntl">#</a> <code>fcntl</code></h3>
         <p><code>fcntl</code> — operation <code>fcntl</code>. Category: *ipc*.</p>
@@ -29487,6 +29512,12 @@ $f = fenwick_update($f, 3, 5)
         <h3><a class="doc-anchor" href="#doc-ferrel-cell-step">#</a> <code>ferrel_cell_step</code></h3>
         <p><code>ferrel_cell_step</code> — single-step update of <code>ferrel cell</code>. Category: *climate, fluids, atmospheric*.</p>
         <pre><code class="lang-perl">p ferrel_cell_step $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-fetch-url">
+        <h3><a class="doc-anchor" href="#doc-fetch-url">#</a> <code>fetch_url</code></h3>
+        <p><code>fetch_url</code> — operation <code>fetch url</code>. Category: *async / network*.</p>
+        <pre><code class="lang-perl">p fetch_url $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-fetch-val">
@@ -43389,6 +43420,12 @@ p mdd(@equity)   # ~0.29 (29% max drawdown)
         <pre><code class="lang-perl">p mechanism_design_obj $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-med">
+        <h3><a class="doc-anchor" href="#doc-med">#</a> <code>med</code></h3>
+        <p><code>med</code> — operation <code>med</code>. Alias for <code>median</code>. Category: *trivial numeric / predicate builtins*.</p>
+        <pre><code class="lang-perl">p med $x
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-medfilt">
         <h3><a class="doc-anchor" href="#doc-medfilt">#</a> <code>medfilt</code></h3>
         <p><code>median_filter(\@signal, $window_size)</code> (alias <code>medfilt</code>) — applies a median filter for noise removal. Each output is the median of the surrounding window. Excellent for removing impulse noise while preserving edges.</p>
@@ -54131,6 +54168,12 @@ var @recent_first = tac([read_lines(&quot;history.log&quot;)])
         <pre><code class="lang-perl">p reverse_words $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-reversed">
+        <h3><a class="doc-anchor" href="#doc-reversed">#</a> <code>reversed</code></h3>
+        <p><code>reversed</code> — operation <code>reversed</code>. Category: *short aliases*.</p>
+        <pre><code class="lang-perl">p reversed $x
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-revwords">
         <h3><a class="doc-anchor" href="#doc-revwords">#</a> <code>revwords</code></h3>
         <p><code>revwords</code> — operation <code>revwords</code>. Alias for <code>reverse_each_word</code>. Category: *string processing extras*.</p>
@@ -63030,8 +63073,10 @@ $uf = union_find_union($uf, 0, 1)
       </article>
       <article class="doc-entry" id="doc-vang">
         <h3><a class="doc-anchor" href="#doc-vang">#</a> <code>vang</code></h3>
-        <p><code>vang</code> — operation <code>vang</code>. Alias for <code>vector_angle</code>. Category: *geometry (extended)*.</p>
-        <pre><code class="lang-perl">p vang $x
+        <p><code>vector_angle(\@a, \@b)</code> (alias <code>vang</code>) — computes the angle in <strong>degrees</strong> between two vectors using the dot product formula.</p>
+        <pre><code class="lang-perl">p vang([1,0], [0,1])   # 90
+p vang([1,0], [1,1])   # 45
+p vang([1,0], [1,0])   # 0
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-vant-hoff">
@@ -63322,13 +63367,6 @@ p @$c   # (0, 0, 1)
       <article class="doc-entry" id="doc-vector-add">
         <h3><a class="doc-anchor" href="#doc-vector-add">#</a> <code>vector_add</code></h3>
         <p><code>vector_add(a, b) → array</code> — componentwise addition.</p>
-      </article>
-      <article class="doc-entry" id="doc-vector-angle">
-        <h3><a class="doc-anchor" href="#doc-vector-angle">#</a> <code>vector_angle</code></h3>
-        <p><code>vector_angle(\@a, \@b)</code> (alias <code>vangle</code>) — computes the angle in radians between two vectors using the dot product formula.</p>
-        <pre><code class="lang-perl">p vangle([1,0], [0,1])   # ~1.5708 (π/2)
-p vangle([1,0], [1,0])   # 0
-</code></pre>
       </article>
       <article class="doc-entry" id="doc-vector-magnitude">
         <h3><a class="doc-anchor" href="#doc-vector-magnitude">#</a> <code>vector_magnitude</code></h3>
@@ -64086,6 +64124,12 @@ p scalar wha(&quot;perl&quot;)        # number of perls on PATH
         <h3><a class="doc-anchor" href="#doc-wilson-theta-step">#</a> <code>wilson_theta_step</code></h3>
         <p><code>wilson_theta_step</code> — single-step update of <code>wilson theta</code>. Category: *ode advanced*.</p>
         <pre><code class="lang-perl">p wilson_theta_step $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-win">
+        <h3><a class="doc-anchor" href="#doc-win">#</a> <code>win</code></h3>
+        <p><code>win</code> — operation <code>win</code>. Category: *functional / iterator*.</p>
+        <pre><code class="lang-perl">p win $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-win-probability">
@@ -65114,6 +65158,12 @@ p zigzag_encode(1)   # 2
         <h3><a class="doc-anchor" href="#doc-zodiac-sign">#</a> <code>zodiac_sign</code></h3>
         <p><code>zodiac_sign(month, day) → string</code> — Western tropical zodiac sign for a given month/day.</p>
         <pre><code class="lang-perl">p zodiac_sign(7, 15)  # Cancer
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-zp">
+        <h3><a class="doc-anchor" href="#doc-zp">#</a> <code>zp</code></h3>
+        <p><code>zp</code> — operation <code>zp</code>. Category: *functional / iterator*.</p>
+        <pre><code class="lang-perl">p zp $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-zpexpand">
