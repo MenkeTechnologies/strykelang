@@ -1194,6 +1194,11 @@ impl<'a> VM<'a> {
         matches!(
             name,
             "zip"
+                // `zp` is a documented alias of `zip`, so it has to preserve
+                // operand arrays identically -- otherwise `zp(@a, @b)`
+                // flattens where `zip(@a, @b)` pairs, and the alias stops
+                // being a synonym.
+                | "zp"
                 | "zip_longest"
                 | "zip_shortest"
                 | "mesh"
@@ -1203,6 +1208,15 @@ impl<'a> VM<'a> {
                 | "head"
                 | "tail"
                 | "drop"
+                // Documented aliases of the four above. Without them `hd` and
+                // `tl` flattened two array operands where `take` / `tail`
+                // preserved them, so the alias returned a different answer
+                // than the name it aliases. `drp` and `l` agreed by accident;
+                // listing them makes that structural instead of luck.
+                | "hd"
+                | "tl"
+                | "drp"
+                | "l"
                 // `len` / `count` / … must receive list-valued operands as **one** value.
                 // Otherwise `len stat $path` flattens `@_`: empty stat → 0 args → `$_` fallback
                 // (wrong), success → 13 args → list_count semantics (wrong for `len`).

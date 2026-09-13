@@ -6381,3 +6381,39 @@ fn both_list_builtin_gates_admit_the_same_names() {
     assert_eq!(ri(r#"scalar(zp([1, 2], [3, 4]))"#), 2);
     assert_eq!(ri(r#"sm(1, 2, 3)"#), 6);
 }
+
+// An alias must be a synonym, not merely a name that resolves. `zp` resolved
+// and still behaved differently from `zip`: `call_preserve_operand_arrays`
+// (vm.rs) decides whether array operands stay unflattened, and it listed the
+// primaries -- zip / take / head / tail / drop / len -- without their aliases.
+// So `zp(@a, @b)` flattened its two arrays into one list and returned a single
+// pair where `zip(@a, @b)` returned two.
+//
+// Resolving and behaving are different properties, and the README table test
+// only checks the first. Each pair below is exercised with *array* operands
+// specifically, since that is the only context where the two disagreed.
+#[test]
+fn documented_aliases_behave_identically_to_their_primaries() {
+    for (alias, primary) in [
+        ("zp", "zip"),
+        ("hd", "take"),
+        ("tl", "tail"),
+        ("drp", "drop"),
+        ("l", "len"),
+    ] {
+        let two_arrays = |name: &str| {
+            format!(r#"my @a = (1, 2); my @b = (3, 4); scalar({name}(@a, @b))"#)
+        };
+        assert_eq!(
+            rs(&two_arrays(alias)),
+            rs(&two_arrays(primary)),
+            "`{alias}` and `{primary}` must agree on array operands — check \
+             call_preserve_operand_arrays in vm.rs"
+        );
+    }
+
+    // The concrete regression: two arrays zip into two pairs under both
+    // spellings. Flattening would collapse them to one.
+    assert_eq!(ri(r#"my @a = (1, 2); my @b = (3, 4); scalar(zip(@a, @b))"#), 2);
+    assert_eq!(ri(r#"my @a = (1, 2); my @b = (3, 4); scalar(zp(@a, @b))"#), 2);
+}
