@@ -11790,48 +11790,15 @@ impl Parser {
                 })
             }
             "map" | "flat_map" | "maps" | "flat_maps" => {
-                let flatten_array_refs = matches!(name.as_str(), "flat_map" | "flat_maps");
-                let stream = matches!(name.as_str(), "maps" | "flat_maps");
-                if matches!(self.peek(), Token::LBrace) {
-                    let (block, list) = self.parse_block_list()?;
-                    Ok(Expr {
-                        kind: ExprKind::MapExpr {
-                            block,
-                            list: Box::new(list),
-                            flatten_array_refs,
-                            stream,
-                        },
-                        line,
-                    })
-                } else {
-                    let expr = self.parse_assign_expr_stop_at_pipe()?;
-                    // Lift bareword to FuncCall($_) so `map sha512, @list`
-                    // calls sha512($_) for each element instead of stringifying.
-                    let expr = Self::lift_bareword_to_topic_call(expr);
-                    let list_expr = if self.pipe_supplies_slurped_list_operand() {
-                        self.pipe_placeholder_list(line)
-                    } else {
-                        self.expect(&Token::Comma)?;
-                        let list_parts = self.parse_list_until_terminator()?;
-                        if list_parts.len() == 1 {
-                            list_parts.into_iter().next().unwrap()
-                        } else {
-                            Expr {
-                                kind: ExprKind::List(list_parts),
-                                line,
-                            }
-                        }
-                    };
-                    Ok(Expr {
-                        kind: ExprKind::MapExprComma {
-                            expr: Box::new(expr),
-                            list: Box::new(list_expr),
-                            flatten_array_refs,
-                            stream,
-                        },
-                        line,
-                    })
+                // `parse_map_operands` also serves the parenthesized call form
+                // (`map(EXPR, LIST)`, `grep({ BLOCK } LIST)`): the parens delimit the
+                // whole argument list, as for any Perl call.
+                let paren = self.eat(&Token::LParen);
+                let parsed = self.parse_map_operands(&name, line)?;
+                if paren {
+                    self.expect(&Token::RParen)?;
                 }
+                Ok(parsed)
             }
             "cond" => {
                 if crate::compat_mode() {
@@ -11850,112 +11817,15 @@ impl Parser {
                 self.parse_algebraic_match_expr(line)
             }
             "grep" | "greps" | "filter" | "fi" | "find_all" | "gr" => {
-                let keyword = match name.as_str() {
-                    "grep" | "gr" => crate::ast::GrepBuiltinKeyword::Grep,
-                    "greps" => crate::ast::GrepBuiltinKeyword::Greps,
-                    "filter" | "fi" => crate::ast::GrepBuiltinKeyword::Filter,
-                    "find_all" => crate::ast::GrepBuiltinKeyword::FindAll,
-                    _ => unreachable!(),
-                };
-                if matches!(self.peek(), Token::LBrace) {
-                    let (block, list) = self.parse_block_list()?;
-                    Ok(Expr {
-                        kind: ExprKind::GrepExpr {
-                            block,
-                            list: Box::new(list),
-                            keyword,
-                        },
-                        line,
-                    })
-                } else {
-                    let expr = self.parse_assign_expr_stop_at_pipe()?;
-                    if self.pipe_supplies_slurped_list_operand() {
-                        // Pipe-RHS blockless form: `|> grep EXPR`
-                        // For literals, desugar to `$_ eq/== EXPR` so
-                        // `|> filter 't'` keeps only elements equal to 't'.
-                        // For regexes, desugar to `$_ =~ EXPR`.
-                        let list = self.pipe_placeholder_list(line);
-                        let topic = Expr {
-                            kind: ExprKind::ScalarVar("_".into()),
-                            line,
-                        };
-                        let test = match &expr.kind {
-                            ExprKind::Integer(_) | ExprKind::Float(_) => Expr {
-                                kind: ExprKind::BinOp {
-                                    op: BinOp::NumEq,
-                                    left: Box::new(topic),
-                                    right: Box::new(expr),
-                                },
-                                line,
-                            },
-                            ExprKind::String(_) | ExprKind::InterpolatedString(_) => Expr {
-                                kind: ExprKind::BinOp {
-                                    op: BinOp::StrEq,
-                                    left: Box::new(topic),
-                                    right: Box::new(expr),
-                                },
-                                line,
-                            },
-                            ExprKind::Regex { .. } => Expr {
-                                kind: ExprKind::BinOp {
-                                    op: BinOp::BindMatch,
-                                    left: Box::new(topic),
-                                    right: Box::new(expr),
-                                },
-                                line,
-                            },
-                            _ => {
-                                // Non-literal (e.g. `defined`, scalar coderef var,
-                                // hash slot): lift barewords to topic-call, then
-                                // route through GrepExprComma so the runtime
-                                // coderef-dispatch in Op::GrepWithExpr handles
-                                // both truthiness AND coderef-call uniformly.
-                                let expr = Self::lift_bareword_to_topic_call(expr);
-                                return Ok(Expr {
-                                    kind: ExprKind::GrepExprComma {
-                                        expr: Box::new(expr),
-                                        list: Box::new(list),
-                                        keyword,
-                                    },
-                                    line,
-                                });
-                            }
-                        };
-                        let block = vec![Statement {
-                            label: None,
-                            kind: StmtKind::Expression(test),
-                            line,
-                        }];
-                        Ok(Expr {
-                            kind: ExprKind::GrepExpr {
-                                block,
-                                list: Box::new(list),
-                                keyword,
-                            },
-                            line,
-                        })
-                    } else {
-                        let expr = Self::lift_bareword_to_topic_call(expr);
-                        self.expect(&Token::Comma)?;
-                        let list_parts = self.parse_list_until_terminator()?;
-                        let list_expr = if list_parts.len() == 1 {
-                            list_parts.into_iter().next().unwrap()
-                        } else {
-                            Expr {
-                                kind: ExprKind::List(list_parts),
-                                line,
-                            }
-                        };
-                        Ok(Expr {
-                            kind: ExprKind::GrepExprComma {
-                                expr: Box::new(expr),
-                                list: Box::new(list_expr),
-                                keyword,
-                            },
-                            line,
-                        })
-                    }
+                // `parse_grep_operands` also serves the parenthesized call form
+                // (`map(EXPR, LIST)`, `grep({ BLOCK } LIST)`): the parens delimit the
+                // whole argument list, as for any Perl call.
+                let paren = self.eat(&Token::LParen);
+                let parsed = self.parse_grep_operands(&name, line)?;
+                if paren {
+                    self.expect(&Token::RParen)?;
                 }
+                Ok(parsed)
             }
             "sort" | "so" => {
                 use crate::ast::SortComparator;
@@ -14623,6 +14493,162 @@ impl Parser {
             kind: make(handle, args),
             line,
         })
+    }
+
+    /// Operands of `map`/`flat_map`/`maps`/`flat_maps`: `{ BLOCK } LIST` or `EXPR, LIST`.
+    fn parse_map_operands(&mut self, name: &str, line: usize) -> StrykeResult<Expr> {
+        let flatten_array_refs = matches!(name, "flat_map" | "flat_maps");
+        let stream = matches!(name, "maps" | "flat_maps");
+        if matches!(self.peek(), Token::LBrace) {
+            let (block, list) = self.parse_block_list()?;
+            Ok(Expr {
+                kind: ExprKind::MapExpr {
+                    block,
+                    list: Box::new(list),
+                    flatten_array_refs,
+                    stream,
+                },
+                line,
+            })
+        } else {
+            let expr = self.parse_assign_expr_stop_at_pipe()?;
+            // Lift bareword to FuncCall($_) so `map sha512, @list`
+            // calls sha512($_) for each element instead of stringifying.
+            let expr = Self::lift_bareword_to_topic_call(expr);
+            let list_expr = if self.pipe_supplies_slurped_list_operand() {
+                self.pipe_placeholder_list(line)
+            } else {
+                self.expect(&Token::Comma)?;
+                let list_parts = self.parse_list_until_terminator()?;
+                if list_parts.len() == 1 {
+                    list_parts.into_iter().next().unwrap()
+                } else {
+                    Expr {
+                        kind: ExprKind::List(list_parts),
+                        line,
+                    }
+                }
+            };
+            Ok(Expr {
+                kind: ExprKind::MapExprComma {
+                    expr: Box::new(expr),
+                    list: Box::new(list_expr),
+                    flatten_array_refs,
+                    stream,
+                },
+                line,
+            })
+        }
+    }
+
+    /// Operands of `grep`/`greps`/`filter`/`find_all`: `{ BLOCK } LIST` or `EXPR, LIST`.
+    fn parse_grep_operands(&mut self, name: &str, line: usize) -> StrykeResult<Expr> {
+        let keyword = match name {
+            "grep" | "gr" => crate::ast::GrepBuiltinKeyword::Grep,
+            "greps" => crate::ast::GrepBuiltinKeyword::Greps,
+            "filter" | "fi" => crate::ast::GrepBuiltinKeyword::Filter,
+            "find_all" => crate::ast::GrepBuiltinKeyword::FindAll,
+            _ => unreachable!(),
+        };
+        if matches!(self.peek(), Token::LBrace) {
+            let (block, list) = self.parse_block_list()?;
+            Ok(Expr {
+                kind: ExprKind::GrepExpr {
+                    block,
+                    list: Box::new(list),
+                    keyword,
+                },
+                line,
+            })
+        } else {
+            let expr = self.parse_assign_expr_stop_at_pipe()?;
+            if self.pipe_supplies_slurped_list_operand() {
+                // Pipe-RHS blockless form: `|> grep EXPR`
+                // For literals, desugar to `$_ eq/== EXPR` so
+                // `|> filter 't'` keeps only elements equal to 't'.
+                // For regexes, desugar to `$_ =~ EXPR`.
+                let list = self.pipe_placeholder_list(line);
+                let topic = Expr {
+                    kind: ExprKind::ScalarVar("_".into()),
+                    line,
+                };
+                let test = match &expr.kind {
+                    ExprKind::Integer(_) | ExprKind::Float(_) => Expr {
+                        kind: ExprKind::BinOp {
+                            op: BinOp::NumEq,
+                            left: Box::new(topic),
+                            right: Box::new(expr),
+                        },
+                        line,
+                    },
+                    ExprKind::String(_) | ExprKind::InterpolatedString(_) => Expr {
+                        kind: ExprKind::BinOp {
+                            op: BinOp::StrEq,
+                            left: Box::new(topic),
+                            right: Box::new(expr),
+                        },
+                        line,
+                    },
+                    ExprKind::Regex { .. } => Expr {
+                        kind: ExprKind::BinOp {
+                            op: BinOp::BindMatch,
+                            left: Box::new(topic),
+                            right: Box::new(expr),
+                        },
+                        line,
+                    },
+                    _ => {
+                        // Non-literal (e.g. `defined`, scalar coderef var,
+                        // hash slot): lift barewords to topic-call, then
+                        // route through GrepExprComma so the runtime
+                        // coderef-dispatch in Op::GrepWithExpr handles
+                        // both truthiness AND coderef-call uniformly.
+                        let expr = Self::lift_bareword_to_topic_call(expr);
+                        return Ok(Expr {
+                            kind: ExprKind::GrepExprComma {
+                                expr: Box::new(expr),
+                                list: Box::new(list),
+                                keyword,
+                            },
+                            line,
+                        });
+                    }
+                };
+                let block = vec![Statement {
+                    label: None,
+                    kind: StmtKind::Expression(test),
+                    line,
+                }];
+                Ok(Expr {
+                    kind: ExprKind::GrepExpr {
+                        block,
+                        list: Box::new(list),
+                        keyword,
+                    },
+                    line,
+                })
+            } else {
+                let expr = Self::lift_bareword_to_topic_call(expr);
+                self.expect(&Token::Comma)?;
+                let list_parts = self.parse_list_until_terminator()?;
+                let list_expr = if list_parts.len() == 1 {
+                    list_parts.into_iter().next().unwrap()
+                } else {
+                    Expr {
+                        kind: ExprKind::List(list_parts),
+                        line,
+                    }
+                };
+                Ok(Expr {
+                    kind: ExprKind::GrepExprComma {
+                        expr: Box::new(expr),
+                        list: Box::new(list_expr),
+                        keyword,
+                    },
+                    line,
+                })
+            }
+        }
     }
 
     fn parse_block_list(&mut self) -> StrykeResult<(Block, Expr)> {

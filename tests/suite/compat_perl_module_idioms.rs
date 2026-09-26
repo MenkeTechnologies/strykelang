@@ -43,3 +43,17 @@ fn shift_arrow_method_call_is_the_oo_accessor_idiom() {
         "8"
     );
 }
+
+// ── `map(...)` / `grep(...)` parenthesized call form ────────────────────────
+
+#[test]
+fn map_and_grep_accept_the_parenthesized_call_form() {
+    assert_eq!(compat(r#"print join ",", map("<$_>", 1, 2)"#), "<1>,<2>");
+    assert_eq!(compat(r#"print join ",", map({ $_ * 10 } 1, 2)"#), "10,20");
+    assert_eq!(compat(r#"print join ",", grep(/a/, qw(ab cd ba))"#), "ab,ba");
+    assert_eq!(compat(r#"print join ",", grep({ $_ > 1 } 1, 2, 3)"#), "2,3");
+    // The closing paren ends the argument list, so a slice can follow it.
+    assert_eq!(compat(r#"print join ",", (map($_ + 1, 1, 2, 3))[0, 2]"#), "2,4");
+    // File::Basename's shape: `map("\Q$_\E", @_)`.
+    assert_eq!(compat(r#"print join " ", map("\Q$_\E", "a.b")"#), r"a\.b");
+}
