@@ -161,3 +161,17 @@ fn module_sub_resolves_its_own_helpers_and_package_vars() {
         "hMy::Homev hMy::Homev"
     );
 }
+
+// ── stryke's reflection-hash names are ordinary hashes under --compat ───────
+
+#[test]
+fn hashes_named_like_reflection_hashes_are_writable() {
+    // `%e`, `%a`, `%c`, … are stryke reflection hashes (frozen) in default mode.
+    assert_eq!(
+        compat(
+            r#"my %e; $e{q}++; $e{q}++; my %a = (x => 1); $a{y} = 2; delete $a{x};
+               my %c; @c{1, 2} = (3, 4); print $e{q}, join(",", keys %a), join(",", sort keys %c)"#
+        ),
+        "2y1,2"
+    );
+}

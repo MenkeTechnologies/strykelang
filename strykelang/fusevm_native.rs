@@ -563,7 +563,8 @@ fn spaceship(a: &StrykeValue, b: &StrykeValue) -> i64 {
 
 /// Reflection hashes are frozen builtins (mirrors vm.rs `is_reflection_hash`).
 fn is_reflection_hash(name: &str) -> bool {
-    matches!(name, "b" | "pc" | "e" | "a" | "d" | "c" | "p" | "all") || name.starts_with("stryke::")
+    (!crate::compat_mode() && matches!(name, "b" | "pc" | "e" | "a" | "d" | "c" | "p" | "all"))
+        || name.starts_with("stryke::")
 }
 
 /// Pop a fusevm Value and view it as a StrykeValue (scalars only on this path).
