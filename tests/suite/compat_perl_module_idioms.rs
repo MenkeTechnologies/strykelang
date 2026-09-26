@@ -50,10 +50,16 @@ fn shift_arrow_method_call_is_the_oo_accessor_idiom() {
 fn map_and_grep_accept_the_parenthesized_call_form() {
     assert_eq!(compat(r#"print join ",", map("<$_>", 1, 2)"#), "<1>,<2>");
     assert_eq!(compat(r#"print join ",", map({ $_ * 10 } 1, 2)"#), "10,20");
-    assert_eq!(compat(r#"print join ",", grep(/a/, qw(ab cd ba))"#), "ab,ba");
+    assert_eq!(
+        compat(r#"print join ",", grep(/a/, qw(ab cd ba))"#),
+        "ab,ba"
+    );
     assert_eq!(compat(r#"print join ",", grep({ $_ > 1 } 1, 2, 3)"#), "2,3");
     // The closing paren ends the argument list, so a slice can follow it.
-    assert_eq!(compat(r#"print join ",", (map($_ + 1, 1, 2, 3))[0, 2]"#), "2,4");
+    assert_eq!(
+        compat(r#"print join ",", (map($_ + 1, 1, 2, 3))[0, 2]"#),
+        "2,4"
+    );
     // File::Basename's shape: `map("\Q$_\E", @_)`.
     assert_eq!(compat(r#"print join " ", map("\Q$_\E", "a.b")"#), r"a\.b");
 }
@@ -85,7 +91,11 @@ fn imported_sub_wins_over_the_stryke_extension_it_shadows() {
         .output()
         .expect("spawn st");
     let _ = std::fs::remove_dir_all(&dir);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert_eq!(String::from_utf8_lossy(&out.stdout), "mine:x");
 }
 
@@ -155,7 +165,11 @@ fn module_sub_resolves_its_own_helpers_and_package_vars() {
         .output()
         .expect("spawn st");
     let _ = std::fs::remove_dir_all(&dir);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert_eq!(
         String::from_utf8_lossy(&out.stdout),
         "hMy::Homev hMy::Homev"

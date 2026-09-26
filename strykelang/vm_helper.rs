@@ -21965,10 +21965,10 @@ impl VMHelper {
                         );
                     }
                 }
-                Ok(StrykeValue::perl_bool(
-                    self.scope
-                        .exists_hash_element(&self.tree_hash_storage_name(hash), &k),
-                ))
+                Ok(StrykeValue::perl_bool(self.scope.exists_hash_element(
+                    &self.tree_hash_storage_name(hash),
+                    &k,
+                )))
             }
             ExprKind::ArrayElement { array, index } => {
                 self.check_strict_array_var(array, line)?;

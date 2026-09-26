@@ -1296,7 +1296,10 @@ mod tests {
             0,
         )
         .expect("pack");
-        assert!(p.as_bytes_arc().is_none(), "leading U selects character mode");
+        assert!(
+            p.as_bytes_arc().is_none(),
+            "leading U selects character mode"
+        );
         assert_eq!(p.to_string(), "H\u{263A}");
     }
 

@@ -2572,8 +2572,7 @@ impl<'a> VM<'a> {
     /// Reflection hashes are frozen builtins even before lazy init.
     fn is_reflection_hash(name: &str) -> bool {
         // `--compat` has no reflection hashes: `%e` / `%a` / … are ordinary Perl hashes.
-        (!crate::compat_mode()
-            && matches!(name, "b" | "pc" | "e" | "a" | "d" | "c" | "p" | "all"))
+        (!crate::compat_mode() && matches!(name, "b" | "pc" | "e" | "a" | "d" | "c" | "p" | "all"))
             || name.starts_with("stryke::")
     }
 

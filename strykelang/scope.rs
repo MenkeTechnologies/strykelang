@@ -3120,12 +3120,16 @@ impl Scope {
                 frame.promote_to_shared_for_capture();
                 for (k, arc) in &frame.shared_arrays {
                     if !capture_skip_bootstrap_array(k) && !k.contains("::") {
-                        captured.push((format!("@shared:{}", k), StrykeValue::array_ref(arc.clone())));
+                        captured.push((
+                            format!("@shared:{}", k),
+                            StrykeValue::array_ref(arc.clone()),
+                        ));
                     }
                 }
                 for (k, arc) in &frame.shared_hashes {
                     if !capture_skip_bootstrap_hash(k) && !k.contains("::") {
-                        captured.push((format!("%shared:{}", k), StrykeValue::hash_ref(arc.clone())));
+                        captured
+                            .push((format!("%shared:{}", k), StrykeValue::hash_ref(arc.clone())));
                     }
                 }
             }
