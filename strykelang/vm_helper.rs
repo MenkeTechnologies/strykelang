@@ -13602,6 +13602,9 @@ impl VMHelper {
             }
             ExprKind::Length(expr) => {
                 let val = self.eval_expr(expr)?;
+                if val.is_undef() && crate::compat_mode() {
+                    return Ok(StrykeValue::UNDEF);
+                }
                 Ok(if let Some(a) = val.as_array_vec() {
                     StrykeValue::integer(a.len() as i64)
                 } else if let Some(h) = val.as_hash_map() {
@@ -23632,6 +23635,10 @@ pub(crate) fn exec_builtin(
     match bid {
         Some(BuiltinId::Length) => {
             let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+            // Perl: `length(undef)` is `undef`, not 0 (BUG-317).
+            if val.is_undef() && crate::compat_mode() {
+                return Ok(StrykeValue::UNDEF);
+            }
             Ok(StrykeValue::integer(val.length_value(this.utf8_pragma)))
         }
         Some(BuiltinId::Defined) => {

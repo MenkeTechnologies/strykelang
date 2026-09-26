@@ -3643,21 +3643,6 @@ does not set it.
 The mtime check catches an edited *script*; nothing catches an edited
 *interpreter*. A build fingerprint in the header (or in the entry key) would.
 
-## BUG-317 — `length(undef)` returns `0`; Perl returns `undef` — **`parity`**
-
-```perl
-my $u;
-my $l = length($u);
-print defined($l) ? "yes" : "no", "\n";   # perl: no    st --compat: yes
-print "[", (defined($l) ? $l : ""), "]\n"; # perl: []    st --compat: [0]
-```
-
-Perl distinguishes "the empty string, length 0" from "no string at all":
-`length(undef)` is `undef`, while `length("")` is `0` (both agree on the
-latter). stryke collapses the two, so `defined(length($x))` — the idiomatic
-"is this a real string?" test — is always true. Found while measuring
-`sort SUBNAME LIST`.
-
 ## BUG-316 — statement-initial `sub { … }->(ARGS)` fails to parse — **`bug`**
 
 An anonymous sub written and called in one statement parses in expression
