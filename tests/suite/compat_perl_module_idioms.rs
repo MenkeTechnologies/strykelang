@@ -175,3 +175,38 @@ fn hashes_named_like_reflection_hashes_are_writable() {
         "2y1,2"
     );
 }
+
+// ── closures share the enclosing arrays and hashes ──────────────────────────
+
+#[test]
+fn closure_mutations_of_outer_arrays_and_hashes_are_shared() {
+    assert_eq!(
+        compat(
+            r#"my @r; my %h; my $f = sub { push @r, 1; $h{x}++ }; $f->(); $f->();
+               sub run { $_[0]->() } my @s; run(sub { push @s, 2 });
+               push @C, 5; my $pc = sub { push @C, 7; scalar @C }; $pc->(); $pc->();
+               print scalar(@r), $h{x}, scalar(@s), "[@C]""#
+        ),
+        "221[5 7 7]"
+    );
+}
+
+#[test]
+fn each_closure_factory_call_gets_its_own_array() {
+    assert_eq!(
+        compat(
+            r#"sub mk { my @a; sub { push @a, @_; scalar @a } }
+               my ($c1, $c2) = (mk(), mk()); $c1->(1); $c1->(2);
+               print $c1->(3), $c2->(9)"#
+        ),
+        "31"
+    );
+}
+
+#[test]
+fn calling_a_closure_does_not_roll_back_a_package_array() {
+    assert_eq!(
+        compat(r#"package Q; our @A = (1); my $f = sub { 1 }; push @A, 2; $f->(); print "@A""#),
+        "1 2"
+    );
+}

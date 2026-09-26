@@ -192,6 +192,37 @@ struct Frame {
 }
 
 impl Frame {
+    /// Move this frame's plain arrays and hashes into shared storage so a closure
+    /// can capture handles to them (`--compat` capture, see [`Scope::capture`]).
+    /// Bootstrap containers (`@INC`, `%ENV`, …), frozen ones (captured by value)
+    /// and package names (`Pkg::x`, looked up in the stash) stay where they are.
+    fn promote_to_shared_for_capture(&mut self) {
+        let (arrays, keep): (Vec<_>, Vec<_>) = std::mem::take(&mut self.arrays)
+            .into_iter()
+            .partition(|(k, _)| {
+                !capture_skip_bootstrap_array(k)
+                    && !self.frozen_arrays.contains(k)
+                    && !k.contains("::")
+            });
+        self.arrays = keep;
+        for (k, v) in arrays {
+            self.shared_arrays
+                .push((k, Arc::new(parking_lot::RwLock::new(v))));
+        }
+        let (hashes, keep): (Vec<_>, Vec<_>) = std::mem::take(&mut self.hashes)
+            .into_iter()
+            .partition(|(k, _)| {
+                !capture_skip_bootstrap_hash(k)
+                    && !self.frozen_hashes.contains(k)
+                    && !k.contains("::")
+            });
+        self.hashes = keep;
+        for (k, v) in hashes {
+            self.shared_hashes
+                .push((k, Arc::new(parking_lot::RwLock::new(v))));
+        }
+    }
+
     /// Drop all lexical bindings so blessed objects run `DESTROY` when frames are recycled
     /// ([`Scope::pop_frame`]) or reused ([`Scope::push_frame`]).
     #[inline]
@@ -3080,8 +3111,26 @@ impl Scope {
                     captured.push((format!("$slot:{}:{}", i, name), cap_val));
                 }
             }
+            if by_ref {
+                // Perl 5 closures share the enclosing arrays and hashes. Promote each
+                // one to shared storage (what `\@a` does) and capture the handle, so
+                // `sub { push @a, ... }` mutates the caller's `@a`. Package names
+                // (`Pkg::a`) are not lexicals: the body finds them in the stash, and a
+                // captured snapshot restored later would overwrite the live global.
+                frame.promote_to_shared_for_capture();
+                for (k, arc) in &frame.shared_arrays {
+                    if !capture_skip_bootstrap_array(k) && !k.contains("::") {
+                        captured.push((format!("@shared:{}", k), StrykeValue::array_ref(arc.clone())));
+                    }
+                }
+                for (k, arc) in &frame.shared_hashes {
+                    if !capture_skip_bootstrap_hash(k) && !k.contains("::") {
+                        captured.push((format!("%shared:{}", k), StrykeValue::hash_ref(arc.clone())));
+                    }
+                }
+            }
             for (k, v) in &frame.arrays {
-                if capture_skip_bootstrap_array(k) {
+                if capture_skip_bootstrap_array(k) || (by_ref && k.contains("::")) {
                     continue;
                 }
                 if frame.frozen_arrays.contains(k) {
@@ -3091,7 +3140,7 @@ impl Scope {
                 }
             }
             for (k, v) in &frame.hashes {
-                if capture_skip_bootstrap_hash(k) {
+                if capture_skip_bootstrap_hash(k) || (by_ref && k.contains("::")) {
                     continue;
                 }
                 if frame.frozen_hashes.contains(k) {
@@ -3184,6 +3233,22 @@ impl Scope {
                 if let Some(slot) = parse_positional_topic_slot(stripped) {
                     if slot > self.max_active_slot {
                         self.max_active_slot = slot;
+                    }
+                }
+            } else if let Some(rest) = name.strip_prefix("@shared:") {
+                if let Some(arc) = val.as_array_ref() {
+                    if let Some(frame) = self.frames.last_mut() {
+                        frame.arrays.retain(|(k, _)| k != rest);
+                        frame.shared_arrays.retain(|(k, _)| k != rest);
+                        frame.shared_arrays.push((rest.to_string(), arc));
+                    }
+                }
+            } else if let Some(rest) = name.strip_prefix("%shared:") {
+                if let Some(arc) = val.as_hash_ref() {
+                    if let Some(frame) = self.frames.last_mut() {
+                        frame.hashes.retain(|(k, _)| k != rest);
+                        frame.shared_hashes.retain(|(k, _)| k != rest);
+                        frame.shared_hashes.push((rest.to_string(), arc));
                     }
                 }
             } else if let Some(rest) = name.strip_prefix("@frozen:") {
