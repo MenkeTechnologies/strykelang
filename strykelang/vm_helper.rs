@@ -2379,6 +2379,26 @@ impl VMHelper {
                 return name.to_string();
             }
         }
+        self.package_global_fallback(name, |s, n| s.scalar_binding_exists(n))
+    }
+
+    /// Last step of the `tree_*_storage_name` resolution: an unqualified name with no
+    /// binding of its own, inside package `Pkg`, is `Pkg::name` when that package
+    /// variable exists — Perl's rule for unqualified globals. It covers module sub
+    /// bodies run by the tree path after the module's file scope (and its `our`
+    /// tracking) has ended: `our $V = 1; sub f { $V }` called later as `Mod::f()`.
+    fn package_global_fallback(
+        &self,
+        name: &str,
+        exists: impl Fn(&crate::scope::Scope, &str) -> bool,
+    ) -> String {
+        let pkg = self.current_package();
+        if pkg != "main" && !exists(&self.scope, name) {
+            let qualified = format!("{pkg}::{name}");
+            if exists(&self.scope, &qualified) {
+                return qualified;
+            }
+        }
         name.to_string()
     }
 
@@ -2842,7 +2862,7 @@ impl VMHelper {
                 return self.stash_array_full_name_for_package(name);
             }
         }
-        name.to_string()
+        self.package_global_fallback(name, |s, n| s.array_binding_exists(n))
     }
 
     /// Storage key for an `@name` access in the tree path: the `our` resolution of
@@ -2865,7 +2885,7 @@ impl VMHelper {
                 return self.stash_hash_full_name_for_package(name);
             }
         }
-        name.to_string()
+        self.package_global_fallback(name, |s, n| s.hash_binding_exists(n))
     }
 
     /// Public wrapper for [`Self::english_note_lexical_scalar`] — used by bytecode
@@ -4644,7 +4664,7 @@ impl VMHelper {
                 } => {
                     let key = self.qualify_sub_key(name);
                     let mut sub = StrykeSub {
-                        name: name.clone(),
+                        name: key.clone(),
                         params: params.clone(),
                         body: body.clone(),
                         closure_env: None,
@@ -8682,7 +8702,7 @@ impl VMHelper {
                     Some(captured)
                 };
                 let mut sub = StrykeSub {
-                    name: name.clone(),
+                    name: key.clone(),
                     params: params.clone(),
                     body: body.clone(),
                     closure_env,

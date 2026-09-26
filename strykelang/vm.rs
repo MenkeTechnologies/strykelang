@@ -3297,6 +3297,20 @@ impl<'a> VM<'a> {
                     if let Some(ref env) = sub.closure_env {
                         self.interp.scope.restore_capture(env);
                     }
+                    // The body runs in the sub's home package, not the caller's: a
+                    // module sub called as `Mod::f()` or through an import must resolve
+                    // its own unqualified helpers and `our` names in `Mod`. Same rule as
+                    // `VMHelper::call_named_sub` (qualified call name, else the sub's
+                    // qualified `name`); after `restore_capture`, which would otherwise
+                    // put back the defining frame's `__PACKAGE__`.
+                    if let Some((pkg, _)) = name
+                        .rsplit_once("::")
+                        .or_else(|| sub.name.rsplit_once("::"))
+                    {
+                        self.interp
+                            .scope
+                            .declare_scalar("__PACKAGE__", StrykeValue::string(pkg.to_string()));
+                    }
                     let argv = self.interp.scope.take_sub_underscore().unwrap_or_default();
                     let line = self.line();
                     self.interp

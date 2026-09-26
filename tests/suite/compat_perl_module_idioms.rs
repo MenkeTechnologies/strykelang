@@ -134,3 +134,30 @@ fn bare_our_does_not_reset_a_value_stored_by_begin() {
     );
 }
 
+// ── module subs run in their own package ───────────────────────────────────
+
+#[test]
+fn module_sub_resolves_its_own_helpers_and_package_vars() {
+    let dir = std::env::temp_dir().join(format!("stryke-compat-home-{}", std::process::id()));
+    std::fs::create_dir_all(dir.join("My")).expect("mkdir");
+    std::fs::write(
+        dir.join("My/Home.pm"),
+        "package My::Home;\nuse strict;\nrequire Exporter;\nour @ISA = ('Exporter');\n\
+         our @EXPORT_OK = qw(f);\nour $V = 'v';\nsub helper { 'h' . __PACKAGE__ }\n\
+         sub f { helper() . $V }\n1;\n",
+    )
+    .expect("write module");
+    let out = Command::new(env!("CARGO_BIN_EXE_st"))
+        .arg("--compat")
+        .arg(format!("-I{}", dir.display()))
+        .args(["-e", r#"use My::Home qw(f); print My::Home::f(), " ", f()"#])
+        .env("STRYKE_CACHE", "0")
+        .output()
+        .expect("spawn st");
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "hMy::Homev hMy::Homev"
+    );
+}
