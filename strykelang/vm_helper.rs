@@ -2845,6 +2845,15 @@ impl VMHelper {
         name.to_string()
     }
 
+    /// Storage key for an `@name` access in the tree path: the `our` resolution of
+    /// [`Self::tree_array_storage_name`], then the `@ISA` / `@EXPORT` stash rule of
+    /// [`Self::stash_array_name_for_package`]. Element, slice and `$#name` accesses
+    /// use it so `$a[0] = ...` in a runtime-registered sub body reaches the same
+    /// `our @a` that `push @a` and a plain `@a` read do.
+    pub(crate) fn tree_array_name(&self, name: &str) -> String {
+        self.stash_array_name_for_package(&self.tree_array_storage_name(name))
+    }
+
     /// Bare `%h` after `our %h` reads the package stash hash. See
     /// [`Self::tree_array_storage_name`] for the resolution policy.
     pub(crate) fn tree_hash_storage_name(&self, name: &str) -> String {
@@ -2871,6 +2880,18 @@ impl VMHelper {
     #[inline]
     pub(crate) fn note_our_scalar_pub(&mut self, bare_name: &str) {
         self.note_our_scalar(bare_name);
+    }
+
+    /// Array half of [`Self::note_our_scalar_pub`] (bytecode `Op::DeclareOurArray`).
+    #[inline]
+    pub(crate) fn note_our_array_pub(&mut self, bare_name: &str) {
+        self.note_our_array(bare_name);
+    }
+
+    /// Hash half of [`Self::note_our_scalar_pub`] (bytecode `Op::DeclareOurHash`).
+    #[inline]
+    pub(crate) fn note_our_hash_pub(&mut self, bare_name: &str) {
+        self.note_our_hash(bare_name);
     }
 
     pub(crate) fn scope_pop_hook(&mut self) {
@@ -3369,6 +3390,9 @@ impl VMHelper {
             || Self::strict_scalar_exempt(name)
             || name.contains("::")
             || self.scope.scalar_binding_exists(name)
+            || self
+                .scope
+                .scalar_binding_exists(&self.tree_scalar_storage_name(name))
         {
             return Ok(());
         }
@@ -3383,7 +3407,13 @@ impl VMHelper {
     }
 
     fn check_strict_array_var(&self, name: &str, line: usize) -> Result<(), FlowOrError> {
-        if !self.strict_vars || name.contains("::") || self.scope.array_binding_exists(name) {
+        if !self.strict_vars
+            || name.contains("::")
+            || self.scope.array_binding_exists(name)
+            || self
+                .scope
+                .array_binding_exists(&self.tree_array_storage_name(name))
+        {
             return Ok(());
         }
         Err(StrykeError::runtime(
@@ -3401,6 +3431,9 @@ impl VMHelper {
         if !self.strict_vars
             || name.contains("::")
             || self.scope.hash_binding_exists(name)
+            || self
+                .scope
+                .hash_binding_exists(&self.tree_hash_storage_name(name))
             || matches!(name, "+" | "-" | "ENV" | "SIG" | "!" | "^H")
         {
             return Ok(());
@@ -7470,7 +7503,7 @@ impl VMHelper {
         match &subject.kind {
             ExprKind::ArrayVar(name) => {
                 self.check_strict_array_var(name, line)?;
-                let aname = self.stash_array_name_for_package(name);
+                let aname = self.tree_array_name(name);
                 Ok(StrykeValue::array_binding_ref(aname))
             }
             ExprKind::HashVar(name) => {
@@ -9321,7 +9354,7 @@ impl VMHelper {
                     }
                     ExprKind::ArrayElement { array, index } => {
                         self.check_strict_array_var(array, stmt.line)?;
-                        let aname = self.stash_array_name_for_package(array);
+                        let aname = self.tree_array_name(array);
                         let idx = self.eval_expr(index)?.to_int();
                         self.scope
                             .local_set_array_element(&aname, idx, val.clone())?;
@@ -10141,7 +10174,7 @@ impl VMHelper {
                         }
                         StringPart::ArrayVar(name) => {
                             self.check_strict_array_var(name, line)?;
-                            let aname = self.stash_array_name_for_package(name);
+                            let aname = self.tree_array_name(name);
                             let arr = self.scope.get_array(&aname);
                             let mut parts = Vec::with_capacity(arr.len());
                             for v in &arr {
@@ -10277,7 +10310,7 @@ impl VMHelper {
                     // Closed `$s[1:3]` and open-ended `$s[2:]` / `$s[:5]` / `$s[::2]`
                     // string-slice sugar — mirrors the VM's `Op::ArraySliceRange`.
                     if let Some((from, to, exclusive, step)) = slice_index_endpoints(&index.kind) {
-                        let aname_check = self.stash_array_name_for_package(array);
+                        let aname_check = self.tree_array_name(array);
                         let prefer_scalar =
                             array == "_" || self.scope.get_array(&aname_check).is_empty();
                         if prefer_scalar {
@@ -10303,7 +10336,7 @@ impl VMHelper {
                     }
                 }
                 let idx = self.eval_expr(index)?.to_int();
-                let aname = self.stash_array_name_for_package(array);
+                let aname = self.tree_array_name(array);
                 if let Some(obj) = self.tied_arrays.get(&aname).cloned() {
                     let class = obj
                         .as_blessed_ref()
@@ -10361,7 +10394,7 @@ impl VMHelper {
             }
             ExprKind::ArraySlice { array, indices } => {
                 self.check_strict_array_var(array, line)?;
-                let aname = self.stash_array_name_for_package(array);
+                let aname = self.tree_array_name(array);
                 let flat = self.flatten_array_slice_index_specs(indices)?;
                 let mut result = Vec::with_capacity(flat.len());
                 for idx in flat {
@@ -10371,11 +10404,12 @@ impl VMHelper {
             }
             ExprKind::HashSlice { hash, keys } => {
                 self.check_strict_hash_var(hash, line)?;
+                let hname = self.tree_hash_storage_name(hash);
                 self.touch_env_hash(hash);
                 let mut result = Vec::new();
                 for key_expr in keys {
                     for k in self.eval_hash_slice_key_components(key_expr)? {
-                        result.push(self.scope.get_hash_element(hash, &k));
+                        result.push(self.scope.get_hash_element(&hname, &k));
                     }
                 }
                 Ok(StrykeValue::array(result))
@@ -10384,11 +10418,12 @@ impl VMHelper {
                 // `%h{KEYS}` — Perl 5.20+ key-value slice. Returns a flat
                 // (key, value, key, value, ...) list. (BUG-008)
                 self.check_strict_hash_var(hash, line)?;
+                let hname = self.tree_hash_storage_name(hash);
                 self.touch_env_hash(hash);
                 let mut result = Vec::new();
                 for key_expr in keys {
                     for k in self.eval_hash_slice_key_components(key_expr)? {
-                        let v = self.scope.get_hash_element(hash, &k);
+                        let v = self.scope.get_hash_element(&hname, &k);
                         result.push(StrykeValue::string(k));
                         result.push(v);
                     }
@@ -10438,7 +10473,7 @@ impl VMHelper {
                 ExprKind::ScalarVar(name) => Ok(StrykeValue::scalar_binding_ref(name.clone())),
                 ExprKind::ArrayVar(name) => {
                     self.check_strict_array_var(name, line)?;
-                    let aname = self.stash_array_name_for_package(name);
+                    let aname = self.tree_array_name(name);
                     // Promote the scope's array to shared Arc-backed storage.
                     // Both the scope and the returned ref share the same Arc.
                     let arc = self.scope.promote_array_to_shared(&aname);
@@ -16391,34 +16426,12 @@ impl VMHelper {
                     )
                     .into());
                 }
-                if self.strict_vars
-                    && !name.contains("::")
-                    && !self.scope.array_binding_exists(name)
-                {
-                    return Err(StrykeError::runtime(
-                        format!(
-                            "Global symbol \"@{}\" requires explicit package name (did you forget to declare \"my @{}\"?)",
-                            name, name
-                        ),
-                        target.line,
-                    )
-                    .into());
-                }
+                self.check_strict_array_var(name, target.line)?;
                 self.scope.set_array(name, val.to_list())?;
                 Ok(StrykeValue::UNDEF)
             }
             ExprKind::HashVar(name) => {
-                if self.strict_vars && !name.contains("::") && !self.scope.hash_binding_exists(name)
-                {
-                    return Err(StrykeError::runtime(
-                        format!(
-                            "Global symbol \"%{}\" requires explicit package name (did you forget to declare \"my %{}\"?)",
-                            name, name
-                        ),
-                        target.line,
-                    )
-                    .into());
-                }
+                self.check_strict_hash_var(name, target.line)?;
                 let items = val.to_list();
                 let mut map = IndexMap::new();
                 let mut i = 0;
@@ -16430,19 +16443,7 @@ impl VMHelper {
                 Ok(StrykeValue::UNDEF)
             }
             ExprKind::ArrayElement { array, index } => {
-                if self.strict_vars
-                    && !array.contains("::")
-                    && !self.scope.array_binding_exists(array)
-                {
-                    return Err(StrykeError::runtime(
-                        format!(
-                            "Global symbol \"@{}\" requires explicit package name (did you forget to declare \"my @{}\"?)",
-                            array, array
-                        ),
-                        target.line,
-                    )
-                    .into());
-                }
+                self.check_strict_array_var(array, target.line)?;
                 if self.scope.is_array_frozen(array) {
                     return Err(StrykeError::runtime(
                         format!("Modification of a frozen value: @{}", array),
@@ -16451,7 +16452,7 @@ impl VMHelper {
                     .into());
                 }
                 let idx = self.eval_expr(index)?.to_int();
-                let aname = self.stash_array_name_for_package(array);
+                let aname = self.tree_array_name(array);
                 if let Some(obj) = self.tied_arrays.get(&aname).cloned() {
                     let class = obj
                         .as_blessed_ref()
@@ -16489,22 +16490,12 @@ impl VMHelper {
                     )
                     .into());
                 }
-                let aname = self.stash_array_name_for_package(array);
+                let aname = self.tree_array_name(array);
                 let flat = self.flatten_array_slice_index_specs(indices)?;
                 self.assign_named_array_slice(&aname, flat, val, target.line)
             }
             ExprKind::HashElement { hash, key } => {
-                if self.strict_vars && !hash.contains("::") && !self.scope.hash_binding_exists(hash)
-                {
-                    return Err(StrykeError::runtime(
-                        format!(
-                            "Global symbol \"%{}\" requires explicit package name (did you forget to declare \"my %{}\"?)",
-                            hash, hash
-                        ),
-                        target.line,
-                    )
-                    .into());
-                }
+                self.check_strict_hash_var(hash, target.line)?;
                 if self.scope.is_hash_frozen(hash) {
                     return Err(StrykeError::runtime(
                         format!("Modification of a frozen value: %%{}", hash),
@@ -16543,17 +16534,7 @@ impl VMHelper {
                         StrykeError::runtime("assign to empty hash slice", target.line).into(),
                     );
                 }
-                if self.strict_vars && !hash.contains("::") && !self.scope.hash_binding_exists(hash)
-                {
-                    return Err(StrykeError::runtime(
-                        format!(
-                            "Global symbol \"%{}\" requires explicit package name (did you forget to declare \"my %{}\"?)",
-                            hash, hash
-                        ),
-                        target.line,
-                    )
-                    .into());
-                }
+                self.check_strict_hash_var(hash, target.line)?;
                 if self.scope.is_hash_frozen(hash) {
                     return Err(StrykeError::runtime(
                         format!("Modification of a frozen value: %%{}", hash),
@@ -16573,7 +16554,8 @@ impl VMHelper {
                     };
                     key_vals.push(v);
                 }
-                self.assign_named_hash_slice(hash, key_vals, val, target.line)
+                let hname = self.tree_hash_storage_name(hash);
+                self.assign_named_hash_slice(&hname, key_vals, val, target.line)
             }
             ExprKind::Typeglob(name) => self.assign_typeglob_value(name, val, target.line),
             ExprKind::TypeglobExpr(e) => {
@@ -16954,7 +16936,7 @@ impl VMHelper {
                 .unwrap_or(StrykeValue::UNDEF),
             _ if name.starts_with('#') && name.len() > 1 => {
                 let arr = &name[1..];
-                let aname = self.stash_array_name_for_package(arr);
+                let aname = self.tree_array_name(arr);
                 let len = self.scope.array_len(&aname);
                 StrykeValue::integer(len as i64 - 1)
             }
@@ -17073,7 +17055,7 @@ impl VMHelper {
                 // `$#name = N` resizes `@name` to length `N + 1`. Truncates
                 // when N < current_last_idx, extends with `undef` otherwise.
                 let arr = &name[1..];
-                let aname = self.stash_array_name_for_package(arr);
+                let aname = self.tree_array_name(arr);
                 let new_last = val.to_int();
                 let new_len = if new_last < 0 {
                     0
@@ -21862,14 +21844,15 @@ impl VMHelper {
                         );
                     }
                 }
+                let hname = self.tree_hash_storage_name(hash);
                 self.scope
-                    .delete_hash_element(hash, &k)
+                    .delete_hash_element(&hname, &k)
                     .map_err(|e| FlowOrError::Error(e.at_line(line)))
             }
             ExprKind::ArrayElement { array, index } => {
                 self.check_strict_array_var(array, line)?;
                 let idx = self.eval_expr(index)?.to_int();
-                let aname = self.stash_array_name_for_package(array);
+                let aname = self.tree_array_name(array);
                 self.scope
                     .delete_array_element(&aname, idx)
                     .map_err(|e| FlowOrError::Error(e.at_line(line)))
@@ -21909,11 +21892,12 @@ impl VMHelper {
                 for key_expr in keys {
                     all_keys.extend(self.eval_hash_slice_key_components(key_expr)?);
                 }
+                let hname = self.tree_hash_storage_name(hash);
                 let mut deleted = Vec::with_capacity(all_keys.len());
                 for k in &all_keys {
                     let v = self
                         .scope
-                        .delete_hash_element(hash, k)
+                        .delete_hash_element(&hname, k)
                         .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
                     deleted.push(v);
                 }
@@ -21922,7 +21906,7 @@ impl VMHelper {
             // `delete @a[INDICES]` — Perl array-slice form.
             ExprKind::ArraySlice { array, indices } => {
                 self.check_strict_array_var(array, line)?;
-                let aname = self.stash_array_name_for_package(array);
+                let aname = self.tree_array_name(array);
                 let mut all_idx: Vec<i64> = Vec::new();
                 for idx_expr in indices {
                     let v = self.eval_expr_ctx(idx_expr, WantarrayCtx::List)?;
@@ -21975,13 +21959,14 @@ impl VMHelper {
                     }
                 }
                 Ok(StrykeValue::perl_bool(
-                    self.scope.exists_hash_element(hash, &k),
+                    self.scope
+                        .exists_hash_element(&self.tree_hash_storage_name(hash), &k),
                 ))
             }
             ExprKind::ArrayElement { array, index } => {
                 self.check_strict_array_var(array, line)?;
                 let idx = self.eval_expr(index)?.to_int();
-                let aname = self.stash_array_name_for_package(array);
+                let aname = self.tree_array_name(array);
                 Ok(StrykeValue::perl_bool(
                     self.scope.exists_array_element(&aname, idx),
                 ))

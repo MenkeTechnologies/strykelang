@@ -2551,12 +2551,18 @@ impl Compiler {
                 // `our $x;` / `our @a;` / `our %h;` with NO initializer aliases the package
                 // variable without resetting it: a BEGIN-phase write to the same stash must
                 // survive (Perl — a bare `our` declaration never clobbers). Register the name
-                // for resolution and `strict 'vars'`, but emit no runtime store. (With an
-                // initializer, `our $x = ...;` assigns and resets, same as Perl.)
+                // for resolution and `strict 'vars'`, and emit a `DeclareOur*` op that binds
+                // the name only when nothing is bound yet — no store, so the value is never
+                // reset, but a nested sub or closure body (whose `strict vars` check runs at
+                // run time) still sees it declared. (With an initializer, `our $x = ...;`
+                // assigns and resets, same as Perl.)
                 if !is_my && decl.initializer.is_none() && decl.type_annotation.is_none() {
                     match decl.sigil {
                         Sigil::Scalar => {
                             self.register_declare_our_scalar(&decl.name);
+                            let stash = self.qualify_stash_scalar_name(&decl.name);
+                            let idx = self.chunk.intern_name(&stash);
+                            self.chunk.emit(Op::DeclareOurScalar(idx), line);
                             continue;
                         }
                         Sigil::Array => {
@@ -2564,6 +2570,9 @@ impl Compiler {
                                 layer.declared_arrays.insert(decl.name.clone());
                                 layer.declared_our_arrays.insert(decl.name.clone());
                             }
+                            let stash = self.qualify_stash_array_name_full(&decl.name);
+                            let idx = self.chunk.intern_name(&stash);
+                            self.chunk.emit(Op::DeclareOurArray(idx), line);
                             continue;
                         }
                         Sigil::Hash => {
@@ -2571,6 +2580,9 @@ impl Compiler {
                                 layer.declared_hashes.insert(decl.name.clone());
                                 layer.declared_our_hashes.insert(decl.name.clone());
                             }
+                            let stash = self.qualify_stash_hash_name_full(&decl.name);
+                            let idx = self.chunk.intern_name(&stash);
+                            self.chunk.emit(Op::DeclareOurHash(idx), line);
                             continue;
                         }
                         Sigil::Typeglob => {} // falls through to the typeglob error below

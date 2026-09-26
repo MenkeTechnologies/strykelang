@@ -1020,6 +1020,18 @@ pub enum Op {
     FilterWithBlock(u16),
     /// `filter` / `fi` `EXPR, LIST` — index into [`Chunk::grep_expr_entries`]; stack: \[list\] → iterator.
     FilterWithExpr(u16),
+
+    // ── Bare `our` declarations (appended — do not reorder earlier op tags) ──────
+    /// `our $x;` with no initializer — stack: `[]` → `[]`. `name_idx` is the
+    /// package-qualified key. Binds the package scalar in the current frame **only if
+    /// no binding exists yet**: a bare `our` never clobbers a value an earlier phase
+    /// block stored, but a nested sub or closure body (checked for `strict vars` at
+    /// run time) must still see the name as declared.
+    DeclareOurScalar(u16),
+    /// `our @a;` with no initializer — same rule as [`Op::DeclareOurScalar`] for arrays.
+    DeclareOurArray(u16),
+    /// `our %h;` with no initializer — same rule as [`Op::DeclareOurScalar`] for hashes.
+    DeclareOurHash(u16),
 }
 
 /// `${^GLOBAL_PHASE}` values emitted with [`Op::SetGlobalPhase`] (matches Perl’s phase strings).

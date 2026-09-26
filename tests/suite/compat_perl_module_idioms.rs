@@ -105,3 +105,32 @@ fn sub_declared_inside_a_block_wins_over_a_builtin_of_the_same_name() {
         "[u]"
     );
 }
+
+// ── bare `our` seen from subs registered at run time ────────────────────────
+
+#[test]
+fn bare_our_is_visible_in_subs_nested_in_blocks_under_strict() {
+    // File::Basename's shape: `our(...)` at file scope, read by a sub defined
+    // inside a `BEGIN` block, in a non-main package, under `use strict`.
+    assert_eq!(
+        compat(
+            r#"package My::B; use strict; our $T; our (@A, %H);
+               BEGIN { my @u; sub set_t { my $old = $T; $T = shift; $old } }
+               BEGIN { sub fill { push @A, @_; $A[5] = 1; $H{k} = 1;
+                                  @H{qw(a b c)} = (1, 2, 3); delete $H{c};
+                                  scalar(@A) . (exists $H{a} ? "E" : "N") . $#A } }
+               set_t("x"); print set_t("y"), fill(1), " [$T] [$My::B::T] [@A[0,5]] [",
+               join(",", sort keys %H), "]";"#
+        ),
+        "x6E5 [y] [y] [1 1] [a,b,k]"
+    );
+}
+
+#[test]
+fn bare_our_does_not_reset_a_value_stored_by_begin() {
+    assert_eq!(
+        compat(r#"our $K; BEGIN { $K = "kept" } our $K; print $K"#),
+        "kept"
+    );
+}
+

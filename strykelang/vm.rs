@@ -10116,6 +10116,36 @@ impl<'a> VM<'a> {
                         self.interp.scope.declare_atomic_hash(n, map);
                         Ok(())
                     }
+                    Op::DeclareOurScalar(name_idx) => {
+                        let n = names[*name_idx as usize].as_str();
+                        if !self.interp.scope.scalar_binding_exists(n) {
+                            self.interp.scope.declare_scalar(n, StrykeValue::UNDEF);
+                        }
+                        // Runtime-registered sub bodies (`BEGIN { sub f { $x } }`) resolve
+                        // bare names through these sets, so `$x` there reads `Pkg::x`.
+                        let bare = n.rsplit("::").next().unwrap_or(n).to_string();
+                        self.interp.english_note_lexical_scalar_pub(&bare);
+                        self.interp.note_our_scalar_pub(&bare);
+                        Ok(())
+                    }
+                    Op::DeclareOurArray(name_idx) => {
+                        let n = names[*name_idx as usize].as_str();
+                        if !self.interp.scope.array_binding_exists(n) {
+                            self.interp.scope.declare_array(n, Vec::new());
+                        }
+                        let bare = n.rsplit("::").next().unwrap_or(n).to_string();
+                        self.interp.note_our_array_pub(&bare);
+                        Ok(())
+                    }
+                    Op::DeclareOurHash(name_idx) => {
+                        let n = names[*name_idx as usize].as_str();
+                        if !self.interp.scope.hash_binding_exists(n) {
+                            self.interp.scope.declare_hash(n, IndexMap::new());
+                        }
+                        let bare = n.rsplit("::").next().unwrap_or(n).to_string();
+                        self.interp.note_our_hash_pub(&bare);
+                        Ok(())
+                    }
                     Op::DeclareOurSyncScalar(name_idx) => {
                         let val = self.pop();
                         let n = names[*name_idx as usize].as_str();
