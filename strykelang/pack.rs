@@ -1,5 +1,11 @@
 //! Subset of Perl `pack` / `unpack` for binary I/O.
-//! Supported: `A` `a` `N` `n` `V` `v` `C` `Q` `q` `Z` `H` `x` `w` `i` `I` `l` `L` `s` `S` `f` `d` (optional repeat count after each; `*` for some).
+//! Supported: `A` `a` `N` `n` `V` `v` `C` `U` `Q` `q` `Z` `H` `x` `w` `i` `I` `l` `L` `s` `S` `f` `d` (optional repeat count after each; `*` for some).
+//!
+//! `U` is a Unicode code point, stored UTF-8 encoded. As in Perl, a template that
+//! starts with `U` packs a character string (`pack "U", 0x263A` is one character);
+//! otherwise the result is the byte string holding the UTF-8 encoding
+//! (`pack "C0U", 0x263A` is three bytes). `unpack` decodes one UTF-8 sequence per
+//! `U`.
 
 use std::sync::Arc;
 
@@ -35,6 +41,7 @@ fn tokenize(template: &str) -> Result<Vec<Token>, String> {
                 | 'V'
                 | 'v'
                 | 'C'
+                | 'U'
                 | 'Q'
                 | 'q'
                 | 'Z'
@@ -107,6 +114,10 @@ pub fn perl_pack(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue>
     let template = args[0].to_string();
     let mut rest = &args[1..];
     match pack_impl(&template, &mut rest) {
+        // A leading `U` selects character mode: the UTF-8 buffer is a text string.
+        Ok(bytes) if template.trim_start().starts_with('U') => Ok(StrykeValue::string(
+            String::from_utf8_lossy(&bytes).into_owned(),
+        )),
         Ok(bytes) => Ok(StrykeValue::bytes(Arc::new(bytes))),
         Err(msg) => Err(StrykeError::runtime(format!("pack: {}", msg), line)),
     }
@@ -238,6 +249,21 @@ fn pack_impl(template: &str, args: &mut &[StrykeValue]) -> Result<Vec<u8>, Strin
                 for _ in 0..count {
                     let v = (take_arg(args)?.to_int() & 0xff) as u8;
                     buf.push(v);
+                }
+            }
+            'U' => {
+                let count = match t.repeat {
+                    Repeat::Star => args.len(),
+                    _ => repeat_fixed(t.repeat, 1)?,
+                };
+                for _ in 0..count {
+                    let cp = take_arg(args)?.to_int();
+                    let ch = u32::try_from(cp)
+                        .ok()
+                        .and_then(char::from_u32)
+                        .unwrap_or(char::REPLACEMENT_CHARACTER);
+                    let mut enc = [0u8; 4];
+                    buf.extend_from_slice(ch.encode_utf8(&mut enc).as_bytes());
                 }
             }
             'Q' => {
@@ -459,6 +485,7 @@ fn unpack_width(op: char, repeat: Repeat) -> Result<Option<usize>, String> {
             }
         },
         'w' => Ok(None), // variable-length
+        'U' => Ok(None), // variable-length UTF-8
         'i' | 'I' | 'l' | 'L' => match repeat {
             Repeat::Star => Ok(None),
             _ => {
@@ -677,6 +704,31 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<StrykeValue>, String> 
                     let v = i64::from_ne_bytes(data[pos..pos + 8].try_into().unwrap());
                     pos += 8;
                     out.push(StrykeValue::integer(v));
+                }
+            }
+            'U' => {
+                let count = match t.repeat {
+                    Repeat::Star => usize::MAX,
+                    _ => repeat_fixed(t.repeat, 1)?,
+                };
+                let mut decoded = 0usize;
+                while decoded < count && pos < data.len() {
+                    let rest = &data[pos..(pos + 4).min(data.len())];
+                    let (cp, len) = match std::str::from_utf8(rest) {
+                        Ok(s) => s.chars().next().map(|c| (c as i64, c.len_utf8())),
+                        Err(e) if e.valid_up_to() > 0 => {
+                            std::str::from_utf8(&rest[..e.valid_up_to()])
+                                .ok()
+                                .and_then(|s| s.chars().next())
+                                .map(|c| (c as i64, c.len_utf8()))
+                        }
+                        Err(_) => None,
+                    }
+                    // Not UTF-8 at this position: the byte is its own code point.
+                    .unwrap_or((data[pos] as i64, 1));
+                    pos += len;
+                    out.push(StrykeValue::integer(cp));
+                    decoded += 1;
                 }
             }
             'w' => {
@@ -1231,5 +1283,37 @@ mod tests {
         assert_eq!(b, b"hello\0");
         let v = unpack_vals("Z*", &b);
         assert_eq!(v[0].to_string(), "hello");
+    }
+
+    #[test]
+    fn pack_leading_u_is_a_character_string() {
+        let p = perl_pack(
+            &[
+                StrykeValue::string("U*".into()),
+                StrykeValue::integer(0x48),
+                StrykeValue::integer(0x263A),
+            ],
+            0,
+        )
+        .expect("pack");
+        assert!(p.as_bytes_arc().is_none(), "leading U selects character mode");
+        assert_eq!(p.to_string(), "H\u{263A}");
+    }
+
+    #[test]
+    fn pack_c0u_is_the_utf8_byte_string() {
+        let b = pack_bytes("C0U", &[StrykeValue::integer(0x263A)]);
+        assert_eq!(b, [0xE2, 0x98, 0xBA]);
+    }
+
+    #[test]
+    fn unpack_u_decodes_one_code_point_per_u() {
+        let v = unpack_vals("U*", "A\u{E9}\u{20AC}".as_bytes());
+        let cps: Vec<i64> = v.iter().map(StrykeValue::to_int).collect();
+        assert_eq!(cps, [0x41, 0xE9, 0x20AC]);
+        // A byte that starts no UTF-8 sequence is its own code point.
+        let v = unpack_vals("U2", &[0xFF, b'a']);
+        let cps: Vec<i64> = v.iter().map(StrykeValue::to_int).collect();
+        assert_eq!(cps, [0xFF, 0x61]);
     }
 }
