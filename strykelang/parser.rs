@@ -19992,6 +19992,9 @@ impl Parser {
         // `shift or die`, `shift ? a : b`. Without these the operator was parsed as the start
         // of the operand. `Token::DefinedOr` is listed for the same reason but does not fire
         // yet: `shift //` still lexes the `//` as an empty regex before the parser sees it.
+        // `Token::Arrow` is the postfix dereference applied to the shifted value —
+        // `shift->[0]`, `shift->{name}`, `shift->method` — which the caller's postfix
+        // loop takes over once the operand is the implicit array.
         if matches!(
             self.peek(),
             Token::Semicolon
@@ -20007,6 +20010,7 @@ impl Parser {
                 | Token::DefinedOr
                 | Token::Question
                 | Token::Colon
+                | Token::Arrow
         ) || self.peek_line() > line
         {
             Ok(Expr {
