@@ -3562,7 +3562,13 @@ against the released stryke binary. Worked around downstream in
 `count_by { $_ } @words` (over a grep/map/split-built `@words`) with a
 plain `$freq{$_}++ for @words` tally. No upstream pin test yet.
 
-## BUG-309 — `--compat` still lets a builtin shadow a user `sub` for parser-dispatched names (`f`, `d`, `p`, `rev`) — **`bug`**
+## BUG-309 — `--compat` still lets a builtin shadow a user `sub` for parser-dispatched names (`f`, `d`, `p`, `rev`) — **`bug`** [FIXED]
+
+Fixed: the parser's bareword dispatch routes a name the program declares as a
+sub to the generic call arm under `--compat` (`shadowed_by_user_sub` in
+`parser.rs`). Re-checked all 79 names listed below as
+`sub NAME { return "USER_NAME" } print NAME();` — stryke --compat and perl
+printed the same line for every one.
 
 `--compat` now gives a user `sub` precedence over a stryke *extension* builtin
 (`Compiler::compat_user_sub_wins`), but only for names dispatched through
@@ -3618,7 +3624,13 @@ directory listing instead of the user's value.
 Pin tests for the half that *is* fixed:
 `tests/suite/compat_udf_shadow_extensions.rs`.
 
-## BUG-318 — a rebuilt binary at the same version replays the old build's bytecode — **`bug`**
+## BUG-318 — a rebuilt binary at the same version replays the old build's bytecode — **`bug`** [FIXED]
+
+Fixed by 04f72bcfc8: each shard entry records the binary stamp (mtime secs+nsecs
+and size) it was cached under and a lookup must match the running binary's stamp
+exactly (`script_cache.rs`). Re-checked: with the cache enabled, a script whose
+result differs between two v0.17.54 builds printed each build's own result on
+alternating runs.
 
 `~/.stryke/scripts.compat.rkyv` is keyed on script path + mtime + package
 version + shard format version (`script_cache.rs`), so two binaries built from
@@ -3831,3 +3843,23 @@ keep their stryke meanings.
 Pinned by `parity/cases/20050_user_sub_shadows_count_family_builtin.pl`, which
 carries a non-colliding control sub alongside each colliding one so a future
 regression cannot be mistaken for a general argument-passing change.
+
+## BUG-319 — `--compat` cannot load core XS modules (List::Util, Scalar::Util, POSIX) — **`parity`**
+
+Under `--compat`, `use Module` loads the module's `.pm` from the system perl's
+`@INC`. For modules whose functions are XS, the `.pm` defines no Perl body for
+them, and the loader path itself stops earlier:
+
+```
+$ st --compat -e 'use List::Util qw(sum); print sum(1,2)'
+VM compile error (unsupported): goto with dynamic or sub-ref target at -e line 0.
+$ st --compat -e 'use Scalar::Util qw(blessed); print blessed(bless {}, "X")'
+VM compile error (unsupported): goto with dynamic or sub-ref target at -e line 0.
+$ st --compat -e 'use POSIX qw(floor); print floor(2.5)'
+`floor` is not defined in module `POSIX` (expected `POSIX::floor`) at -e line 1.
+```
+
+The `goto` is Exporter's `goto &{as_heavy()}` (Exporter.pm lines 22, 78–90),
+reached from List::Util's `goto &Exporter::import`. Even with that lowered, the
+XS functions (`sum`, `blessed`, `floor`) have no Perl definition to import;
+they need to bind to stryke's native builtins of the same meaning.
