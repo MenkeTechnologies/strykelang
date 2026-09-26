@@ -3255,13 +3255,26 @@ impl<'a> VM<'a> {
             let is_bare_builtin = !crate::compat_mode()
                 && !name.contains("::")
                 && crate::builtins::is_callable_spelling(name);
-            if let Some(r) = crate::builtins::try_builtin(self.interp, name, &args, self.line()) {
+            // `--compat`: a sub the program can reach by this name (declared in a
+            // nested block, imported by `use Module qw(name)`, installed through a
+            // glob) wins over a stryke builtin of the same spelling, as in Perl.
+            let compat_sub = if crate::compat_mode() {
+                self.interp.resolve_sub_by_name(name)
+            } else {
+                None
+            };
+            let builtin = if compat_sub.is_some() {
+                None
+            } else {
+                crate::builtins::try_builtin(self.interp, name, &args, self.line())
+            };
+            if let Some(r) = builtin {
                 self.interp.wantarray_kind = saved_wa_call;
                 self.push(r?);
             } else {
                 self.interp.wantarray_kind = saved_wa_call;
-                let maybe_sub = if is_bare_builtin {
-                    None
+                let maybe_sub = if compat_sub.is_some() || is_bare_builtin {
+                    compat_sub
                 } else {
                     self.interp.resolve_sub_by_name(name)
                 };

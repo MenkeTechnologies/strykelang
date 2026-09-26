@@ -1703,6 +1703,17 @@ impl Compiler {
                     self.chunk.sub_entries.push((name_idx, 0, false));
                     self.declared_subs.insert(q);
                 }
+                // `--compat`: a name imported by `use Module LIST` is a user sub in the
+                // importing package, so a call to it must not lower to a stryke
+                // extension builtin of the same spelling (see `compat_user_sub_wins`).
+                StmtKind::Use {
+                    module, imports, ..
+                } if crate::compat_mode() => {
+                    for name in crate::parser::Parser::imported_sub_names(module, imports) {
+                        self.declared_subs
+                            .insert(Self::qualify_sub_decl_pass1(&name, &pending_pkg));
+                    }
+                }
                 _ => {}
             }
         }

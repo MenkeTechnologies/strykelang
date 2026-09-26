@@ -6904,6 +6904,46 @@ impl Parser {
         })
     }
 
+    /// Sub names a `use Module LIST` statement imports: `use Module qw(name
+    /// &name2 $var :tag)` yields `name`, `name2`; `use constant PI => 3` and
+    /// `use constant { E => 2 }` yield the constant names. Variables, `:tags`,
+    /// `-flags` and `!negations` name no sub and are skipped, as are the import
+    /// lists of lowercase pragmas (`use lib 'dir'`, `use warnings 'all'`), which
+    /// are not sub names — except `constant` and `subs`, whose lists are.
+    ///
+    /// Under `--compat` the parser and the compiler both treat these names as
+    /// user subs, so `use File::Basename qw(basename)` calls the imported sub
+    /// instead of rejecting — or silently running — the stryke extension of
+    /// the same name.
+    pub(crate) fn imported_sub_names(module: &str, imports: &[Expr]) -> Vec<String> {
+        fn collect<'a>(e: &'a Expr, out: &mut Vec<&'a str>) {
+            match &e.kind {
+                ExprKind::String(s) => out.push(s),
+                ExprKind::QW(words) => out.extend(words.iter().map(String::as_str)),
+                ExprKind::List(items) => items.iter().for_each(|i| collect(i, out)),
+                ExprKind::HashRef(pairs) => pairs.iter().for_each(|(k, _)| collect(k, out)),
+                _ => {}
+            }
+        }
+        let is_pragma = module.chars().all(|c| c.is_ascii_lowercase() || c == ':');
+        if is_pragma && !matches!(module, "constant" | "subs") {
+            return Vec::new();
+        }
+        let mut names = Vec::new();
+        imports.iter().for_each(|e| collect(e, &mut names));
+        names
+            .into_iter()
+            .map(|raw| raw.strip_prefix('&').unwrap_or(raw))
+            .filter(|name| {
+                name.chars()
+                    .next()
+                    .is_some_and(|c| c.is_alphabetic() || c == '_')
+                    && name.chars().all(|c| c.is_alphanumeric() || c == '_')
+            })
+            .map(String::from)
+            .collect()
+    }
+
     fn parse_use(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
         // Capture the keyword (`use` or its alias `import`) so error
@@ -7032,6 +7072,10 @@ impl Parser {
                     }
                 }
                 self.eat(&Token::Semicolon);
+                if crate::compat_mode() {
+                    self.declared_subs
+                        .extend(Self::imported_sub_names(&full_name, &imports));
+                }
                 Ok(Statement {
                     label: None,
                     kind: StmtKind::Use {

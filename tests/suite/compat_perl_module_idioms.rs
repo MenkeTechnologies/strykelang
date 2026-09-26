@@ -57,3 +57,51 @@ fn map_and_grep_accept_the_parenthesized_call_form() {
     // File::Basename's shape: `map("\Q$_\E", @_)`.
     assert_eq!(compat(r#"print join " ", map("\Q$_\E", "a.b")"#), r"a\.b");
 }
+
+// ── imported names beat stryke extensions of the same spelling ──────────────
+
+/// Write `My/Shadow.pm` exporting `basename` (a stryke extension name) into a
+/// fresh directory and return that directory for `-I`.
+fn module_dir_exporting_basename() -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("stryke-compat-import-{}", std::process::id()));
+    std::fs::create_dir_all(dir.join("My")).expect("mkdir");
+    std::fs::write(
+        dir.join("My/Shadow.pm"),
+        "package My::Shadow;\nrequire Exporter;\nour @ISA = ('Exporter');\n\
+         our @EXPORT_OK = qw(basename);\nsub basename { \"mine:$_[0]\" }\n1;\n",
+    )
+    .expect("write module");
+    dir
+}
+
+#[test]
+fn imported_sub_wins_over_the_stryke_extension_it_shadows() {
+    let dir = module_dir_exporting_basename();
+    let out = Command::new(env!("CARGO_BIN_EXE_st"))
+        .arg("--compat")
+        .arg(format!("-I{}", dir.display()))
+        .args(["-e", r#"use My::Shadow qw(basename); print basename("x")"#])
+        .env("STRYKE_CACHE", "0")
+        .output()
+        .expect("spawn st");
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "mine:x");
+}
+
+#[test]
+fn use_constant_names_are_callable_even_when_they_spell_an_extension() {
+    assert_eq!(
+        compat("use constant PI => 3; use constant { E => 2, TAU => 6 }; print PI, E, TAU"),
+        "326"
+    );
+}
+
+#[test]
+fn sub_declared_inside_a_block_wins_over_a_builtin_of_the_same_name() {
+    // `s1` is a stryke builtin; the program's own `sub s1` must be the one called.
+    assert_eq!(
+        compat(r#"our $T; { sub s1 { $T = shift } } s1("u"); print "[$T]""#),
+        "[u]"
+    );
+}
