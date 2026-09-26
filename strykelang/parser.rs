@@ -832,9 +832,9 @@ impl Parser {
                             self.peek_line(),
                         ));
                     }
-                    self.parse_sub_decl(true)?
+                    self.parse_sub_decl_or_invoked_anon(true)?
                 }
-                "fn" => self.parse_sub_decl(false)?,
+                "fn" => self.parse_sub_decl_or_invoked_anon(false)?,
                 "struct" => {
                     if crate::compat_mode() {
                         return Err(self.syntax_err(
@@ -5290,6 +5290,29 @@ impl Parser {
         let body = self.parse_block();
         self.sub_body_depth -= 1;
         body
+    }
+
+    /// Statement-initial `sub`/`fn`. A named sub is a declaration, but an
+    /// anonymous one followed by `->` (`sub { … }->(ARGS)`) is an expression
+    /// statement: re-parse it from the keyword through the expression path so
+    /// the postfix call/subscript chain and any statement modifier apply (BUG-316).
+    fn parse_sub_decl_or_invoked_anon(&mut self, is_sub_keyword: bool) -> StrykeResult<Statement> {
+        let saved = self.pos;
+        let stmt = self.parse_sub_decl(is_sub_keyword)?;
+        let is_anon = matches!(
+            &stmt.kind,
+            StmtKind::Expression(Expr {
+                kind: ExprKind::CodeRef { .. },
+                ..
+            })
+        );
+        if !is_anon || !matches!(self.peek(), Token::Arrow) {
+            return Ok(stmt);
+        }
+        self.pos = saved;
+        let expr = self.parse_expression()?;
+        let stmt = self.maybe_postfix_modifier(expr)?;
+        self.parse_stmt_postfix_modifier(stmt)
     }
 
     fn parse_sub_decl(&mut self, is_sub_keyword: bool) -> StrykeResult<Statement> {
