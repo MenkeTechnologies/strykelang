@@ -332,3 +332,42 @@ fn reverse_through_arrayref_deref() {
     "#;
     assert_eq!(eval_int(code), 1);
 }
+
+// ── mutations after `\@a` / `\%h` stay visible through the reference ─────────
+// Taking a reference moves the container to shared storage; every mutation of
+// the named variable must reach that storage, not a fresh frame copy.
+
+#[test]
+fn unshift_after_taking_a_ref_is_seen_through_the_ref() {
+    let code = r#"
+        my @a = (1, 2);
+        my $r = \@a;
+        unshift @a, 0;
+        join(",", @$r) . "|" . join(",", @a)
+    "#;
+    assert_eq!(eval_string(code), "0,1,2|0,1,2");
+}
+
+#[test]
+fn delete_array_element_after_taking_a_ref_is_seen_through_the_ref() {
+    let code = r#"
+        my @a = (1, 2, 3);
+        my $r = \@a;
+        delete $a[1];
+        defined($r->[1]) ? "def" : "undef"
+    "#;
+    assert_eq!(eval_string(code), "undef");
+}
+
+#[test]
+fn delete_and_clear_hash_after_taking_a_ref_are_seen_through_the_ref() {
+    let code = r#"
+        my %h = (a => 1, b => 2);
+        my $hr = \%h;
+        delete $h{a};
+        my $after_delete = join(",", sort keys %$hr);
+        %h = ();
+        $after_delete . "|" . scalar(keys %$hr)
+    "#;
+    assert_eq!(eval_string(code), "b|0");
+}

@@ -6936,11 +6936,8 @@ impl VMHelper {
                 flat_vals.push(a.clone());
             }
         }
-        let arr = self.scope.get_array_mut(&arr_name)?;
-        for (i, v) in flat_vals.into_iter().enumerate() {
-            arr.insert(i, v);
-        }
-        Ok(StrykeValue::integer(arr.len() as i64))
+        let len = self.scope.unshift_to_array(&arr_name, flat_vals)?;
+        Ok(StrykeValue::integer(len as i64))
     }
 
     /// Random fractional value like Perl `rand`: `[0, upper)` when `upper > 0`,
@@ -21422,14 +21419,10 @@ impl VMHelper {
                 vals.push(val);
             }
         }
-        let arr = self
+        let len = self
             .scope
-            .get_array_mut(&arr_name)
+            .unshift_to_array(&arr_name, vals)
             .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-        for (i, v) in vals.into_iter().enumerate() {
-            arr.insert(i, v);
-        }
-        let len = arr.len();
         Ok(StrykeValue::integer(len as i64))
     }
 
@@ -21615,14 +21608,11 @@ impl VMHelper {
             return Ok(w.len() as i64);
         }
         if let Some(name) = arr_ref.as_array_binding_name() {
-            let arr = self
+            let len = self
                 .scope
-                .get_array_mut(&name)
+                .unshift_to_array(&name, flat)
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-            for (i, v) in flat.into_iter().enumerate() {
-                arr.insert(i, v);
-            }
-            return Ok(arr.len() as i64);
+            return Ok(len as i64);
         }
         if let Some(s) = arr_ref.as_str() {
             if self.strict_refs {
@@ -21636,14 +21626,11 @@ impl VMHelper {
                 .into());
             }
             let name = s.to_string();
-            let arr = self
+            let len = self
                 .scope
-                .get_array_mut(&name)
+                .unshift_to_array(&name, flat)
                 .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-            for (i, v) in flat.into_iter().enumerate() {
-                arr.insert(i, v);
-            }
-            return Ok(arr.len() as i64);
+            return Ok(len as i64);
         }
         Err(StrykeError::runtime("unshift argument is not an ARRAY reference", line).into())
     }

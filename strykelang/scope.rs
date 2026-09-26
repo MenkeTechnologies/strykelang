@@ -2077,6 +2077,54 @@ impl Scope {
         Ok(frame.get_array_mut(name).unwrap())
     }
 
+    /// Run `f` on the storage of `@name`, whichever kind holds it: a `mysync`
+    /// atomic array, an array promoted to shared storage by `\@name` (or bound by
+    /// `*name = \@x`), or a plain frame array. [`Self::get_array_mut`] can only
+    /// reach the last kind, so a mutation routed through it on a shared array
+    /// wrote a fresh frame array that the reference never saw.
+    pub fn with_array_mut<R>(
+        &mut self,
+        name: &str,
+        f: impl FnOnce(&mut Vec<StrykeValue>) -> R,
+    ) -> Result<R, StrykeError> {
+        canon_main!(name);
+        if let Some(aa) = self.find_atomic_array(name) {
+            return Ok(f(&mut aa.0.lock()));
+        }
+        if let Some(arc) = self.find_shared_array(name) {
+            return Ok(f(&mut arc.write()));
+        }
+        Ok(f(self.get_array_mut(name)?))
+    }
+
+    /// `unshift @name, LIST` — prepend `vals` in order; returns the new length.
+    pub fn unshift_to_array(
+        &mut self,
+        name: &str,
+        vals: Vec<StrykeValue>,
+    ) -> Result<usize, StrykeError> {
+        self.with_array_mut(name, |arr| {
+            arr.splice(0..0, vals);
+            arr.len()
+        })
+    }
+
+    /// Hash half of [`Self::with_array_mut`].
+    pub fn with_hash_mut<R>(
+        &mut self,
+        name: &str,
+        f: impl FnOnce(&mut IndexMap<String, StrykeValue>) -> R,
+    ) -> Result<R, StrykeError> {
+        canon_main!(name);
+        if let Some(ah) = self.find_atomic_hash(name) {
+            return Ok(f(&mut ah.0.lock()));
+        }
+        if let Some(arc) = self.find_shared_hash(name) {
+            return Ok(f(&mut arc.write()));
+        }
+        Ok(f(self.get_hash_mut(name)?))
+    }
+
     /// Push to array — works for both regular and atomic arrays.
     pub fn push_to_array(&mut self, name: &str, val: StrykeValue) -> Result<(), StrykeError> {
         let val = self.resolve_container_binding_ref(val);
@@ -2121,12 +2169,12 @@ impl Scope {
             }
             return Ok(());
         }
-        let arr = self.get_array_mut(name)?;
-        arr.reserve(count);
-        for i in start..end {
-            arr.push(StrykeValue::integer(i));
-        }
-        Ok(())
+        self.with_array_mut(name, |arr| {
+            arr.reserve(count);
+            for i in start..end {
+                arr.push(StrykeValue::integer(i));
+            }
+        })
     }
 
     /// Pop from array — works for regular, shared, and atomic arrays.
@@ -2376,32 +2424,14 @@ impl Scope {
         name: &str,
         index: i64,
     ) -> Result<StrykeValue, StrykeError> {
-        if let Some(aa) = self.find_atomic_array(name) {
-            let mut arr = aa.0.lock();
-            let idx = if index < 0 {
-                (arr.len() as i64 + index) as usize
-            } else {
-                index as usize
-            };
-            if idx >= arr.len() {
-                return Ok(StrykeValue::UNDEF);
+        self.with_array_mut(name, |arr| {
+            let len = arr.len() as i64;
+            let idx = if index < 0 { len + index } else { index };
+            if idx < 0 || idx >= len {
+                return StrykeValue::UNDEF;
             }
-            let old = arr.get(idx).cloned().unwrap_or(StrykeValue::UNDEF);
-            arr[idx] = StrykeValue::UNDEF;
-            return Ok(old);
-        }
-        let arr = self.get_array_mut(name)?;
-        let idx = if index < 0 {
-            (arr.len() as i64 + index) as usize
-        } else {
-            index as usize
-        };
-        if idx >= arr.len() {
-            return Ok(StrykeValue::UNDEF);
-        }
-        let old = arr.get(idx).cloned().unwrap_or(StrykeValue::UNDEF);
-        arr[idx] = StrykeValue::UNDEF;
-        Ok(old)
+            std::mem::replace(&mut arr[idx as usize], StrykeValue::UNDEF)
+        })
     }
 
     // ── Hashes ──
@@ -2613,6 +2643,10 @@ impl Scope {
             *ah.0.lock() = val;
             return Ok(());
         }
+        if let Some(arc) = self.find_shared_hash(name) {
+            *arc.write() = val;
+            return Ok(());
+        }
         self.check_parallel_hash_write(name)?;
         for frame in self.frames.iter_mut().rev() {
             if frame.has_hash(name) {
@@ -2765,14 +2799,14 @@ impl Scope {
             }
             return Ok(());
         }
-        let hash = self.get_hash_mut(name)?;
-        hash.reserve(count);
-        let mut buf = itoa::Buffer::new();
-        for i in start..end {
-            let key = buf.format(i).to_owned();
-            hash.insert(key, StrykeValue::integer(i.wrapping_mul(k)));
-        }
-        Ok(())
+        self.with_hash_mut(name, |hash| {
+            hash.reserve(count);
+            let mut buf = itoa::Buffer::new();
+            for i in start..end {
+                let key = buf.format(i).to_owned();
+                hash.insert(key, StrykeValue::integer(i.wrapping_mul(k)));
+            }
+        })
     }
     /// `delete_hash_element` — see implementation.
     pub fn delete_hash_element(
@@ -2785,11 +2819,9 @@ impl Scope {
         if name == "ENV" {
             std::env::remove_var(key);
         }
-        if let Some(ah) = self.find_atomic_hash(name) {
-            return Ok(ah.0.lock().shift_remove(key).unwrap_or(StrykeValue::UNDEF));
-        }
-        let hash = self.get_hash_mut(name)?;
-        Ok(hash.shift_remove(key).unwrap_or(StrykeValue::UNDEF))
+        self.with_hash_mut(name, |hash| {
+            hash.shift_remove(key).unwrap_or(StrykeValue::UNDEF)
+        })
     }
     /// `exists_hash_element` — see implementation.
     #[inline]
