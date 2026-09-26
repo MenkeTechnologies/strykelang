@@ -9212,6 +9212,25 @@ impl Parser {
                 }
                 if matches!(self.peek(), Token::Ident(_)) {
                     let name = self.parse_qualified_subroutine_name()?;
+                    // `&name(ARGS)` calls the sub with exactly ARGS (prototype ignored).
+                    // Only the bare `&name` form passes the caller's `@_` along.
+                    if matches!(self.peek(), Token::LParen) {
+                        self.advance();
+                        let args = self.parse_arg_list()?;
+                        self.expect(&Token::RParen)?;
+                        return Ok(Expr {
+                            kind: ExprKind::IndirectCall {
+                                target: Box::new(Expr {
+                                    kind: ExprKind::SubroutineCodeRef(name),
+                                    line,
+                                }),
+                                args,
+                                ampersand: true,
+                                pass_caller_arglist: false,
+                            },
+                            line,
+                        });
+                    }
                     return Ok(Expr {
                         kind: ExprKind::SubroutineRef(name),
                         line,

@@ -210,3 +210,16 @@ fn calling_a_closure_does_not_roll_back_a_package_array() {
         "1 2"
     );
 }
+
+// ── `&name(ARGS)` ────────────────────────────────────────────────────────────
+
+#[test]
+fn ampersand_call_passes_exactly_the_parenthesized_args() {
+    assert_eq!(
+        compat(
+            r#"sub show { "F(@_)" } sub pass_along { &show } sub empty_args { &show() }
+               print &show(2, 3), "a", &show(4), pass_along(7), empty_args(8)"#
+        ),
+        "F(2 3)aF(4)F(7)F()"
+    );
+}
