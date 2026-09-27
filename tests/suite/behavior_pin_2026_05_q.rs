@@ -462,17 +462,15 @@ fn dollar_underscore_zero_workaround_for_first_element_works() {
 // ── refaddr of `\&fn` differs between repeated evaluations (BUG-102) ───────
 
 #[test]
-fn refaddr_of_repeated_backslash_amp_returns_different_today() {
-    // BUG-102: in Perl, multiple `\&myff` references all share the sub's
-    // CV address. In stryke, each `\&myff` evaluation creates a new
-    // coderef wrapper.
+fn refaddr_of_repeated_backslash_amp_is_the_sub_address() {
+    // BUG-102 (fixed): every `\&myff` shares the sub's address, as in perl.
     assert_eq!(
         eval_int(
             r#"sub myff { 1 }
                my $r1 = \&myff; my $r2 = \&myff;
                refaddr($r1) == refaddr($r2) ? 1 : 0"#
         ),
-        0
+        1
     );
 }
 

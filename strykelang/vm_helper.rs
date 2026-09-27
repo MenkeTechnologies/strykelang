@@ -1306,6 +1306,57 @@ fn rewrite_perl_regex_dollar_end_anchor(pat: &str, multiline_flag: bool) -> Stri
     out
 }
 
+/// Perl's `(?^FLAGS:...)` group — how an interpolated `qr//` stringifies —
+/// resets the `imsx` flags to their defaults and then applies FLAGS. Rewrite
+/// it to the explicit `(?FLAGS-REST:...)` form so the pattern stays on the
+/// Rust `regex` engine: `qr/ab/i` inside `/x$re/` keeps its `/i`, and `qr/ab/`
+/// inside `/x$re/i` stays case-sensitive. Flags without an inline equivalent
+/// (`n`, `p`, and the `a`/`u`/`l`/`d` charset modifiers) are dropped.
+fn rewrite_perl_caret_flag_groups(pat: &str) -> std::borrow::Cow<'_, str> {
+    if !pat.contains("(?^") {
+        return std::borrow::Cow::Borrowed(pat);
+    }
+    let chars: Vec<char> = pat.chars().collect();
+    let mut out = String::with_capacity(pat.len() + 8);
+    let mut i = 0usize;
+    while i < chars.len() {
+        let c = chars[i];
+        if c == '\\' && i + 1 < chars.len() {
+            out.push(c);
+            out.push(chars[i + 1]);
+            i += 2;
+            continue;
+        }
+        if c == '[' {
+            i = copy_regex_char_class(&chars, i, &mut out);
+            continue;
+        }
+        if c == '(' && chars.get(i + 1) == Some(&'?') && chars.get(i + 2) == Some(&'^') {
+            let mut j = i + 3;
+            while j < chars.len() && chars[j].is_ascii_alphabetic() {
+                j += 1;
+            }
+            if chars.get(j) == Some(&':') {
+                let given: String = chars[i + 3..j].iter().collect();
+                let on: String = "imsx".chars().filter(|f| given.contains(*f)).collect();
+                let off: String = "imsx".chars().filter(|f| !given.contains(*f)).collect();
+                out.push_str("(?");
+                out.push_str(&on);
+                if !off.is_empty() {
+                    out.push('-');
+                    out.push_str(&off);
+                }
+                out.push(':');
+                i = j + 1;
+                continue;
+            }
+        }
+        out.push(c);
+        i += 1;
+    }
+    std::borrow::Cow::Owned(out)
+}
+
 /// Buffered directory listing for Perl `opendir` / `readdir` (Rust `ReadDir` is single-pass).
 #[derive(Debug, Clone)]
 pub(crate) struct DirHandleState {
@@ -22543,6 +22594,7 @@ impl VMHelper {
         let expanded = expand_perl_regex_quotemeta(pattern);
         let expanded = expand_perl_regex_octal_escapes(&expanded);
         let expanded = rewrite_perl_regex_dollar_end_anchor(&expanded, flags.contains('m'));
+        let expanded = rewrite_perl_caret_flag_groups(&expanded);
         let mut re_str = String::new();
         if flags.contains('i') {
             re_str.push_str("(?i)");

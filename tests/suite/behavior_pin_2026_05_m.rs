@@ -197,16 +197,14 @@ fn class_private_field_rejects_external_access() {
 // ── refaddr returns different addresses for `\@a` taken twice ───────────────
 
 #[test]
-fn refaddr_of_repeated_backslash_at_returns_different_addresses_today() {
-    // BUG-075: in Perl, multiple `\@a` references all share the array's
-    // address. In stryke, each `\@a` evaluates to a fresh ref-cell, so
-    // refaddr returns different values.
+fn refaddr_of_repeated_backslash_at_is_the_array_address() {
+    // BUG-075 (fixed): every `\@a` shares the array's address, as in perl.
     assert_eq!(
         eval_int(
             r#"my @a; my $r1 = \@a; my $r2 = \@a;
                refaddr($r1) == refaddr($r2) ? 1 : 0"#
         ),
-        0
+        1
     );
 }
 

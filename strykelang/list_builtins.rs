@@ -206,10 +206,11 @@ fn scalar_util_refaddr(arg: Option<&StrykeValue>) -> crate::error::StrykeResult<
     if v.is_undef() {
         return Ok(StrykeValue::UNDEF);
     }
-    if v.with_heap(|_| ()).is_none() {
-        return Ok(StrykeValue::UNDEF);
-    }
-    Ok(StrykeValue::integer(v.raw_bits() as i64))
+    // The referent's address: two refs to one array share it, and it
+    // equals `$ref + 0` under --compat.
+    Ok(v.perl_ref_addr()
+        .map(|a| StrykeValue::integer(a as i64))
+        .unwrap_or(StrykeValue::UNDEF))
 }
 
 fn scalar_util_reftype(arg: Option<&StrykeValue>) -> crate::error::StrykeResult<StrykeValue> {

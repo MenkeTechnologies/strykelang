@@ -2595,6 +2595,21 @@ impl StrykeValue {
             return f64::from_bits(self.0);
         }
         match unsafe { self.heap_ref() } {
+            // `--compat`: a reference numifies to its address (`$r1 == $r2`
+            // is identity), as in perl.
+            HeapObject::ArrayRef(_)
+            | HeapObject::HashRef(_)
+            | HeapObject::ScalarRef(_)
+            | HeapObject::CaptureCell(_)
+            | HeapObject::CodeRef(_)
+            | HeapObject::ArrayBindingRef(_)
+            | HeapObject::HashBindingRef(_)
+            | HeapObject::ScalarBindingRef(_)
+            | HeapObject::Blessed(_)
+                if crate::compat_mode() =>
+            {
+                self.perl_ref_addr().unwrap_or(0) as f64
+            }
             HeapObject::Integer(n) => *n as f64,
             HeapObject::BigInt(b) => {
                 use num_traits::ToPrimitive;
@@ -2641,6 +2656,19 @@ impl StrykeValue {
             return f64::from_bits(self.0) as i64;
         }
         match unsafe { self.heap_ref() } {
+            HeapObject::ArrayRef(_)
+            | HeapObject::HashRef(_)
+            | HeapObject::ScalarRef(_)
+            | HeapObject::CaptureCell(_)
+            | HeapObject::CodeRef(_)
+            | HeapObject::ArrayBindingRef(_)
+            | HeapObject::HashBindingRef(_)
+            | HeapObject::ScalarBindingRef(_)
+            | HeapObject::Blessed(_)
+                if crate::compat_mode() =>
+            {
+                self.perl_ref_addr().unwrap_or(0) as i64
+            }
             HeapObject::Integer(n) => *n,
             HeapObject::BigInt(b) => {
                 use num_traits::ToPrimitive;
@@ -2739,6 +2767,41 @@ impl StrykeValue {
             HeapObject::BigInt(_) => "INTEGER".to_string(),
             HeapObject::Float(_) => "FLOAT".to_string(),
         }
+    }
+    /// Identity of the thing a reference points at — what perl prints inside
+    /// `ARRAY(0x…)` and returns from `$ref + 0` / `refaddr`. Two references
+    /// to the same array, hash, scalar or sub give the same address; a blessed
+    /// reference has its referent's address. A by-name binding ref (`\$x`
+    /// to a frame variable) has no storage address, so its name is hashed.
+    /// `None` for non-references.
+    pub fn perl_ref_addr(&self) -> Option<usize> {
+        fn name_addr(name: &str) -> usize {
+            use std::hash::{Hash, Hasher};
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+            name.hash(&mut h);
+            // Keep it in the range a heap address prints in.
+            (h.finish() as usize & 0x0000_7fff_ffff_fff8) | 0x1000
+        }
+        if !nanbox::is_heap(self.0) {
+            return None;
+        }
+        Some(match unsafe { self.heap_ref() } {
+            HeapObject::ArrayRef(a) => Arc::as_ptr(a) as *const u8 as usize,
+            HeapObject::HashRef(h) => Arc::as_ptr(h) as *const u8 as usize,
+            HeapObject::ScalarRef(r) | HeapObject::CaptureCell(r) => {
+                Arc::as_ptr(r) as *const u8 as usize
+            }
+            HeapObject::CodeRef(s) => Arc::as_ptr(s) as usize,
+            HeapObject::ArrayBindingRef(n)
+            | HeapObject::HashBindingRef(n)
+            | HeapObject::ScalarBindingRef(n) => name_addr(n),
+            HeapObject::Blessed(b) => b
+                .data
+                .read()
+                .perl_ref_addr()
+                .unwrap_or(Arc::as_ptr(b) as *const u8 as usize),
+            _ => return None,
+        })
     }
     /// True when this value is one of the reference kinds perl's `ref` names —
     /// an RV in perl terms. Stryke-native container values (Set, Deque, a bare
@@ -3039,8 +3102,15 @@ impl fmt::Display for StrykeValue {
                 Ok(())
             }
             HeapObject::Hash(h) => write!(f, "{}/{}", h.len(), h.capacity()),
-            HeapObject::ArrayRef(_) | HeapObject::ArrayBindingRef(_) => f.write_str("ARRAY(0x...)"),
-            HeapObject::HashRef(_) | HeapObject::HashBindingRef(_) => f.write_str("HASH(0x...)"),
+            // Native stryke prints a fixed placeholder so output is
+            // reproducible; `--compat` prints the referent address like perl,
+            // so distinct references stringify (and key a hash) distinctly.
+            HeapObject::ArrayRef(_) | HeapObject::ArrayBindingRef(_) => {
+                write_ref_placeholder(f, "ARRAY", self.perl_ref_addr())
+            }
+            HeapObject::HashRef(_) | HeapObject::HashBindingRef(_) => {
+                write_ref_placeholder(f, "HASH", self.perl_ref_addr())
+            }
             // A ref to a glob prints as `GLOB(0x...)`, not `SCALAR(...)` —
             // the address distinguishes globrefs the way it does coderefs.
             HeapObject::ScalarRef(r) if r.read().as_glob_name().is_some() => {
@@ -3048,7 +3118,9 @@ impl fmt::Display for StrykeValue {
             }
             HeapObject::ScalarRef(_)
             | HeapObject::ScalarBindingRef(_)
-            | HeapObject::CaptureCell(_) => f.write_str("SCALAR(0x...)"),
+            | HeapObject::CaptureCell(_) => {
+                write_ref_placeholder(f, "SCALAR", self.perl_ref_addr())
+            }
             HeapObject::CodeRef(sub) => {
                 // Match Perl's `CODE(0x<hexaddr>)` so distinct closures
                 // stringify to distinct values and string comparison can
@@ -3058,8 +3130,21 @@ impl fmt::Display for StrykeValue {
                 let addr = Arc::as_ptr(sub) as usize;
                 write!(f, "CODE(0x{:x})", addr)
             }
-            HeapObject::Regex(_, src, _) => write!(f, "(?:{src})"),
-            HeapObject::Blessed(b) => write!(f, "{}=HASH(0x...)", b.class),
+            // Perl's form: `qr/ab/i` is `(?^i:ab)`. The flags travel with the
+            // text, so interpolating the regex into another pattern keeps them.
+            HeapObject::Regex(_, src, flags) => {
+                write!(f, "(?^{}:{src})", perl_qr_flag_string(flags))
+            }
+            HeapObject::Blessed(b) => {
+                let kind = match b.data.read().type_name().as_str() {
+                    "ARRAY" => "ARRAY",
+                    "SCALAR" => "SCALAR",
+                    "CODE" => "CODE",
+                    _ => "HASH",
+                };
+                write!(f, "{}=", b.class)?;
+                write_ref_placeholder(f, kind, self.perl_ref_addr())
+            }
             HeapObject::IOHandle(name) => f.write_str(name),
             HeapObject::Glob(name) => write!(f, "*{name}"),
             HeapObject::Atomic(arc) => write!(f, "{}", arc.lock()),
@@ -3670,6 +3755,40 @@ fn parse_number(s: &str) -> f64 {
         return 0.0;
     }
     s[..end].parse::<f64>().unwrap_or(0.0)
+}
+
+/// `KIND(0x…)` for a stringified reference: the referent address under
+/// `--compat`, the fixed `0x...` placeholder in native stryke.
+fn write_ref_placeholder(
+    f: &mut fmt::Formatter<'_>,
+    kind: &str,
+    addr: Option<usize>,
+) -> fmt::Result {
+    match addr {
+        Some(a) if crate::compat_mode() => write!(f, "{kind}(0x{a:x})"),
+        _ => write!(f, "{kind}(0x...)"),
+    }
+}
+
+/// The flag letters of a stringified `qr//` in Perl's order: the charset
+/// modifier (`u`/`a`/`l`) first, then `m s i x n` (`xx` kept doubled).
+/// Match-time-only flags (`g`, `c`, `o`, `e`, `r`) are not part of the regex.
+fn perl_qr_flag_string(flags: &str) -> String {
+    let mut out = String::new();
+    if let Some(cs) = ['u', 'a', 'l'].into_iter().find(|c| flags.contains(*c)) {
+        out.push(cs);
+    }
+    for c in ['m', 's', 'i'] {
+        if flags.contains(c) {
+            out.push(c);
+        }
+    }
+    let xs = flags.chars().filter(|c| *c == 'x').count().min(2);
+    out.extend(std::iter::repeat_n('x', xs));
+    if flags.contains('n') {
+        out.push('n');
+    }
+    out
 }
 
 fn format_float(f: f64) -> String {
@@ -5323,13 +5442,21 @@ mod tests {
     }
 
     #[test]
-    fn display_regex_shows_non_capturing_prefix() {
+    fn display_regex_uses_perl_caret_group() {
         let r = StrykeValue::regex(
             PerlCompiledRegex::compile("x+").unwrap(),
             "x+".into(),
             "".into(),
         );
-        assert_eq!(r.to_string(), "(?:x+)");
+        assert_eq!(r.to_string(), "(?^:x+)");
+        // Perl orders the flags charset-first, then m s i x; `g` is not a
+        // regex flag and never appears.
+        let r = StrykeValue::regex(
+            PerlCompiledRegex::compile("x+").unwrap(),
+            "x+".into(),
+            "gxiu".into(),
+        );
+        assert_eq!(r.to_string(), "(?^uix:x+)");
     }
 
     #[test]

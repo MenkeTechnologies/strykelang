@@ -26,15 +26,10 @@ fn bless_arrayref_ref_returns_class_name() {
 }
 
 #[test]
-fn bless_arrayref_stringifies_with_hash_tag_today() {
-    // Documented in BUGS.md (BUG-002): stringification format ignores
-    // underlying ref kind for blessed array refs.
+fn bless_arrayref_stringifies_with_array_tag() {
+    // BUG-002 (fixed): a blessed array ref names its underlying kind.
     let s = eval_string(r#"my $o = bless [1,2,3], "Bar"; "$o""#);
-    assert!(
-        s.starts_with("Bar=HASH("),
-        "expected current buggy `Bar=HASH(...)` form, got {:?}",
-        s
-    );
+    assert!(s.starts_with("Bar=ARRAY("), "got {:?}", s);
 }
 
 // ── Native `class { ... }` syntax ─────────────────────────────────────────────
