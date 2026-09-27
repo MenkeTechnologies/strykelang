@@ -1137,13 +1137,13 @@ fn unpairs_native(args: &[StrykeValue]) -> crate::error::StrykeResult<StrykeValu
             out.push(g.first().cloned().unwrap_or(StrykeValue::UNDEF));
             out.push(g.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
         } else if let Some(b) = x.as_blessed_ref() {
-            if b.class == "Pair" {
-                let d = b.data.read();
-                if let Some(r) = d.as_array_ref() {
-                    let g = r.read();
-                    out.push(g.first().cloned().unwrap_or(StrykeValue::UNDEF));
-                    out.push(g.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
-                }
+            // Any blessed ARRAY — `Pair`, List::Util's `_Pair` — unpairs like
+            // a plain one.
+            let d = b.data.read();
+            if let Some(r) = d.as_array_ref() {
+                let g = r.read();
+                out.push(g.first().cloned().unwrap_or(StrykeValue::UNDEF));
+                out.push(g.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
             } else {
                 out.push(StrykeValue::UNDEF);
                 out.push(StrykeValue::UNDEF);

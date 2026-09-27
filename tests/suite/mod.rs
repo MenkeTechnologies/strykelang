@@ -392,4 +392,5 @@ mod wantarray_pin;
 mod weep_pin;
 mod wolfram_smoke;
 mod x_operator_pin;
+mod xs_native_modules;
 mod zip_pad_pin;

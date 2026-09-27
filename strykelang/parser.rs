@@ -131,6 +131,10 @@ pub struct Parser {
     error_file: String,
     /// User-declared sub names (for allowing UDF to shadow stryke extensions in compat mode).
     declared_subs: std::collections::HashSet<String>,
+    /// Names `use List::Util qw(sum)` / `use POSIX` imported from a core XS module
+    /// stryke implements natively, mapped to the qualified function
+    /// (`sum` → `List::Util::sum`). See [`crate::xs_native`].
+    xs_imports: std::collections::HashMap<String, String>,
     /// When > 0, `parse_named_expr` will not consume following barewords as paren-less
     /// function arguments. Used by thread macro to prevent `t Color::Red p` from
     /// interpreting `p` as an argument to the enum constructor instead of a stage.
@@ -245,6 +249,7 @@ impl Parser {
             next_desugar_tmp: 0,
             error_file: file.into(),
             declared_subs,
+            xs_imports: std::collections::HashMap::new(),
             suppress_parenless_call: 0,
             pending_thread_input: None,
             suppress_slash_as_div: 0,
@@ -6917,6 +6922,38 @@ impl Parser {
     /// instead of rejecting — or silently running — the stryke extension of
     /// the same name.
     pub(crate) fn imported_sub_names(module: &str, imports: &[Expr]) -> Vec<String> {
+        // A native XS module imports no user subs: its names are rewritten to
+        // the qualified native function (see `Parser::xs_imports`).
+        if crate::xs_native::module(module).is_some() {
+            return Vec::new();
+        }
+        let is_pragma = module.chars().all(|c| c.is_ascii_lowercase() || c == ':');
+        if is_pragma && !matches!(module, "constant" | "subs") {
+            return Vec::new();
+        }
+        Self::import_list_sub_names(imports)
+    }
+
+    /// `use POSIX qw(floor)`: calls to `floor` in this file are calls to
+    /// `POSIX::floor`. `use POSIX;` imports the module's default list, and
+    /// `use POSIX ()` nothing. Names the module does not provide are left for
+    /// the runtime `use` to reject.
+    fn record_xs_imports(&mut self, m: &'static crate::xs_native::XsModule, imports: &[Expr]) {
+        let names: Vec<String> = if imports.is_empty() {
+            m.default_export.iter().map(|s| s.to_string()).collect()
+        } else {
+            Self::import_list_sub_names(imports)
+        };
+        for short in names {
+            if m.function(&short).is_some() {
+                let qualified = format!("{}::{}", m.name, short);
+                self.xs_imports.insert(short, qualified);
+            }
+        }
+    }
+
+    /// The sub names written in an import list: `qw(a &b $c :tag)` → `a`, `b`.
+    fn import_list_sub_names(imports: &[Expr]) -> Vec<String> {
         fn collect<'a>(e: &'a Expr, out: &mut Vec<&'a str>) {
             match &e.kind {
                 ExprKind::String(s) => out.push(s),
@@ -6925,10 +6962,6 @@ impl Parser {
                 ExprKind::HashRef(pairs) => pairs.iter().for_each(|(k, _)| collect(k, out)),
                 _ => {}
             }
-        }
-        let is_pragma = module.chars().all(|c| c.is_ascii_lowercase() || c == ':');
-        if is_pragma && !matches!(module, "constant" | "subs") {
-            return Vec::new();
         }
         let mut names = Vec::new();
         imports.iter().for_each(|e| collect(e, &mut names));
@@ -7076,6 +7109,9 @@ impl Parser {
                 if crate::compat_mode() {
                     self.declared_subs
                         .extend(Self::imported_sub_names(&full_name, &imports));
+                }
+                if let Some(m) = crate::xs_native::module(&full_name) {
+                    self.record_xs_imports(m, &imports);
                 }
                 Ok(Statement {
                     label: None,
@@ -10626,6 +10662,60 @@ impl Parser {
         }
     }
 
+    /// The native XS function a call to `name` reaches, with its call shape:
+    /// `List::Util::sum` itself, or `sum` imported by `use List::Util`.
+    fn xs_call_target(&self, name: &str) -> Option<(String, crate::xs_native::Shape)> {
+        if let Some((_, f)) = crate::xs_native::function(name) {
+            return Some((name.to_string(), f.shape));
+        }
+        if self.declared_subs.contains(name) {
+            return None;
+        }
+        let qualified = self.xs_imports.get(name)?;
+        let (_, f) = crate::xs_native::function(qualified)?;
+        Some((qualified.clone(), f.shape))
+    }
+
+    /// Arguments of a call to a native XS function, per its prototype:
+    /// `first { ... } @list` (`&@`), `INT_MAX` (`()`), or a plain list.
+    fn parse_xs_call(
+        &mut self,
+        name: String,
+        shape: crate::xs_native::Shape,
+        line: usize,
+    ) -> StrykeResult<Expr> {
+        use crate::xs_native::Shape;
+        let args = if matches!(self.peek(), Token::LParen) {
+            self.advance();
+            let args = self.parse_arg_list()?;
+            self.expect(&Token::RParen)?;
+            args
+        } else if shape == Shape::Nullary {
+            Vec::new()
+        } else if shape == Shape::Block && matches!(self.peek(), Token::LBrace) {
+            let body = self.parse_block()?;
+            let mut args = vec![Expr {
+                kind: ExprKind::CodeRef {
+                    params: vec![],
+                    body,
+                    return_type: None,
+                },
+                line,
+            }];
+            self.eat(&Token::Comma);
+            args.extend(self.parse_list_until_terminator()?);
+            args
+        } else if self.peek().is_term_start() {
+            self.parse_list_until_terminator()?
+        } else {
+            Vec::new()
+        };
+        Ok(Expr {
+            kind: ExprKind::FuncCall { name, args },
+            line,
+        })
+    }
+
     fn parse_named_expr(&mut self, mut name: String) -> StrykeResult<Expr> {
         let line = self.peek_line();
         self.advance(); // consume the ident
@@ -10654,6 +10744,16 @@ impl Parser {
                 kind: ExprKind::String(name),
                 line,
             });
+        }
+
+        // `sum(...)` after `use List::Util qw(sum)`, or `POSIX::floor(...)`: a
+        // core XS function stryke implements natively, parsed with the XS
+        // function's prototype rather than as the stryke builtin of the same
+        // spelling. A user sub of the bare name still wins.
+        if crate::compat_mode() {
+            if let Some((qualified, shape)) = self.xs_call_target(&name) {
+                return self.parse_xs_call(qualified, shape, line);
+            }
         }
 
         if crate::compat_mode() {

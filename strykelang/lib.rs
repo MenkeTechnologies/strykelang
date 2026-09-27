@@ -239,6 +239,8 @@ pub mod vm_helper;
 pub mod web;
 /// `web_orm` submodule.
 pub mod web_orm;
+/// Core Perl XS modules (`List::Util`, `Scalar::Util`, `POSIX`) implemented natively.
+mod xs_native;
 /// `zsh_convert` submodule — zsh source → stryke source transpiler.
 pub mod zsh_convert;
 

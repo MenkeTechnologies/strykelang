@@ -3360,6 +3360,18 @@ impl<'a> VM<'a> {
                         self.interp.universal_can(&thing, &what)
                     };
                     self.push(out);
+                } else if let Some(out) = self.interp.call_xs_native(name, &args, want, self.line())
+                {
+                    // `List::Util::sum`, `POSIX::floor`, or a name imported from
+                    // one — core XS functions with no Perl body, implemented natively.
+                    match out {
+                        Ok(v) => self.push(v),
+                        Err(crate::vm_helper::FlowOrError::Flow(
+                            crate::vm_helper::Flow::Return(v),
+                        )) => self.push(v),
+                        Err(crate::vm_helper::FlowOrError::Error(e)) => return Err(e),
+                        Err(_) => self.push(StrykeValue::UNDEF),
+                    }
                 } else if !name.contains("::")
                     && matches!(
                         name,

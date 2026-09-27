@@ -816,6 +816,9 @@ pub struct VMHelper {
     pub profiler: Option<Profiler>,
     /// Per-module `our @EXPORT` / `our @EXPORT_OK` (Exporter-style). Absent key → legacy import-all.
     pub(crate) module_export_lists: HashMap<String, ModuleExportLists>,
+    /// Sub keys imported from a native XS module (`main::floor` → `POSIX::floor`), set by
+    /// `use POSIX qw(floor)`; see [`crate::xs_native`].
+    pub(crate) xs_imports: HashMap<String, String>,
     /// Virtual modules: path → source (for AOT bundles). Checked before filesystem in `require`.
     pub(crate) virtual_modules: HashMap<String, String>,
     /// `tie %name, ...` — object that implements FETCH/STORE for that hash.
@@ -1758,6 +1761,7 @@ impl VMHelper {
             wantarray_kind: WantarrayCtx::Scalar,
             profiler: None,
             module_export_lists: HashMap::new(),
+            xs_imports: HashMap::new(),
             virtual_modules: HashMap::new(),
             tied_hashes: HashMap::new(),
             tied_scalars: HashMap::new(),
@@ -2123,6 +2127,7 @@ impl VMHelper {
             wantarray_kind: self.wantarray_kind,
             profiler: None,
             module_export_lists: self.module_export_lists.clone(),
+            xs_imports: self.xs_imports.clone(),
             virtual_modules: self.virtual_modules.clone(),
             tied_hashes: self.tied_hashes.clone(),
             tied_scalars: self.tied_scalars.clone(),
@@ -4376,6 +4381,12 @@ impl VMHelper {
         if self.scope.exists_hash_element("INC", relpath) {
             return Ok(StrykeValue::integer(1));
         }
+        // `require POSIX` — the `.pm` would end in `XSLoader::load`, which has
+        // no compiled object to load; the functions are native instead.
+        if let Some(m) = crate::xs_native::module_for_inc_key(relpath) {
+            self.require_xs_native_module(m)?;
+            return Ok(StrykeValue::integer(1));
+        }
         self.invoke_require_hook("require__before", relpath, line)?;
 
         // Lockfile-driven module resolution. When the cwd is inside a stryke
@@ -4524,6 +4535,9 @@ impl VMHelper {
                 Ok(())
             }
             "threads" | "Thread::Pool" | "Parallel::ForkManager" => Ok(()),
+            _ if crate::xs_native::module(module).is_some() => {
+                self.use_xs_native_module(module, imports, line)
+            }
             _ => {
                 self.require_execute_versioned(module, version, line)?;
                 let imports = Self::imports_after_leading_use_version(imports);
@@ -4531,6 +4545,76 @@ impl VMHelper {
                 Ok(())
             }
         }
+    }
+
+    /// `use List::Util qw(sum)` — a core XS module stryke implements natively
+    /// ([`crate::xs_native`]): record it in `%INC` without reading its `.pm`,
+    /// and bind each imported name in the caller's package to the native
+    /// function.
+    fn use_xs_native_module(
+        &mut self,
+        module: &str,
+        imports: &[Expr],
+        line: usize,
+    ) -> StrykeResult<()> {
+        let Some(m) = crate::xs_native::module(module) else {
+            return Ok(());
+        };
+        self.require_xs_native_module(m)?;
+        let imports = Self::imports_after_leading_use_version(imports);
+        if Self::is_explicit_empty_import_list(imports) {
+            return Ok(());
+        }
+        let requested = Self::pragma_import_strings(imports, line)?;
+        let names = crate::xs_native::import_names(m, &requested)
+            .map_err(|msg| StrykeError::runtime(msg, line))?;
+        for short in names {
+            let key = self.import_alias_key(short);
+            self.xs_imports
+                .insert(key, format!("{}::{}", m.name, short));
+        }
+        Ok(())
+    }
+
+    /// Call `name` if it is a native XS function: qualified (`POSIX::floor`)
+    /// or imported into the calling package by `use POSIX qw(floor)`.
+    pub(crate) fn call_xs_native(
+        &mut self,
+        name: &str,
+        args: &[StrykeValue],
+        want: WantarrayCtx,
+        line: usize,
+    ) -> Option<ExecResult> {
+        let qualified = if let Some((m, _)) = crate::xs_native::function(name) {
+            // Like perl, the qualified name exists once the module is loaded.
+            let relpath = m.inc_key();
+            if !self.scope.exists_hash_element("INC", &relpath) {
+                return None;
+            }
+            name.to_string()
+        } else {
+            self.xs_imports.get(&self.qualify_sub_key(name))?.clone()
+        };
+        crate::xs_native::call(self, &qualified, args, want, line)
+    }
+
+    /// `%INC` entry for a native XS module, so `require` and `use` load it once
+    /// and `$INC{"List/Util.pm"}` is true afterwards.
+    fn require_xs_native_module(&mut self, m: &crate::xs_native::XsModule) -> StrykeResult<()> {
+        let relpath = m.inc_key();
+        if self.scope.exists_hash_element("INC", &relpath) {
+            return Ok(());
+        }
+        let path = format!("(stryke native)/{relpath}");
+        self.scope
+            .set_hash_element("INC", &relpath, StrykeValue::string(path.clone()))?;
+        if !m.perl_source.is_empty() {
+            let saved_pkg = self.scope.get_scalar("__PACKAGE__");
+            let r = crate::parse_and_run_module_in_file(m.perl_source, self, &path);
+            let _ = self.scope.set_scalar("__PACKAGE__", saved_pkg);
+            r?;
+        }
+        Ok(())
     }
 
     /// `no strict 'refs'`, `no warnings`, `no feature`, …
