@@ -379,6 +379,7 @@ mod thread_last_pin;
 mod thread_macro_stage_acceptance;
 mod threading_macro_pin;
 mod time_pin;
+mod topic_match_and_aliasing;
 mod topk_semantics_pin;
 mod tr_translit_pin;
 mod turn_pin;

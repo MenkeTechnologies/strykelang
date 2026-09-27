@@ -3353,7 +3353,11 @@ impl Compiler {
                 // continue block). Complex sources (lists, ranges, `keys`)
                 // keep copy semantics, matching Perl. (BUG-019)
                 let alias_array_name_idx: Option<u16> = match &list.kind {
-                    ExprKind::ArrayVar(name) => Some(self.chunk.intern_name(name)),
+                    // A `val` (frozen) array cannot be written through; its elements
+                    // are read-only, so there is nothing to alias back.
+                    ExprKind::ArrayVar(name) if self.check_array_mutable(name, line).is_ok() => {
+                        Some(self.chunk.intern_name(name))
+                    }
                     _ => None,
                 };
                 // PushFrame isolates __foreach_list__ / __foreach_i__ from outer/nested loops.
@@ -8795,6 +8799,17 @@ impl Compiler {
                 }
             }
             ExprKind::PostfixForeach { expr, list } => {
+                // `EXPR for @arr` aliases `$_` to each element, like the
+                // statement form: write `$_` back after each iteration (see
+                // BUG-019 in `StmtKind::Foreach`).
+                let alias_array_name_idx: Option<u16> = match &list.kind {
+                    // A `val` (frozen) array cannot be written through; its elements
+                    // are read-only, so there is nothing to alias back.
+                    ExprKind::ArrayVar(name) if self.check_array_mutable(name, line).is_ok() => {
+                        Some(self.chunk.intern_name(name))
+                    }
+                    _ => None,
+                };
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
                 let list_name = self.chunk.intern_name("__pf_foreach_list__");
                 self.emit_op(Op::DeclareArray(list_name), line, Some(root));
@@ -8802,6 +8817,11 @@ impl Compiler {
                 self.emit_op(Op::LoadInt(0), line, Some(root));
                 self.emit_op(Op::DeclareScalar(counter), line, Some(root));
                 let underscore = self.chunk.intern_name("_");
+                // Perl localizes `$_` for the loop: `print for 1..2` leaves the
+                // caller's `$_` as it was.
+                let saved_topic = self.chunk.intern_name("__pf_foreach_topic__");
+                self.emit_get_scalar(underscore, line, Some(root));
+                self.emit_op(Op::DeclareScalar(saved_topic), line, Some(root));
 
                 let loop_start = self.chunk.len();
                 self.emit_get_scalar(counter, line, Some(root));
@@ -8815,11 +8835,18 @@ impl Compiler {
 
                 self.compile_expr(expr)?;
                 self.emit_op(Op::Pop, line, Some(root));
+                if let Some(arr_idx) = alias_array_name_idx {
+                    self.emit_get_scalar(underscore, line, Some(root));
+                    self.emit_get_scalar(counter, line, Some(root));
+                    self.emit_op(Op::SetArrayElem(arr_idx), line, Some(root));
+                }
 
                 self.emit_pre_inc(counter, line, Some(root));
                 self.emit_op(Op::Pop, line, Some(root));
                 self.emit_op(Op::Jump(loop_start), line, Some(root));
                 self.chunk.patch_jump_here(exit_jump);
+                self.emit_get_scalar(saved_topic, line, Some(root));
+                self.emit_set_scalar(underscore, line, Some(root));
                 self.emit_op(Op::LoadUndef, line, Some(root));
             }
 
