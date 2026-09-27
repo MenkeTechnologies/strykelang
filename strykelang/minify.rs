@@ -195,6 +195,16 @@ fn token_source(t: &Token) -> String {
         DoubleString(s) => format!("\"{}\"", escape_double(s)),
         BacktickString(s) => format!("`{s}`"),
         Regex(pattern, flags, delim) => format!("{delim}{pattern}{delim}{flags}"),
+        Qr(pattern, flags, delim) => {
+            let close = match delim {
+                '(' => ')',
+                '[' => ']',
+                '{' => '}',
+                '<' => '>',
+                c => *c,
+            };
+            format!("qr{delim}{pattern}{close}{flags}")
+        }
         HereDoc(_, body, _) => body.clone(),
         QW(words) => format!("qw({})", words.join(" ")),
         FormatDecl { name, lines } => {

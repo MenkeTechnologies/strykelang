@@ -742,9 +742,18 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
         ExprKind::Bareword(s) => {
             buf.push_str(s);
         }
-        ExprKind::Regex(pat, flags) => {
+        ExprKind::Regex(pat, flags, is_qr) => {
             let d = choose_delim();
-            let _ = write!(buf, "qr{}{}{}{}", d, escape_regex_delim(pat, d), d, flags);
+            let op = if *is_qr { "qr" } else { "m" };
+            let _ = write!(
+                buf,
+                "{}{}{}{}{}",
+                op,
+                d,
+                escape_regex_delim(pat, d),
+                d,
+                flags
+            );
         }
         ExprKind::QW(words) => {
             buf.push_str("qw(");

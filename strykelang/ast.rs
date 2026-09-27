@@ -979,8 +979,10 @@ pub enum ExprKind {
     /// Unquoted identifier used as an expression term (`if (FOO)`), distinct from quoted `'FOO'` / `"FOO"`.
     /// Resolved at runtime: nullary subroutine if defined, otherwise stringifies like Perl barewords.
     Bareword(String),
-    /// `Regex` variant.
-    Regex(String, String),
+    /// Regex literal: (pattern, flags, written_as_qr). The flag is true for
+    /// `qr//`; false for `m//` and bare `//`, which in Perl match `$_` when used
+    /// as a value rather than building a regex object.
+    Regex(String, String, bool),
     /// `QW` variant.
     QW(Vec<String>),
     /// `Undef` variant.

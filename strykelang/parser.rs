@@ -2897,7 +2897,8 @@ impl Parser {
                     }
                 }
                 // `/pattern/flags` — grep filter (desugar to `grep { /pattern/flags }`)
-                Token::Regex(ref pattern, ref flags, delim) => {
+                Token::Regex(ref pattern, ref flags, delim)
+                | Token::Qr(ref pattern, ref flags, delim) => {
                     let pattern = pattern.clone();
                     let flags = flags.clone();
                     self.advance();
@@ -4128,7 +4129,7 @@ impl Parser {
 
     fn parse_match_pattern(&mut self) -> StrykeResult<MatchPattern> {
         match self.peek().clone() {
-            Token::Regex(pattern, flags, _delim) => {
+            Token::Regex(pattern, flags, _delim) | Token::Qr(pattern, flags, _delim) => {
                 self.advance();
                 Ok(MatchPattern::Regex { pattern, flags })
             }
@@ -8219,7 +8220,7 @@ impl Parser {
                 delim,
             },
             // Bare `/regex/` (no explicit `m`): promote to Match on piped LHS
-            ExprKind::Regex(pattern, flags) => ExprKind::Match {
+            ExprKind::Regex(pattern, flags, _) => ExprKind::Match {
                 expr: Box::new(lhs),
                 pattern,
                 flags,
@@ -8687,7 +8688,7 @@ impl Parser {
                 let line = left.line;
                 self.advance();
                 match self.peek().clone() {
-                    Token::Regex(pattern, flags, delim) => {
+                    Token::Regex(pattern, flags, delim) | Token::Qr(pattern, flags, delim) => {
                         self.advance();
                         Ok(Expr {
                             kind: ExprKind::Match {
@@ -8750,7 +8751,7 @@ impl Parser {
                 let line = left.line;
                 self.advance();
                 match self.peek().clone() {
-                    Token::Regex(pattern, flags, delim) => {
+                    Token::Regex(pattern, flags, delim) | Token::Qr(pattern, flags, delim) => {
                         self.advance();
                         Ok(Expr {
                             kind: ExprKind::UnaryOp {
@@ -10085,7 +10086,14 @@ impl Parser {
             Token::Regex(pattern, flags, _delim) => {
                 self.advance();
                 Ok(Expr {
-                    kind: ExprKind::Regex(pattern, flags),
+                    kind: ExprKind::Regex(pattern, flags, false),
+                    line,
+                })
+            }
+            Token::Qr(pattern, flags, _delim) => {
+                self.advance();
+                Ok(Expr {
+                    kind: ExprKind::Regex(pattern, flags, true),
                     line,
                 })
             }

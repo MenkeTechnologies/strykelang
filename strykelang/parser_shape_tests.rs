@@ -601,7 +601,7 @@ fn expr_regex_literal_token_form() {
     // Statement-level `m//` is often parsed as a regex literal expression.
     assert!(matches!(
         first_expr_kind("m/pattern/;"),
-        ExprKind::Regex(_, _) | ExprKind::Match { .. }
+        ExprKind::Regex(_, _, _) | ExprKind::Match { .. }
     ));
 }
 

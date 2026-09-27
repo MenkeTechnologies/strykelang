@@ -12,8 +12,12 @@ pub enum Token {
     DoubleString(String),
     /// `` `...` `` or `qx{...}` — interpolated like double quotes, then executed as `sh -c` (Perl `qx`).
     BacktickString(String),
-    /// Regex pattern: (pattern, flags, delimiter)
+    /// Regex pattern: (pattern, flags, delimiter) — `m//` or bare `//`.
     Regex(String, String, char),
+    /// `qr//` pattern: (pattern, flags, delimiter). Kept apart from [`Token::Regex`]
+    /// because a bare `//` in value context matches `$_` while `qr//` builds a
+    /// regex object.
+    Qr(String, String, char),
     /// `HereDoc` variant.
     HereDoc(String, String, bool),
     /// `QW` variant.
@@ -287,6 +291,7 @@ impl Token {
                 | Token::LogNotWord
                 | Token::QW(_)
                 | Token::Regex(_, _, _)
+                | Token::Qr(_, _, _)
                 | Token::FileTest(_)
                 | Token::ThreadArrow
                 | Token::ThreadArrowLast

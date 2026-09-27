@@ -193,8 +193,15 @@ fn regex_literal_expression_kind() {
     let StmtKind::Expression(expr) = &p.statements[0].kind else {
         panic!("expected Expression");
     };
-    let ExprKind::Regex(_, flags) = &expr.kind else {
+    let ExprKind::Regex(_, flags, is_qr) = &expr.kind else {
         panic!("expected Regex");
     };
     assert!(flags.is_empty());
+    // `m//` is a match, not a `qr//` object.
+    assert!(!is_qr);
+    let p = stryke::parse("qr/abc/i").expect("parse");
+    let StmtKind::Expression(expr) = &p.statements[0].kind else {
+        panic!("expected Expression");
+    };
+    assert!(matches!(&expr.kind, ExprKind::Regex(_, f, true) if f == "i"));
 }

@@ -1674,7 +1674,7 @@ impl StaticAnalyzer {
                     }
                 }
             }
-            ExprKind::Regex(_, _)
+            ExprKind::Regex(_, _, _)
             | ExprKind::Substitution { .. }
             | ExprKind::Transliterate { .. }
             | ExprKind::Match { .. } => {}

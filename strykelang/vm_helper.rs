@@ -7421,7 +7421,7 @@ impl VMHelper {
         let topic = self.scope.get_scalar("_");
         let line = cond.line;
         match &cond.kind {
-            ExprKind::Regex(pattern, flags) => {
+            ExprKind::Regex(pattern, flags, _) => {
                 let re = self.compile_regex(pattern, flags, line)?;
                 let s = topic.to_string();
                 Ok(re.is_match(&s))
@@ -7480,11 +7480,13 @@ impl VMHelper {
         cond: &Expr,
     ) -> Result<bool, FlowOrError> {
         match &cond.kind {
-            ExprKind::Regex(pattern, flags) => {
+            ExprKind::Regex(pattern, flags, _) => {
                 let topic = self.scope.get_scalar("_");
                 let line = cond.line;
                 let s = topic.to_string();
-                let v = self.regex_match_execute(s, pattern, flags, false, "_", line)?;
+                // `/x/g` in a condition iterates from `pos($_)` (`while (/x/g)`).
+                let scalar_g = flags.contains('g');
+                let v = self.regex_match_execute(s, pattern, flags, scalar_g, "_", line)?;
                 Ok(v.is_true())
             }
             // `while (<STDIN>)` / `if (<>)` — Perl assigns the line to `$_` before testing (definedness).
@@ -10159,7 +10161,7 @@ impl VMHelper {
                     Ok(StrykeValue::UNDEF)
                 }
             }
-            ExprKind::Regex(pattern, flags) => {
+            ExprKind::Regex(pattern, flags, is_qr) => {
                 if ctx == WantarrayCtx::Void {
                     // Expression statement: bare `/pat/;` is `$_ =~ /pat/` (Perl), not a regex object.
                     let topic = self.scope.get_scalar("_");
@@ -10717,7 +10719,7 @@ impl VMHelper {
                     }
                     BinOp::LogAnd | BinOp::LogAndWord => {
                         match &left.kind {
-                            ExprKind::Regex(_, _) => {
+                            ExprKind::Regex(_, _, _) => {
                                 if !self.eval_boolean_rvalue_condition(left)? {
                                     return Ok(StrykeValue::string(String::new()));
                                 }
@@ -10730,7 +10732,7 @@ impl VMHelper {
                             }
                         }
                         return match &right.kind {
-                            ExprKind::Regex(_, _) => Ok(StrykeValue::integer(
+                            ExprKind::Regex(_, _, _) => Ok(StrykeValue::integer(
                                 if self.eval_boolean_rvalue_condition(right)? {
                                     1
                                 } else {
@@ -10742,7 +10744,7 @@ impl VMHelper {
                     }
                     BinOp::LogOr | BinOp::LogOrWord => {
                         match &left.kind {
-                            ExprKind::Regex(_, _) => {
+                            ExprKind::Regex(_, _, _) => {
                                 if self.eval_boolean_rvalue_condition(left)? {
                                     return Ok(StrykeValue::integer(1));
                                 }
@@ -10755,7 +10757,7 @@ impl VMHelper {
                             }
                         }
                         return match &right.kind {
-                            ExprKind::Regex(_, _) => Ok(StrykeValue::integer(
+                            ExprKind::Regex(_, _, _) => Ok(StrykeValue::integer(
                                 if self.eval_boolean_rvalue_condition(right)? {
                                     1
                                 } else {
@@ -10875,7 +10877,7 @@ impl VMHelper {
                 _ => {
                     match op {
                         UnaryOp::LogNot | UnaryOp::LogNotWord => {
-                            if let ExprKind::Regex(pattern, flags) = &expr.kind {
+                            if let ExprKind::Regex(pattern, flags, _) = &expr.kind {
                                 let topic = self.scope.get_scalar("_");
                                 let rl = expr.line;
                                 let s = topic.to_string();
@@ -11232,8 +11234,8 @@ impl VMHelper {
                     let key = std::ptr::from_ref(expr) as usize;
                     match (&from.kind, &to.kind) {
                         (
-                            ExprKind::Regex(left_pat, left_flags),
-                            ExprKind::Regex(right_pat, right_flags),
+                            ExprKind::Regex(left_pat, left_flags, _),
+                            ExprKind::Regex(right_pat, right_flags, _),
                         ) => {
                             let dot = self.scalar_flipflop_dot_line();
                             let subject = self.scope.get_scalar("_").to_string();
@@ -11267,7 +11269,7 @@ impl VMHelper {
                                 right_m,
                             )))
                         }
-                        (ExprKind::Regex(left_pat, left_flags), ExprKind::Eof(None)) => {
+                        (ExprKind::Regex(left_pat, left_flags, _), ExprKind::Eof(None)) => {
                             let dot = self.scalar_flipflop_dot_line();
                             let subject = self.scope.get_scalar("_").to_string();
                             let left_re = self.compile_regex(left_pat, left_flags, line).map_err(
@@ -11292,7 +11294,7 @@ impl VMHelper {
                             )))
                         }
                         (
-                            ExprKind::Regex(left_pat, left_flags),
+                            ExprKind::Regex(left_pat, left_flags, _),
                             ExprKind::Integer(_) | ExprKind::Float(_),
                         ) => {
                             let dot = self.scalar_flipflop_dot_line();
@@ -11319,7 +11321,7 @@ impl VMHelper {
                                 right_m,
                             )))
                         }
-                        (ExprKind::Regex(left_pat, left_flags), _) => {
+                        (ExprKind::Regex(left_pat, left_flags, _), _) => {
                             if let ExprKind::Eof(Some(_)) = &to.kind {
                                 return Err(FlowOrError::Error(StrykeError::runtime(
                                     "regex flip-flop with eof(HANDLE) is not supported",

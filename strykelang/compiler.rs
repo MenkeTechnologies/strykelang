@@ -60,8 +60,19 @@ pub fn expr_tail_is_list_sensitive(expr: &Expr) -> bool {
             else_expr,
             ..
         } => expr_tail_is_list_sensitive(then_expr) || expr_tail_is_list_sensitive(else_expr),
-        // ArrayVar, HashVar, slices — handled by VM's ReturnValue + List context
-        // compilation. Do NOT allow these to trigger a compilation error.
+        // A match yields its captures (or every match under `/g`) in list
+        // context and 0/1 in scalar: `map { /(\d+)/ } @lines`.
+        ExprKind::Match { .. }
+        | ExprKind::BinOp {
+            op: BinOp::BindMatch,
+            ..
+        } => true,
+        // A bare `//` is a `$_` match under --compat (see the `ExprKind::Regex`
+        // compile arm); `qr//` and native `//` are a single regex value.
+        ExprKind::Regex(_, _, is_qr) => !*is_qr && crate::compat_mode(),
+        // An array or hash is its elements in list context and a count in
+        // scalar: `map { my @m = f($_); @m } LIST`.
+        ExprKind::ArrayVar(_) | ExprKind::HashVar(_) | ExprKind::Caller(_) => true,
         _ => false,
     }
 }
@@ -1256,7 +1267,26 @@ impl Compiler {
     /// Emits `$_` + pattern and [`Op::RegexMatchDyn`] so match vars and truthy 0/1 match `=~`.
     fn compile_boolean_rvalue_condition(&mut self, cond: &Expr) -> Result<(), CompileError> {
         let line = cond.line;
-        if let ExprKind::Regex(pattern, flags) = &cond.kind {
+        if let ExprKind::Regex(pattern, flags, _) = &cond.kind {
+            if flags.contains('g') {
+                // `while (/x/g)` / `$n++ while /x/g` / `/x/g;` iterate: each
+                // test resumes at `pos($_)`. The dynamic match has no pos
+                // bookkeeping, so it re-matched from 0 forever.
+                let topic_match = Expr {
+                    kind: ExprKind::Match {
+                        expr: Box::new(Expr {
+                            kind: ExprKind::ScalarVar("_".into()),
+                            line,
+                        }),
+                        pattern: pattern.clone(),
+                        flags: flags.clone(),
+                        scalar_g: true,
+                        delim: '/',
+                    },
+                    line,
+                };
+                return self.compile_expr_ctx(&topic_match, WantarrayCtx::Scalar);
+            }
             let name_idx = self.chunk.intern_name("_");
             self.emit_get_scalar(name_idx, line, Some(cond));
             let pat_idx = self
@@ -4596,7 +4626,15 @@ impl Compiler {
                     BinOp::BindMatch => {
                         self.compile_expr(left)?;
                         self.compile_expr(right)?;
-                        self.emit_op(Op::RegexMatchDyn(false), line, Some(root));
+                        if ctx == WantarrayCtx::List {
+                            // `my ($n) = $s =~ $re` returns the captures, as a
+                            // literal `=~ /(..)/` does (see `ExprKind::Match`).
+                            self.emit_op(Op::WantarrayPush(ctx.as_byte()), line, Some(root));
+                            self.emit_op(Op::RegexMatchDynList, line, Some(root));
+                            self.emit_op(Op::WantarrayPop, line, Some(root));
+                        } else {
+                            self.emit_op(Op::RegexMatchDyn(false), line, Some(root));
+                        }
                         return Ok(());
                     }
                     BinOp::BindNotMatch => {
@@ -6363,7 +6401,7 @@ impl Compiler {
                     } else {
                         self.emit_op(Op::Range(*tilde), line, Some(root));
                     }
-                } else if let (ExprKind::Regex(lp, lf), ExprKind::Regex(rp, rf)) =
+                } else if let (ExprKind::Regex(lp, lf, _), ExprKind::Regex(rp, rf, _)) =
                     (&from.kind, &to.kind)
                 {
                     let slot = self.chunk.alloc_flip_flop_slot();
@@ -6383,7 +6421,7 @@ impl Compiler {
                         line,
                         Some(root),
                     );
-                } else if let (ExprKind::Regex(lp, lf), ExprKind::Eof(None)) =
+                } else if let (ExprKind::Regex(lp, lf, _), ExprKind::Eof(None)) =
                     (&from.kind, &to.kind)
                 {
                     let slot = self.chunk.alloc_flip_flop_slot();
@@ -6396,12 +6434,12 @@ impl Compiler {
                     );
                 } else if matches!(
                     (&from.kind, &to.kind),
-                    (ExprKind::Regex(_, _), ExprKind::Eof(Some(_)))
+                    (ExprKind::Regex(_, _, _), ExprKind::Eof(Some(_)))
                 ) {
                     return Err(CompileError::Unsupported(
                         "regex flip-flop with eof(HANDLE) is not supported".into(),
                     ));
-                } else if let ExprKind::Regex(lp, lf) = &from.kind {
+                } else if let ExprKind::Regex(lp, lf, _) = &from.kind {
                     let slot = self.chunk.alloc_flip_flop_slot();
                     let lp_idx = self.chunk.add_constant(StrykeValue::string(lp.clone()));
                     let lf_idx = self.chunk.add_constant(StrykeValue::string(lf.clone()));
@@ -7894,7 +7932,16 @@ impl Compiler {
                 string,
                 limit,
             } => {
-                self.compile_expr(pattern)?;
+                // `split /PAT/` takes the pattern itself, never a match against
+                // `$_` — load the regex object even where a bare `//` value
+                // would otherwise match (see the `ExprKind::Regex` arm).
+                if let ExprKind::Regex(p, f, _) = &pattern.kind {
+                    let pat_idx = self.chunk.add_constant(StrykeValue::string(p.clone()));
+                    let flags_idx = self.chunk.add_constant(StrykeValue::string(f.clone()));
+                    self.emit_op(Op::LoadRegex(pat_idx, flags_idx), line, Some(root));
+                } else {
+                    self.compile_expr(pattern)?;
+                }
                 self.compile_expr(string)?;
                 if let Some(l) = limit {
                     self.compile_expr(l)?;
@@ -8874,10 +8921,29 @@ impl Compiler {
             }
 
             // ── Regex literal ──
-            ExprKind::Regex(pattern, flags) => {
+            ExprKind::Regex(pattern, flags, is_qr) => {
                 if ctx == WantarrayCtx::Void {
                     // Statement context: bare `/pat/;` is `$_ =~ /pat/` (Perl), not a discarded regex object.
                     self.compile_boolean_rvalue_condition(root)?;
+                } else if !*is_qr && crate::compat_mode() {
+                    // Perl: `m//` / bare `//` used as a value is a match against
+                    // `$_` — `my ($n) = /(\d+)/` binds the capture, `my @d =
+                    // /\d/g` collects every match. Only `qr//` builds a regex
+                    // object. Native stryke keeps a bare `//` as a regex value.
+                    let topic_match = Expr {
+                        kind: ExprKind::Match {
+                            expr: Box::new(Expr {
+                                kind: ExprKind::ScalarVar("_".into()),
+                                line,
+                            }),
+                            pattern: pattern.clone(),
+                            flags: flags.clone(),
+                            scalar_g: false,
+                            delim: '/',
+                        },
+                        line,
+                    };
+                    self.compile_expr_ctx(&topic_match, ctx)?;
                 } else {
                     let pat_idx = self
                         .chunk

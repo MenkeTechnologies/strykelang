@@ -567,6 +567,10 @@ pub enum Op {
     /// Dynamic `=~` / `!~`: pattern from RHS, subject from LHS; empty flags.
     /// stack: `[subject, pattern]` (pattern on top) → 0/1; `true` = negate (`!~`).
     RegexMatchDyn(bool),
+    /// List-context dynamic `=~` (`my ($n) = $s =~ $qr`): same operands as
+    /// [`RegexMatchDyn`] but pushes the match result itself — the captures, or
+    /// `(1)` when the pattern has none, or the empty list on failure.
+    RegexMatchDynList,
     /// Regex literal as a value (`qr/PAT/FLAGS`) — pattern and flags string pool indices.
     LoadRegex(u16, u16),
     /// After [`RegexMatchDyn`] for bare `m//` in `&&` / `||`: pop 0/1; push `""` or `1` (Perl scalar).

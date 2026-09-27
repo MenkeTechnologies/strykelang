@@ -6992,7 +6992,7 @@ impl<'a> VM<'a> {
                             }
                         }
                     }
-                    Op::RegexMatchDyn(negate) => {
+                    Op::RegexMatchDyn(_) | Op::RegexMatchDynList => {
                         let rhs = self.pop();
                         let s = self.pop().into_string();
                         let line = self.line();
@@ -7005,9 +7005,11 @@ impl<'a> VM<'a> {
                                 .regex_match_execute(s, &pattern, "", false, "_", line)
                         };
                         match exec {
+                            Ok(v) if matches!(op, Op::RegexMatchDynList) => self.push(v),
                             Ok(v) => {
                                 let matched = v.is_true();
-                                let out = if *negate { !matched } else { matched };
+                                let negate = matches!(op, Op::RegexMatchDyn(true));
+                                let out = if negate { !matched } else { matched };
                                 self.push(StrykeValue::integer(if out { 1 } else { 0 }));
                             }
                             Err(FlowOrError::Error(e)) => return Err(e),

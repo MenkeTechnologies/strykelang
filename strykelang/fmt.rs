@@ -747,7 +747,7 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::Float(f) => format!("{}", f),
         ExprKind::String(s) => format_string_literal(s),
         ExprKind::Bareword(s) => s.clone(),
-        ExprKind::Regex(p, fl) => format!("/{}/{}/", p, fl),
+        ExprKind::Regex(p, fl, _) => format!("/{}/{}/", p, fl),
         ExprKind::QW(ws) => format!("qw({})", ws.join(" ")),
         ExprKind::Undef => "undef".to_string(),
         ExprKind::MagicConst(crate::ast::MagicConstKind::File) => "__FILE__".to_string(),

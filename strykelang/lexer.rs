@@ -2936,7 +2936,7 @@ impl Lexer {
                         }
                         let flags = self.read_while(|c| REGEX_FLAG_CHARS.contains(c));
                         self.last_was_term = true;
-                        return Ok(Token::Regex(pattern, flags, delim));
+                        return Ok(Token::Qr(pattern, flags, delim));
                     }
                     "m" => {
                         // After `->`, `m` is a method name, not a regex match.
@@ -3846,7 +3846,7 @@ mod tests {
     fn tokenize_qr_regex_with_flags() {
         let mut l = Lexer::new("qr/pat/i");
         let t = l.tokenize().expect("tokenize");
-        assert!(matches!(t[0].0, Token::Regex(ref p, ref f, _) if p == "pat" && f == "i"));
+        assert!(matches!(t[0].0, Token::Qr(ref p, ref f, _) if p == "pat" && f == "i"));
     }
 
     #[test]
@@ -3867,7 +3867,7 @@ mod tests {
     fn tokenize_qr_slash_includes_gco_flags() {
         let mut l = Lexer::new("qr/x/gco");
         let t = l.tokenize().expect("tokenize");
-        assert!(matches!(&t[0].0, Token::Regex(p, f, _) if p == "x" && f == "gco"));
+        assert!(matches!(&t[0].0, Token::Qr(p, f, _) if p == "x" && f == "gco"));
     }
 
     #[test]
@@ -3894,8 +3894,8 @@ mod tests {
         let src = "qr#(\n    [!=]~\n    | split|grep|map\n    | not|and|or|xor\n)#x";
         let mut l = Lexer::new(src);
         let t = l.tokenize().expect("tokenize");
-        let Token::Regex(p, f, _) = &t[0].0 else {
-            panic!("expected Regex, got {:?}", t[0].0);
+        let Token::Qr(p, f, _) = &t[0].0 else {
+            panic!("expected Qr, got {:?}", t[0].0);
         };
         let rest: Vec<_> = t.iter().skip(1).take(8).map(|x| &x.0).collect();
         assert!(f.contains('x'), "flags={f:?} pattern={p:?} rest={rest:?}");
