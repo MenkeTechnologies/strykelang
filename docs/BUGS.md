@@ -3985,3 +3985,23 @@ applies to every name that is not Perl 5 core, the same test
 `Compiler::compat_user_sub_wins` uses. The same bug had made `local` look
 broken in `sub t { local $g = 2; show() }`.
 `parity/cases/20067_user_sub_named_like_stryke_alias.pl`.
+
+## BUG-326 — `--compat` `use Module;` did not import the module's `@EXPORT` at parse time — **`parity`** [FIXED]
+
+A `use` with no import list imports the module's `@EXPORT`, but the parser
+only knew the names written in an explicit list. An exported name that is
+also a stryke extension was then rejected:
+
+```
+$ st --compat -e 'use File::Basename; print basename("/a/b/c.txt")'
+`basename` is a stryke extension (disabled by --compat) at -e line 1.
+```
+
+Under `--compat` the parser now reads the first literal `@EXPORT = qw(...)` /
+`@EXPORT = ('a', ...)` from the module's `.pm` on the run's `@INC` (`-I`,
+`vendor/perl`, perl's `@INC`, the script's directory, `STRYKE_INC`, `.`)
+without running it, and treats those names as user subs, as it already did for
+`use Module qw(name)`. `use Module ()` still imports nothing. A module that
+builds `@EXPORT` at run time is not seen.
+`parity/cases/20078_use_file_basename_default_exports.pl`;
+`use_without_a_list_imports_the_modules_export_list`.
