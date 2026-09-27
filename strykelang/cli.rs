@@ -1096,35 +1096,7 @@ pub(crate) fn configure_interpreter(cli: &Cli, interp: &mut VMHelper, filename: 
 
     // Order: `-I`, in-tree `vendor/perl` (pure-Perl modules, …), system `perl`’s @INC, script
     // dir, `STRYKE_INC`, then `.` (deduped).
-    let mut inc_paths: Vec<String> = cli.include.clone();
-    let vendor = crate::vendor_perl_inc_path();
-    if vendor.is_dir() {
-        crate::perl_inc::push_unique_string_paths(
-            &mut inc_paths,
-            vec![vendor.to_string_lossy().into_owned()],
-        );
-    }
-    crate::perl_inc::push_unique_string_paths(
-        &mut inc_paths,
-        crate::perl_inc::paths_from_system_perl(),
-    );
-    if filename != "-e" && filename != "-" && filename != "repl" {
-        if let Some(parent) = std::path::Path::new(filename).parent() {
-            if !parent.as_os_str().is_empty() {
-                crate::perl_inc::push_unique_string_paths(
-                    &mut inc_paths,
-                    vec![parent.to_string_lossy().into_owned()],
-                );
-            }
-        }
-    }
-    if let Ok(extra) = std::env::var("STRYKE_INC") {
-        let extra: Vec<String> = std::env::split_paths(&extra)
-            .map(|p| p.to_string_lossy().into_owned())
-            .collect();
-        crate::perl_inc::push_unique_string_paths(&mut inc_paths, extra);
-    }
-    crate::perl_inc::push_unique_string_paths(&mut inc_paths, vec![".".to_string()]);
+    let inc_paths = crate::perl_inc::search_paths(&cli.include, filename);
     let inc_dirs: Vec<crate::value::StrykeValue> = inc_paths
         .into_iter()
         .map(crate::value::StrykeValue::string)
@@ -2005,6 +1977,15 @@ fn run(full_argv: &[String]) -> i32 {
         let code = decode_utf8_or_latin1(&code);
         (code, "-".to_string())
     };
+
+    // `--compat` `use Module;` reads `Module.pm`'s `@EXPORT` while parsing, from
+    // the same `@INC` the run will have.
+    if cli.compat {
+        crate::perl_inc::set_compile_search_paths(crate::perl_inc::search_paths(
+            &cli.include,
+            &filename,
+        ));
+    }
 
     let (program_text, data_opt) = crate::data_section::split_data_section(&raw_script);
     let code = strip_shebang_and_extract(&program_text, cli.extract.is_some());

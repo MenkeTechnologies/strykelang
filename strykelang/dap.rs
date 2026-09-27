@@ -1613,33 +1613,7 @@ pub fn run_with_args(args: &[String]) -> i32 {
     // Pre-populate @INC the same way `configure_interpreter` does for CLI:
     // vendor perl modules, system perl's INC, the script's directory,
     // `STRYKE_INC`, then ".".
-    let mut inc_paths: Vec<String> = Vec::new();
-    let vendor = crate::vendor_perl_inc_path();
-    if vendor.is_dir() {
-        crate::perl_inc::push_unique_string_paths(
-            &mut inc_paths,
-            vec![vendor.to_string_lossy().into_owned()],
-        );
-    }
-    crate::perl_inc::push_unique_string_paths(
-        &mut inc_paths,
-        crate::perl_inc::paths_from_system_perl(),
-    );
-    if let Some(parent) = std::path::Path::new(&lp.program).parent() {
-        if !parent.as_os_str().is_empty() {
-            crate::perl_inc::push_unique_string_paths(
-                &mut inc_paths,
-                vec![parent.to_string_lossy().into_owned()],
-            );
-        }
-    }
-    if let Ok(extra) = std::env::var("STRYKE_INC") {
-        let extra: Vec<String> = std::env::split_paths(&extra)
-            .map(|p| p.to_string_lossy().into_owned())
-            .collect();
-        crate::perl_inc::push_unique_string_paths(&mut inc_paths, extra);
-    }
-    crate::perl_inc::push_unique_string_paths(&mut inc_paths, vec![".".to_string()]);
+    let inc_paths = crate::perl_inc::search_paths(&[], &lp.program);
     let inc_dirs: Vec<crate::value::StrykeValue> = inc_paths
         .into_iter()
         .map(crate::value::StrykeValue::string)

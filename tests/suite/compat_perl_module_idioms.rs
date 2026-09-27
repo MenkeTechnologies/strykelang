@@ -237,3 +237,43 @@ fn ampersand_call_passes_exactly_the_parenthesized_args() {
         "F(2 3)aF(4)F(7)F()"
     );
 }
+
+// ── `use Module;` with no import list ───────────────────────────────────────
+
+#[test]
+fn use_without_a_list_imports_the_modules_export_list() {
+    // `use Module;` imports `@EXPORT`. The parser reads it from `Module.pm`, so
+    // an exported `basename` is the module's sub, not the stryke extension
+    // (`--compat` rejected the call as a disabled extension).
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::create_dir_all(dir.path().join("My")).unwrap();
+    std::fs::write(
+        dir.path().join("My/Paths.pm"),
+        "package My::Paths;\n\
+         # @EXPORT = qw(decoy);\n\
+         use Exporter 'import';\n\
+         our @EXPORT_OK = qw(extra);\n\
+         our @EXPORT = ('basename', qw(tail_of));\n\
+         sub basename { \"mine:$_[0]\" }\n\
+         sub tail_of { substr($_[0], -1) }\n\
+         sub extra { 'x' }\n\
+         1;\n",
+    )
+    .unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_st"))
+        .args(["--compat", "-I"])
+        .arg(dir.path())
+        .args([
+            "-e",
+            r#"use My::Paths; print basename("/a/b"), " ", tail_of("xyz")"#,
+        ])
+        .env("STRYKE_CACHE", "0")
+        .output()
+        .expect("spawn st");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "mine:/a/b z",
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}

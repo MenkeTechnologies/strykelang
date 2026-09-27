@@ -6920,7 +6920,8 @@ impl Parser {
     /// Under `--compat` the parser and the compiler both treat these names as
     /// user subs, so `use File::Basename qw(basename)` calls the imported sub
     /// instead of rejecting — or silently running — the stryke extension of
-    /// the same name.
+    /// the same name. With no import list the names are the module's
+    /// `@EXPORT`, read from its `.pm` (`perl_inc::module_default_exports`).
     pub(crate) fn imported_sub_names(module: &str, imports: &[Expr]) -> Vec<String> {
         // A native XS module imports no user subs: its names are rewritten to
         // the qualified native function (see `Parser::xs_imports`).
@@ -6930,6 +6931,11 @@ impl Parser {
         let is_pragma = module.chars().all(|c| c.is_ascii_lowercase() || c == ':');
         if is_pragma && !matches!(module, "constant" | "subs") {
             return Vec::new();
+        }
+        if imports.is_empty() {
+            // `use Module;` imports the module's `@EXPORT`.
+            let names = crate::perl_inc::module_default_exports(module);
+            return Self::sub_names(names.iter().map(String::as_str));
         }
         Self::import_list_sub_names(imports)
     }
@@ -6965,8 +6971,13 @@ impl Parser {
         }
         let mut names = Vec::new();
         imports.iter().for_each(|e| collect(e, &mut names));
-        names
-            .into_iter()
+        Self::sub_names(names.into_iter())
+    }
+
+    /// The sub names among import-list words: `&b` is `b`; `$c`, `:tag`,
+    /// `-flag` and `!neg` name no sub.
+    fn sub_names<'a>(words: impl Iterator<Item = &'a str>) -> Vec<String> {
+        words
             .map(|raw| raw.strip_prefix('&').unwrap_or(raw))
             .filter(|name| {
                 name.chars()
