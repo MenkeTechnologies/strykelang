@@ -281,6 +281,9 @@ struct CallFrame {
     /// if any. Checked against the returned value at `Op::Return` /
     /// `Op::ReturnValue` before it is pushed to the caller.
     return_type: Option<crate::ast::PerlTypeName>,
+    /// [`VMHelper::caller_frames`](crate::vm_helper::VMHelper) depth to
+    /// truncate back to when this frame is popped.
+    caller_depth: usize,
 }
 
 /// Stack-based bytecode virtual machine.
@@ -691,6 +694,7 @@ impl<'a> VM<'a> {
     fn unwind_stale_block_region_frame(&mut self) {
         if let Some(frame) = self.call_stack.pop() {
             if frame.block_region {
+                self.interp.leave_caller_frame(frame.caller_depth);
                 self.interp.wantarray_kind = frame.saved_wantarray;
                 self.stack.truncate(frame.stack_base);
                 self.interp.pop_scope_to_depth(frame.scope_depth);
@@ -745,6 +749,7 @@ impl<'a> VM<'a> {
             block_region: true,
             sub_profiler_start: None,
             return_type: None,
+            caller_depth: self.interp.caller_frames.len(),
         });
         self.interp.scope_push_hook();
         self.interp.wantarray_kind = WantarrayCtx::Scalar;
@@ -1564,6 +1569,7 @@ impl<'a> VM<'a> {
         // this frame never *owns* the slots, so `set_scalar_slot` would walk outward
         // and clobber the caller's identically-numbered slots.)
         if let Some(frame) = self.call_stack.pop() {
+            self.interp.leave_caller_frame(frame.caller_depth);
             self.interp.wantarray_kind = frame.saved_wantarray;
             self.stack.truncate(frame.stack_base);
             self.interp.pop_scope_to_depth(frame.scope_depth);
@@ -2008,6 +2014,7 @@ impl<'a> VM<'a> {
             }
         }
         if let Some(frame) = self.call_stack.pop() {
+            self.interp.leave_caller_frame(frame.caller_depth);
             self.interp.wantarray_kind = frame.saved_wantarray;
             self.stack.truncate(frame.stack_base);
             self.interp.pop_scope_to_depth(frame.scope_depth);
@@ -2185,6 +2192,7 @@ impl<'a> VM<'a> {
             }
         }
         if let Some(frame) = self.call_stack.pop() {
+            self.interp.leave_caller_frame(frame.caller_depth);
             self.interp.wantarray_kind = frame.saved_wantarray;
             self.stack.truncate(frame.stack_base);
             self.interp.pop_scope_to_depth(frame.scope_depth);
@@ -2305,6 +2313,9 @@ impl<'a> VM<'a> {
         };
         if let Some(sub) = self.interp.subs.get(&full_name).cloned() {
             let saved_wa = self.interp.wantarray_kind;
+            let caller_depth = self
+                .interp
+                .enter_caller_frame(&full_name, self.line(), want);
             self.interp.wantarray_kind = want;
             self.interp.scope_push_hook();
             self.interp.scope.declare_array("_", all_args);
@@ -2318,6 +2329,7 @@ impl<'a> VM<'a> {
                 .map_err(|e| e.at_line(line))?;
             self.interp.scope.declare_array("_", argv);
             let result = self.interp.exec_block_no_scope(&sub.body);
+            self.interp.leave_caller_frame(caller_depth);
             self.interp.wantarray_kind = saved_wa;
             self.interp.scope_pop_hook();
             match result {
@@ -3139,6 +3151,7 @@ impl<'a> VM<'a> {
                 p.enter_sub(name);
             }
             self.interp.debugger_enter_sub(name);
+            let caller_depth = self.interp.enter_caller_frame(name, self.line(), want);
 
             // Fib-shaped recursive-add fast path: if the target sub is tagged with a
             // `fib_like` pattern (detected at sub-registration time in the compiler and
@@ -3163,6 +3176,7 @@ impl<'a> VM<'a> {
                                 p.exit_sub(t0.elapsed());
                             }
                             self.interp.debugger_leave_sub();
+                            self.interp.leave_caller_frame(caller_depth);
                             self.interp.wantarray_kind = saved_wa;
                             return Ok(());
                         }
@@ -3187,6 +3201,7 @@ impl<'a> VM<'a> {
                     block_region: false,
                     sub_profiler_start: sub_prof_t0,
                     return_type: ret_ty.clone(),
+                    caller_depth,
                 });
                 self.interp.wantarray_kind = want;
                 self.interp.scope_push_hook();
@@ -3220,6 +3235,7 @@ impl<'a> VM<'a> {
                     block_region: false,
                     sub_profiler_start: sub_prof_t0,
                     return_type: ret_ty.clone(),
+                    caller_depth,
                 });
                 self.interp.wantarray_kind = want;
                 self.interp.scope_push_hook();
@@ -3285,6 +3301,7 @@ impl<'a> VM<'a> {
                         p.enter_sub(name);
                     }
                     self.interp.debugger_enter_sub(name);
+                    let caller_depth = self.interp.enter_caller_frame(name, self.line(), want);
                     // Only substitute $_ when argc == 0; passing an empty array keeps args empty.
                     let args = if argc == 0 {
                         self.interp.with_topic_default_args(args)
@@ -3334,6 +3351,7 @@ impl<'a> VM<'a> {
                             if let (Some(p), Some(t0)) = (&mut self.interp.profiler, t0) {
                                 p.exit_sub(t0.elapsed());
                             }
+                            self.interp.leave_caller_frame(caller_depth);
                             self.interp.debugger_leave_sub();
                             return Err(e);
                         }
@@ -3343,6 +3361,7 @@ impl<'a> VM<'a> {
                         p.exit_sub(t0.elapsed());
                     }
                     self.interp.debugger_leave_sub();
+                    self.interp.leave_caller_frame(caller_depth);
                 } else if !name.contains("::")
                     && matches!(
                         name,
@@ -3630,6 +3649,7 @@ impl<'a> VM<'a> {
             // Tear down the current frame exactly like Op::Return, then re-dispatch with
             // the restored ip: the new frame's return_ip becomes the original caller's.
             let frame = self.call_stack.pop().expect("checked above");
+            self.interp.leave_caller_frame(frame.caller_depth);
             if let Some(t0) = frame.sub_profiler_start {
                 if let Some(p) = &mut self.interp.profiler {
                     p.exit_sub(t0.elapsed());
@@ -3723,6 +3743,7 @@ impl<'a> VM<'a> {
             return Ok(());
         }
         let frame = self.call_stack.pop().expect("checked above");
+        self.interp.leave_caller_frame(frame.caller_depth);
         if let Some(t0) = frame.sub_profiler_start {
             if let Some(p) = &mut self.interp.profiler {
                 p.exit_sub(t0.elapsed());
@@ -5577,6 +5598,7 @@ impl<'a> VM<'a> {
                     }
                     Op::Return => {
                         if let Some(frame) = self.call_stack.pop() {
+                            self.interp.leave_caller_frame(frame.caller_depth);
                             if frame.block_region {
                                 return Err(StrykeError::runtime(
                                     "Return in map/grep/sort block bytecode",
@@ -5636,6 +5658,7 @@ impl<'a> VM<'a> {
                             val
                         };
                         if let Some(frame) = self.call_stack.pop() {
+                            self.interp.leave_caller_frame(frame.caller_depth);
                             if frame.block_region {
                                 return Err(StrykeError::runtime(
                                     "Return in map/grep/sort block bytecode",
@@ -5676,6 +5699,7 @@ impl<'a> VM<'a> {
                         let val = self.pop();
                         let val = self.resolve_binding_ref(val);
                         if let Some(frame) = self.call_stack.pop() {
+                            self.interp.leave_caller_frame(frame.caller_depth);
                             if !frame.block_region {
                                 return Err(StrykeError::runtime(
                                     "BlockReturnValue without map/grep/sort block frame",
@@ -7985,6 +8009,8 @@ impl<'a> VM<'a> {
                             self.interp.wantarray_kind = want;
                             self.interp.scope_push_hook();
                             self.interp.scope.declare_array("_", args.clone());
+                            let caller_depth =
+                                self.interp.enter_caller_frame(&sub.name, self.line(), want);
                             if let Some(ref env) = sub.closure_env {
                                 self.interp.scope.restore_capture(env);
                             }
@@ -7997,6 +8023,7 @@ impl<'a> VM<'a> {
                             // Set $_0, $_1, $_2, ... for all args, and $_ to first arg
                             self.interp.scope.set_closure_args(&argv);
                             let result = self.interp.exec_block_no_scope(&sub.body);
+                            self.interp.leave_caller_frame(caller_depth);
                             self.interp.wantarray_kind = saved_wa;
                             self.interp.scope_pop_hook();
                             self.interp.current_sub_stack.pop();
@@ -10384,6 +10411,7 @@ impl<'a> VM<'a> {
         }
         let stack_base = self.stack.len() - args.len();
         let mut sub_prof_t0 = None;
+        let mut caller_depth = self.interp.caller_frames.len();
         if let Some(nidx) = self.sub_entry_name_idx(entry_ip) {
             sub_prof_t0 = self.interp.profiler.is_some().then(std::time::Instant::now);
             let nm_owned = self.names[nidx as usize].to_string();
@@ -10391,6 +10419,7 @@ impl<'a> VM<'a> {
                 p.enter_sub(nm_owned.as_str());
             }
             self.interp.debugger_enter_sub(nm_owned.as_str());
+            caller_depth = self.interp.enter_caller_frame(&nm_owned, self.line(), want);
         }
         let ret_ty = self.sub_entry_name_idx(entry_ip).and_then(|nidx| {
             self.sub_return_types
@@ -10407,6 +10436,7 @@ impl<'a> VM<'a> {
             block_region: false,
             sub_profiler_start: sub_prof_t0,
             return_type: ret_ty,
+            caller_depth,
         });
         self.interp.wantarray_kind = want;
         self.interp.scope_push_hook();

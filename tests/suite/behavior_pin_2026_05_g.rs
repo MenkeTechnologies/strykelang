@@ -219,13 +219,13 @@ fn sort_default_uppercase_before_lowercase() {
 // ── caller(N) shape with no arg ─────────────────────────────────────────────
 
 #[test]
-fn caller_without_arg_returns_four_field_list() {
-    // Default caller() returns (package, file, line, sub-name).
+fn caller_without_arg_returns_three_field_list() {
+    // Bare `caller` returns (package, file, line) — line 2 is the `gx()` call.
     let out = eval_string(
         r#"sub gx { my @c = caller; scalar(@c) . ":" . $c[0] . "/" . $c[2] }
            gx()"#,
     );
-    assert!(out.starts_with("4:main/"), "got {:?}", out);
+    assert_eq!(out, "3:main/2");
 }
 
 // ── Prototype `\@` not honored today ─────────────────────────────────────────

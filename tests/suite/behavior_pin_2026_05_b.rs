@@ -356,10 +356,8 @@ fn caller_zero_includes_subroutine_name() {
            sub fnx { gx() }
            fnx()"#,
     );
-    // Fields 0,1,3 → package, filename, sub-name. Stryke stores the unqualified
-    // name in the registry today; the field is populated, no longer empty.
-    assert!(out.starts_with("main,-e,"), "unexpected prefix: {:?}", out);
-    assert!(out.ends_with(",gx"), "expected ',gx' suffix, got {:?}", out);
+    // Fields 0,1,3 → package, filename, sub-name; perl qualifies the name.
+    assert_eq!(out, "main,-e,main::gx");
 }
 
 // ── `kv-slice` yields key-value pairs (BUG-008 FIXED) ────────────────────────

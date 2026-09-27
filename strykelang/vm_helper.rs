@@ -923,8 +923,26 @@ pub struct VMHelper {
     pub(crate) current_sub_stack: Vec<Arc<StrykeSub>>,
     /// Interactive debugger state (`-d` flag).
     pub debugger: Option<crate::debugger::Debugger>,
+    /// Perl call frames as `caller` reports them, innermost last. Pushed at
+    /// every user-sub entry and `eval` block, popped (truncated) on exit.
+    pub(crate) caller_frames: Vec<CallerFrame>,
     /// Call stack for debugger: (sub_name, call_line).
     pub(crate) debug_call_stack: Vec<(String, usize)>,
+}
+
+/// One entry of [`VMHelper::caller_frames`]: what `caller(N)` reports.
+#[derive(Debug, Clone)]
+pub(crate) struct CallerFrame {
+    /// Fully qualified sub name (`main::f`, `Foo::bar`), or `(eval)`.
+    pub(crate) sub: String,
+    /// Package of the code that made the call.
+    pub(crate) pkg: String,
+    /// Source file of the call site.
+    pub(crate) file: String,
+    /// Line of the call site.
+    pub(crate) line: usize,
+    /// Context the sub was called in.
+    pub(crate) want: WantarrayCtx,
 }
 
 /// Snapshot of stash + `@ISA` for REPL `$obj->method` tab-completion (no `Interpreter` handle needed).
@@ -1790,6 +1808,7 @@ impl VMHelper {
             rate_limit_slots: Vec::new(),
             log_level_override: None,
             current_sub_stack: Vec::new(),
+            caller_frames: Vec::new(),
             debugger: None,
             debug_call_stack: Vec::new(),
         };
@@ -2149,6 +2168,7 @@ impl VMHelper {
             rate_limit_slots: Vec::new(),
             log_level_override: self.log_level_override,
             current_sub_stack: Vec::new(),
+            caller_frames: Vec::new(),
             debugger: None,
             debug_call_stack: Vec::new(),
         }
@@ -3147,6 +3167,103 @@ impl VMHelper {
         if let Some(dbg) = &mut self.debugger {
             dbg.enter_sub(name);
         }
+    }
+
+    /// Record a Perl call frame for `caller`: `sub_name` is being entered from
+    /// source line `line` in context `want`. The frame's package is the
+    /// package of the code making the call — the enclosing sub's package, or
+    /// the runtime package at top level. Returns the depth to truncate back to
+    /// on exit ([`Self::leave_caller_frame`]).
+    pub(crate) fn enter_caller_frame(
+        &mut self,
+        sub_name: &str,
+        line: usize,
+        want: WantarrayCtx,
+    ) -> usize {
+        let depth = self.caller_frames.len();
+        let pkg = match self.caller_frames.last() {
+            Some(f) if f.sub == "(eval)" || f.sub.ends_with("::__ANON__") => f.pkg.clone(),
+            Some(f) => f
+                .sub
+                .rsplit_once("::")
+                .map(|(p, _)| p.to_string())
+                .unwrap_or_else(|| "main".to_string()),
+            None => self.current_package(),
+        };
+        let sub = if sub_name == "(eval)" || sub_name.contains("::") {
+            sub_name.to_string()
+        } else {
+            // Unqualified names are `main` subs, except `__ANON__`, which Perl
+            // reports under the package it was compiled in — the caller's
+            // package is the closest runtime approximation.
+            let home = if sub_name == "__ANON__" {
+                pkg.as_str()
+            } else {
+                "main"
+            };
+            format!("{home}::{sub_name}")
+        };
+        self.caller_frames.push(CallerFrame {
+            sub,
+            pkg,
+            file: self.file.clone(),
+            line,
+            want,
+        });
+        depth
+    }
+
+    /// Pop call frames back to `depth` (from [`Self::enter_caller_frame`]).
+    /// Truncating rather than popping one keeps the stack right after a
+    /// `die` unwound frames that never reached their own exit.
+    #[inline]
+    pub(crate) fn leave_caller_frame(&mut self, depth: usize) {
+        self.caller_frames.truncate(depth);
+    }
+
+    /// `caller` / `caller(LEVEL)`. `level` is `None` for the bare form, which
+    /// returns only `(package, filename, line)`. In scalar context the result
+    /// is the package name. Past the outermost frame (including at top level)
+    /// the result is the empty list, or `undef` in scalar context.
+    pub(crate) fn caller_value(&self, level: Option<i64>, scalar: bool) -> StrykeValue {
+        let n = level.unwrap_or(0);
+        let frame = usize::try_from(n)
+            .ok()
+            .and_then(|n| self.caller_frames.len().checked_sub(n + 1))
+            .map(|i| &self.caller_frames[i]);
+        let Some(f) = frame else {
+            return if scalar {
+                StrykeValue::UNDEF
+            } else {
+                StrykeValue::array(vec![])
+            };
+        };
+        if scalar {
+            return StrykeValue::string(f.pkg.clone());
+        }
+        let mut out = vec![
+            StrykeValue::string(f.pkg.clone()),
+            StrykeValue::string(f.file.clone()),
+            StrykeValue::integer(f.line as i64),
+        ];
+        if level.is_some() {
+            let want = match f.want {
+                WantarrayCtx::List => StrykeValue::integer(1),
+                WantarrayCtx::Scalar => StrykeValue::perl_bool(false),
+                WantarrayCtx::Void => StrykeValue::UNDEF,
+            };
+            let hasargs = if f.sub == "(eval)" {
+                StrykeValue::perl_bool(false)
+            } else {
+                StrykeValue::integer(1)
+            };
+            out.push(StrykeValue::string(f.sub.clone()));
+            out.push(hasargs);
+            out.push(want);
+            // evaltext, is_require, hints, bitmask, hinthash
+            out.extend(std::iter::repeat_n(StrykeValue::UNDEF, 5));
+        }
+        StrykeValue::array(out)
     }
 
     /// Pair to [`Self::debugger_enter_sub`].
@@ -14659,24 +14776,12 @@ impl VMHelper {
                     crate::value::BlessedRef::new_blessed(class_name, val),
                 )))
             }
-            ExprKind::Caller(_) => {
-                // Simplified caller frame: (package, file, line, subname). The
-                // sub name is the fully-qualified name of the currently
-                // executing sub (the one that invoked `caller`). Returning it
-                // unblocks logger / decorator patterns that rely on `caller`
-                // for "who called me" identification.
-                let sub_name = self
-                    .current_sub_stack
-                    .last()
-                    .map(|s| StrykeValue::string(s.name.clone()))
-                    .unwrap_or(StrykeValue::UNDEF);
-                let pkg = self.current_package();
-                Ok(StrykeValue::array(vec![
-                    StrykeValue::string(pkg),
-                    StrykeValue::string(self.file.clone()),
-                    StrykeValue::integer(line as i64),
-                    sub_name,
-                ]))
+            ExprKind::Caller(level) => {
+                let level = match level {
+                    Some(e) => Some(self.eval_expr(e)?.to_int()),
+                    None => None,
+                };
+                Ok(self.caller_value(level, ctx == WantarrayCtx::Scalar))
             }
             ExprKind::Wantarray => Ok(match self.wantarray_kind {
                 WantarrayCtx::Void => StrykeValue::UNDEF,
@@ -20819,6 +20924,14 @@ impl VMHelper {
         _line: usize,
         home_package: Option<String>,
     ) -> ExecResult {
+        // `caller` reports the qualified name; a cached bare `name` is
+        // qualified by the home package the registry key carried.
+        let frame_name = match &home_package {
+            Some(pkg) if !sub.name.contains("::") && sub.name != "__ANON__" => {
+                format!("{pkg}::{}", sub.name)
+            }
+            _ => sub.name.clone(),
+        };
         // Push current sub for __SUB__ access
         self.current_sub_stack.push(Arc::new(sub.clone()));
 
@@ -20885,6 +20998,7 @@ impl VMHelper {
             p.enter_sub(&sub.name);
         }
         self.debugger_enter_sub(&sub.name);
+        let caller_depth = self.enter_caller_frame(&frame_name, _line, want);
         // Always evaluate the function body's last expression in List context so
         // `@array` returns the array contents, not the count. The caller adapts the
         // return value to their own wantarray context after receiving it.
@@ -20893,6 +21007,7 @@ impl VMHelper {
             p.exit_sub(t0.elapsed());
         }
         self.debugger_leave_sub();
+        self.leave_caller_frame(caller_depth);
         // For goto &sub, capture @_ before popping the frame
         let goto_args = if matches!(
             result,
@@ -24826,6 +24941,10 @@ pub(crate) fn exec_builtin(
         Some(BuiltinId::Eval) => {
             let arg = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
             this.eval_nesting += 1;
+            // `eval` is a call frame of its own: `caller(0)` inside it reports
+            // `(eval)` and `caller(1)` the enclosing sub.
+            let want = this.wantarray_kind;
+            let caller_depth = this.enter_caller_frame("(eval)", line, want);
             let out = if let Some(sub) = arg.as_code_ref() {
                 match this.exec_block(&sub.body) {
                     Ok(v) => {
@@ -24854,6 +24973,7 @@ pub(crate) fn exec_builtin(
                     }
                 }
             };
+            this.leave_caller_frame(caller_depth);
             this.eval_nesting -= 1;
             out
         }
@@ -24891,21 +25011,15 @@ pub(crate) fn exec_builtin(
             )))
         }
         Some(BuiltinId::Caller) => {
-            // Simplified caller frame: (package, file, line, subname).
-            // The sub name is the fully-qualified name of the currently
-            // executing sub so logger / decorator patterns work.
-            let sub_name = this
-                .current_sub_stack
-                .last()
-                .map(|s| StrykeValue::string(s.name.clone()))
-                .unwrap_or(StrykeValue::UNDEF);
-            let pkg = this.current_package();
-            Ok(StrykeValue::array(vec![
-                StrykeValue::string(pkg),
-                StrykeValue::string(this.file.clone()),
-                StrykeValue::integer(line as i64),
-                sub_name,
-            ]))
+            // Compiler shape: `[level_or_undef, has_level, scalar_ctx]`.
+            let has_level = args.get(1).is_some_and(|v| v.is_true());
+            let scalar = args.get(2).is_some_and(|v| v.is_true());
+            let level = if has_level {
+                Some(args.first().map(|v| v.to_int()).unwrap_or(0))
+            } else {
+                None
+            };
+            Ok(this.caller_value(level, scalar))
         }
         // Parallel ops (shouldn't reach here — handled by block ops)
         Some(BuiltinId::PMap)

@@ -8462,18 +8462,20 @@ impl Compiler {
             ExprKind::Caller(e) => {
                 if let Some(inner) = e {
                     self.compile_expr(inner)?;
-                    self.emit_op(
-                        Op::CallBuiltin(BuiltinId::Caller as u16, 1),
-                        line,
-                        Some(root),
-                    );
                 } else {
-                    self.emit_op(
-                        Op::CallBuiltin(BuiltinId::Caller as u16, 0),
-                        line,
-                        Some(root),
-                    );
+                    self.emit_op(Op::LoadUndef, line, Some(root));
                 }
+                self.emit_op(Op::LoadInt(i64::from(e.is_some())), line, Some(root));
+                self.emit_op(
+                    Op::LoadInt(i64::from(ctx == WantarrayCtx::Scalar)),
+                    line,
+                    Some(root),
+                );
+                self.emit_op(
+                    Op::CallBuiltin(BuiltinId::Caller as u16, 3),
+                    line,
+                    Some(root),
+                );
             }
             ExprKind::Wantarray => {
                 self.emit_op(
