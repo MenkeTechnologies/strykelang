@@ -10686,9 +10686,15 @@ impl Parser {
         // function-call arm, which keeps the name and lets the runtime prefer
         // the user sub — the same path the `cnt` / `len` / `count` family
         // already takes.
+        //
+        // The test is "not a Perl 5 core name", not "is a registered
+        // extension": the short aliases (`t` -> `thread`, `pr` -> `print`,
+        // `sp`, `j`, `k`, `v`, …) have dedicated arms here but are not in the
+        // extension registry, and a Perl program's `sub t` / `sub pr` must
+        // still be callable. Mirrors `Compiler::compat_user_sub_wins`.
         let shadowed_by_user_sub = crate::compat_mode()
-            && Self::stryke_extension_name(&name).is_some()
-            && self.declared_subs.contains(&name);
+            && self.declared_subs.contains(&name)
+            && !crate::builtins::is_perl5_core_name(&name);
         // A name no bareword can have, so the match falls through to `_`.
         let dispatch: &str = if shadowed_by_user_sub { "\u{0}" } else { &name };
 
