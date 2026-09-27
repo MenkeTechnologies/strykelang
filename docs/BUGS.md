@@ -627,7 +627,9 @@ accurate message would be "Can't modify constant string in postfix ++"
 Severity: **polish**.
 
 
-## BUG-002 — Blessed arrayrefs stringify with `HASH` tag
+## BUG-002 — Blessed arrayrefs stringify with `HASH` tag [FIXED]
+
+Fixed: a blessed reference stringifies with its referent's kind (`Bar=ARRAY(0x...)`). Pin: `bless_arrayref_stringifies_with_array_tag`.
 
 ```sh
 $ stryke -e 'my $o = bless [1,2,3], "Bar"; print "$o\n"; print ref($o)'
@@ -960,7 +962,9 @@ string (`open($fh, "-|", "cmd string")`) keeps the `sh -c` shell form.
 Severity: ~~**bug**~~ resolved.
 
 
-## BUG-036 — `$obj->can("method")` returns a coderef that doesn't actually invoke
+## BUG-036 — `$obj->can("method")` returns a coderef that doesn't actually invoke [FIXED]
+
+Fixed: `can` returns the method's own code ref (`VMHelper::find_method_sub`), so `$obj->can("m")->($obj)` runs the method. Pin: `can_returns_coderef_that_runs_the_method`; `parity/cases/20072_universal_isa_can_functions.pl`.
 
 ```sh
 $ stryke -e '
@@ -1614,7 +1618,9 @@ Tests: `struct_does_not_have_pkg_new_today`,
 Severity: **bug** (small surface).
 
 
-## BUG-075 — `refaddr(\@a)` returns a fresh address per `\@a` evaluation
+## BUG-075 — `refaddr(\@a)` returns a fresh address per `\@a` evaluation [FIXED]
+
+Fixed: `refaddr` and `--compat` numification/stringification use the referent's address (`StrykeValue::perl_ref_addr`), so every `\@a` shares one address. Pin: `refaddr_of_repeated_backslash_at_is_the_array_address`.
 
 ```sh
 $ stryke -e 'my @a; print refaddr(\@a) == refaddr(\@a) ? "eq" : "ne"'
@@ -1924,7 +1930,9 @@ Tests: `ternary_inside_interpolated_anon_array_is_rejected_today`,
 Severity: **bug** (parser).
 
 
-## BUG-102 — `refaddr(\&fn)` differs between repeated evaluations
+## BUG-102 — `refaddr(\&fn)` differs between repeated evaluations [FIXED]
+
+Fixed with BUG-075: a code ref's address is the sub's. Pin: `refaddr_of_repeated_backslash_amp_is_the_sub_address`.
 
 ```sh
 $ stryke -e 'sub myff { 1 }
@@ -3135,7 +3143,9 @@ Severity: **parity** (matches Perl's *default* behavior without
 `use utf8`; documented here so users don't expect `use utf8` semantics).
 
 
-## BUG-248 — `caller(N)` returns wrong package and line
+## BUG-248 — `caller(N)` returns wrong package and line [FIXED]
+
+Fixed: the interpreter keeps a Perl call-frame stack (`VMHelper::caller_frames`) pushed at every sub entry, method call and `eval`, so `caller(N)` reports the call site's package and line and the fully qualified sub name (`main::f`, `(eval)`). Pins: `tests/suite/caller_stack_pin.rs`; `parity/cases/20071_caller_frames.pl`.
 
 ```sh
 $ s -e '
@@ -3166,7 +3176,9 @@ Severity: **bug** (P1; stack-walking is wrong on two of three fields;
 affects logging, AOP, error-reporting code paths).
 
 
-## BUG-249 — `caller(N)` never returns empty list
+## BUG-249 — `caller(N)` never returns empty list [FIXED]
+
+Fixed with BUG-248: past the outermost frame (and at top level) `caller` is the empty list, `undef` in scalar context; scalar context is the package; the bare form has 3 fields and `caller(N)` 11.
 
 ```sh
 $ s -e 'my @c = caller(0); print "len=", scalar(@c), "\n"'
@@ -3766,6 +3778,14 @@ sub bump { $_[0]++ } my $x = 5; bump($x); print "$x\n";   # perl: 6      st: 5
 my @a = (1,2,3); $_ *= 2 for @a; print "@a\n";            # perl: 2 4 6  st: 1 2 3
 ```
 
+The `foreach` half is done for a bare-array source: both `for (@a) { ... }`
+and the statement-modifier form `EXPR for @a` write the loop variable back to
+the element after each iteration (the second line above now prints `2 4 6`;
+`parity/cases/20070_postfix_for_aliases_and_localizes_topic.pl`). Still open:
+`@_` aliasing (`$_[0] =~ s///` and `$_[0]++` do not reach the caller's
+variable, so File::Basename's `dirname` returns `"/a/"`), and aliasing through
+non-array sources (`for ($x, $y)`, `for (@$ref)`).
+
 ## BUG-313 — `use utf8` is ignored inside a sub body — **`parity`**
 
 `use utf8` is honored at file scope but not when it appears inside a sub, so the
@@ -3863,3 +3883,62 @@ The `goto` is Exporter's `goto &{as_heavy()}` (Exporter.pm lines 22, 78–90),
 reached from List::Util's `goto &Exporter::import`. Even with that lowered, the
 XS functions (`sum`, `blessed`, `floor`) have no Perl definition to import;
 they need to bind to stryke's native builtins of the same meaning.
+
+## BUG-320 — a bare `/re/` used as a value was a regex object, not a `$_` match — **`parity`** [FIXED]
+
+`my ($n) = /(\d+)/`, `my @all = /\d/g`, `map { /(\d)/ } @lines` and
+`my $ok = /x/` all returned the pattern (`(?:\d)`) instead of matching `$_`.
+The lexer now emits `qr//` as its own token (`Token::Qr`) and
+`ExprKind::Regex` carries whether it was written as `qr`; under `--compat` an
+`m//` or bare `//` in scalar or list context compiles as a `$_` match. `split
+/re/` still takes the pattern itself. Native stryke keeps a bare `//` as a
+regex value. `parity/cases/20068_bare_match_as_value_matches_topic.pl`.
+
+Found with it: a `map` block ending in a match or an array evaluated that tail
+in scalar context (`map { my @c = f($_); @c }` gave counts), and `$s =~ $qr` in
+list context returned 1 instead of the captures. Both fixed; pinned in the
+same case and in `tests/suite/topic_match_and_aliasing.rs`.
+
+## BUG-321 — `while (/x/g)` never advanced `pos` and looped forever — **`bug`** [FIXED]
+
+A bare `/x/g` in a condition (or as a statement) compiled to the dynamic
+match, which has no `pos` bookkeeping, so every test re-matched from offset 0:
+`while (/(\w)/g) { ... }` printed the last capture forever and `pos()` stayed
+undef after `/l+/g;`. It now compiles as an iterating `$_` match.
+`parity/cases/20069_while_bare_match_g_iterates.pl`.
+
+## BUG-322 — `for (@frozen)` died after the first element — **`bug`** [FIXED]
+
+The foreach alias write-back stored into the source array even when it was a
+`val` array, so `val @a = (1,2,3); for (@a) { ... }` ran one iteration and then
+died with `cannot modify frozen array`. Frozen sources skip the write-back.
+Pin: `foreach_over_frozen_array_reads_every_element`.
+
+## BUG-323 — references compared and hashed as equal; `qr//` lost its flags when interpolated — **`parity`** [FIXED]
+
+Every reference stringified to the same `ARRAY(0x...)` and numified to 0, so
+under `--compat` `$r1 == $r2` was true for distinct arrays and `%seen{$ref}`
+collapsed all references into one key. `--compat` now prints and numifies the
+referent's address (native stryke keeps the reproducible placeholder).
+`qr/ab/i` stringified as `(?:ab)`, so `/x$re/` silently dropped the `/i`; it is
+now perl's `(?^i:ab)`, and the regex compiler rewrites `(?^FLAGS:` to an
+explicit inline-flag group so the pattern stays on the fast engine.
+`parity/cases/20073_ref_identity_and_qr_stringify.pl`.
+
+## BUG-324 — `UNIVERSAL::isa` / `UNIVERSAL::can` as functions, and `defined &name` — **`parity`** [FIXED]
+
+`UNIVERSAL::isa($x, "T")` died with `Undefined subroutine`, and `defined &name`
+called the sub (dying when it did not exist, and testing the return value when
+it did). The function forms now answer from the MRO and the referent type, and
+`defined &name` is a lookup. `parity/cases/20072_universal_isa_can_functions.pl`.
+
+## BUG-325 — `--compat` user subs named `t`, `pr`, `sp`, … were unreachable — **`bug`** [FIXED]
+
+BUG-309's guard routed a user sub to the generic call only when its name was in
+the stryke-extension registry. The short keyword aliases (`t` → `thread`,
+`pr` → `print`, `sp` → `split`, …) have dedicated parser arms but are not in
+that registry, so `sub t { ... } t()` ran the thread macro. The guard now
+applies to every name that is not Perl 5 core, the same test
+`Compiler::compat_user_sub_wins` uses. The same bug had made `local` look
+broken in `sub t { local $g = 2; show() }`.
+`parity/cases/20067_user_sub_named_like_stryke_alias.pl`.
