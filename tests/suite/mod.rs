@@ -367,6 +367,7 @@ mod string_search_pin;
 mod string_slice_colon_pin;
 mod strings_text;
 mod strptime_template_deburr;
+mod sub_arg_aliasing;
 mod sub_call_pin;
 mod sub_ref_vm;
 mod subs;

@@ -61,3 +61,30 @@ fn compat_posix_constants_take_no_arguments() {
     assert_eq!(eval_compat(r#"use POSIX; INT_MAX + 1"#), "2147483648");
     assert_eq!(eval_compat(r#"use POSIX qw(floor); floor(1e20)"#), "1e+20");
 }
+
+#[test]
+fn compat_module_subs_reach_the_native_functions() {
+    // A module's subs run on the tree-walker, whose named-sub dispatch must
+    // reach the XS functions too (it used to die "Undefined subroutine
+    // &List::Util::first").
+    let dir = std::env::temp_dir().join(format!("stryke_xs_native_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("XsNativeUser.pm"),
+        "package XsNativeUser;\n\
+         use List::Util qw(first sum);\n\
+         use POSIX qw(floor);\n\
+         sub pick { return first { $_ > 2 } @_ }\n\
+         sub total { return sum(@_) . '/' . floor(2.7) }\n\
+         1;\n",
+    )
+    .unwrap();
+    let code = format!(
+        r#"BEGIN {{ unshift @INC, "{}" }} require XsNativeUser;
+           XsNativeUser::pick(1, 5, 7) . " " . XsNativeUser::total(1, 2)"#,
+        dir.display()
+    );
+    let out = eval_compat(&code);
+    std::fs::remove_dir_all(&dir).ok();
+    assert_eq!(out, "5 3/2");
+}

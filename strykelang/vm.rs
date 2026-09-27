@@ -215,6 +215,7 @@ impl ParallelBlockVmShared {
             jit_buf_plain: Vec::new(),
             jit_buf_arg: Vec::new(),
             jit_trampoline_out: None,
+            arg_alias_pending: false,
             jit_trampoline_depth: 0,
             halt: false,
             try_stack: Vec::new(),
@@ -557,6 +558,9 @@ pub struct VM<'a> {
     jit_buf_arg: Vec<i64>,
     /// Set when running [`VM::jit_trampoline_run_sub`]; [`Op::ReturnValue`] stores here and exits dispatch.
     jit_trampoline_out: Option<StrykeValue>,
+    /// Set by [`Op::ArgAliasCall`]: the next user-sub call tracks writes through `$_[N]`
+    /// (`--compat` `@_` aliasing, BUG-312). Consumed by that call.
+    arg_alias_pending: bool,
     /// Nesting depth for [`Self::jit_trampoline_run_sub`]; dispatch breaks on [`Self::jit_trampoline_out`] only when `> 0`.
     jit_trampoline_depth: u32,
     /// Set by [`Op::Halt`]; outer loop exits after handling [`Self::try_recover_from_exception`].
@@ -675,6 +679,7 @@ impl<'a> VM<'a> {
             jit_buf_plain: Vec::new(),
             jit_buf_arg: Vec::new(),
             jit_trampoline_out: None,
+            arg_alias_pending: false,
             jit_trampoline_depth: 0,
             halt: false,
             try_stack: Vec::new(),
@@ -2213,6 +2218,8 @@ impl<'a> VM<'a> {
         wa: u8,
         super_call: bool,
     ) -> StrykeResult<()> {
+        // `Op::ArgAliasCall` before this call: log writes through `$_[N]` (BUG-312).
+        let track_arg_aliases = std::mem::take(&mut self.arg_alias_pending);
         let method_owned = self.names[name_idx as usize].clone();
         let argc = argc as usize;
         let want = WantarrayCtx::from_byte(wa);
@@ -2315,6 +2322,9 @@ impl<'a> VM<'a> {
                 .apply_sub_signature(sub.as_ref(), &argv, line)
                 .map_err(|e| e.at_line(line))?;
             self.interp.scope.declare_array("_", argv);
+            if track_arg_aliases {
+                self.interp.scope.track_arg_aliases();
+            }
             let result = self.interp.exec_block_no_scope(&sub.body);
             self.interp.leave_caller_frame(caller_depth);
             self.interp.wantarray_kind = saved_wa;
@@ -3108,6 +3118,8 @@ impl<'a> VM<'a> {
         let name = name_owned.as_str();
         let argc = argc_u8 as usize;
         let want = WantarrayCtx::from_byte(wa_byte);
+        // `Op::ArgAliasCall` before this call: log writes through `$_[N]` (BUG-312).
+        let track_arg_aliases = std::mem::take(&mut self.arg_alias_pending);
         // Declared return type (`fn f(): Type`) for this sub, enforced at return.
         let ret_ty = self
             .sub_return_types
@@ -3241,6 +3253,9 @@ impl<'a> VM<'a> {
                     self.interp.scope.set_closure_args(&argv);
                     self.interp.current_sub_stack.push(sub.clone());
                 }
+                if track_arg_aliases {
+                    self.interp.scope.track_arg_aliases();
+                }
                 self.ip = entry_ip;
             }
         } else {
@@ -3324,6 +3339,9 @@ impl<'a> VM<'a> {
                     let result = {
                         self.interp.scope.declare_array("_", argv.clone());
                         self.interp.scope.set_closure_args(&argv);
+                        if track_arg_aliases {
+                            self.interp.scope.track_arg_aliases();
+                        }
                         self.interp
                             .exec_block_no_scope_with_tail(&sub.body, WantarrayCtx::List)
                     };
@@ -5586,6 +5604,32 @@ impl<'a> VM<'a> {
                     }
                     Op::GotoSubRef => {
                         self.vm_goto_sub_ref()?;
+                        Ok(())
+                    }
+                    Op::ArgAliasCall => {
+                        self.arg_alias_pending = true;
+                        self.interp.scope.clear_arg_alias_writes();
+                        Ok(())
+                    }
+                    Op::ArgAliasWrote => {
+                        let depth = self.interp.scope.depth();
+                        let wrote = self.interp.scope.arg_alias_wrote(depth);
+                        self.push(StrykeValue::integer(i64::from(wrote)));
+                        Ok(())
+                    }
+                    Op::ArgAliasOut(pos) => {
+                        let depth = self.interp.scope.depth();
+                        match self.interp.scope.arg_alias_write(depth, *pos as usize) {
+                            Some(v) => {
+                                let v = v.clone();
+                                self.push(v);
+                                self.push(StrykeValue::integer(1));
+                            }
+                            None => {
+                                self.push(StrykeValue::UNDEF);
+                                self.push(StrykeValue::integer(0));
+                            }
+                        }
                         Ok(())
                     }
                     Op::CallStaticSubId(sid, name_idx, argc, wa) => {

@@ -345,6 +345,54 @@ type DeferredSubBody = (
     Option<crate::ast::PerlTypeName>,
 );
 
+/// An argument that `@_` aliases under `--compat` (BUG-312), and where a
+/// write through `$_[N]` is stored back.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ArgAlias<'a> {
+    /// `$x` — a plain scalar variable.
+    Scalar(&'a str),
+    /// `$_[N]` with a literal `N`: the caller's own argument, so the alias
+    /// chains through a wrapper sub to *its* caller.
+    SubArgElement(i64),
+}
+
+/// `(position in @_, target)` for each argument of a sub call that `@_`
+/// aliases and whose position is fixed at compile time: every argument
+/// before it yields exactly one value. Stops at the first argument that may
+/// flatten to a list (`@a`, `f()`, a range), since positions after it are
+/// only known at run time.
+pub(crate) fn aliased_args(args: &[Expr]) -> Vec<(usize, ArgAlias<'_>)> {
+    let mut out = Vec::new();
+    for (pos, arg) in args.iter().enumerate() {
+        match &arg.kind {
+            ExprKind::ScalarVar(name)
+                if name != "_"
+                    && !VMHelper::is_special_scalar_name_for_set(name)
+                    && name
+                        .chars()
+                        .next()
+                        .is_some_and(|c| c.is_alphabetic() || c == '_') =>
+            {
+                out.push((pos, ArgAlias::Scalar(name)));
+            }
+            ExprKind::ArrayElement { array, index } if array == "_" => {
+                if let ExprKind::Integer(n) = index.kind {
+                    out.push((pos, ArgAlias::SubArgElement(n)));
+                }
+            }
+            ExprKind::ScalarVar(_)
+            | ExprKind::Integer(_)
+            | ExprKind::Float(_)
+            | ExprKind::String(_)
+            | ExprKind::InterpolatedString(_)
+            | ExprKind::ArrayElement { .. }
+            | ExprKind::HashElement { .. } => {}
+            _ => break,
+        }
+    }
+    out
+}
+
 impl Compiler {
     /// Array/hash slice subscripts are list context: `@a[LIST]` flattens ranges, `reverse`,
     /// `sort`, `grep`, `map`, and array variables the same way `@h{LIST}` does. Scalar
@@ -1322,6 +1370,88 @@ impl Compiler {
         } else {
             self.emit_op(Op::SetScalarPlain(name_idx), line, ast);
         }
+    }
+
+    /// A call to a user sub: arguments in list context (flattened into `@_`),
+    /// then `Op::Call`, with `--compat` `@_` aliasing of the arguments.
+    fn compile_user_sub_call(
+        &mut self,
+        name_idx: u16,
+        args: &[Expr],
+        ctx: WantarrayCtx,
+        line: usize,
+        root: &Expr,
+    ) -> Result<(), CompileError> {
+        for arg in args {
+            self.compile_expr_ctx(arg, WantarrayCtx::List)?;
+        }
+        let aliased = self.emit_arg_alias_call(args, line, root);
+        self.emit_op(
+            Op::Call(name_idx, args.len() as u8, ctx.as_byte()),
+            line,
+            Some(root),
+        );
+        self.emit_arg_alias_stores(&aliased, 0, line, root);
+        Ok(())
+    }
+
+    /// `--compat`: `@_` aliases the arguments [`aliased_args`] finds, as in
+    /// Perl (BUG-312). Before the call op: [`Op::ArgAliasCall`], so the sub
+    /// logs its writes through `$_[N]`. Returns the aliased arguments for
+    /// [`Self::emit_arg_alias_stores`] after the call op.
+    fn emit_arg_alias_call<'e>(
+        &mut self,
+        args: &'e [Expr],
+        line: usize,
+        root: &Expr,
+    ) -> Vec<(usize, ArgAlias<'e>)> {
+        if !crate::compat_mode() {
+            return Vec::new();
+        }
+        let aliased = aliased_args(args);
+        if !aliased.is_empty() {
+            self.emit_op(Op::ArgAliasCall, line, Some(root));
+        }
+        aliased
+    }
+
+    /// After the call op: store what the sub wrote to `$_[pos + offset]`
+    /// into the argument at `pos` (`offset` is 1 for a method call, whose
+    /// `$_[0]` is the invocant). Leaves the call's result on the stack.
+    fn emit_arg_alias_stores(
+        &mut self,
+        aliased: &[(usize, ArgAlias<'_>)],
+        offset: usize,
+        line: usize,
+        root: &Expr,
+    ) {
+        if aliased.is_empty() {
+            return;
+        }
+        // Nothing written (the common case): one test skips every store.
+        self.emit_op(Op::ArgAliasWrote, line, Some(root));
+        let none_written = self.chunk.emit(Op::JumpIfFalse(0), line);
+        for &(pos, target) in aliased {
+            // stack: [result, value, wrote?]
+            self.emit_op(Op::ArgAliasOut((pos + offset) as u16), line, Some(root));
+            let skip = self.chunk.emit(Op::JumpIfFalse(0), line);
+            match target {
+                ArgAlias::Scalar(name) => {
+                    let name_idx = self.chunk.intern_name(name);
+                    self.emit_set_scalar(name_idx, line, Some(root));
+                }
+                ArgAlias::SubArgElement(index) => {
+                    let arr_idx = self.chunk.intern_name("_");
+                    self.emit_op(Op::LoadInt(index), line, Some(root));
+                    self.emit_op(Op::SetArrayElem(arr_idx), line, Some(root));
+                }
+            }
+            let done = self.chunk.emit(Op::Jump(0), line);
+            self.chunk.patch_jump_here(skip);
+            self.emit_op(Op::Pop, line, Some(root));
+            self.chunk.patch_jump_here(done);
+        }
+        self.chunk.patch_jump_here(none_written);
     }
 
     /// Emit SetScalarKeep or SetScalarSlotKeep depending on slot availability.
@@ -6532,15 +6662,8 @@ impl Compiler {
                 // straight to `Op::CallBuiltin`, which `patch_static_sub_calls` never
                 // revisits — so without this the user's sub is silently unreachable.
                 if self.compat_user_sub_wins(name, dispatch_name) {
-                    for arg in args {
-                        self.compile_expr_ctx(arg, WantarrayCtx::List)?;
-                    }
                     let name_idx = self.chunk.intern_name(&self.qualify_sub_key(dispatch_name));
-                    self.emit_op(
-                        Op::Call(name_idx, args.len() as u8, ctx.as_byte()),
-                        line,
-                        Some(root),
-                    );
+                    self.compile_user_sub_call(name_idx, args, ctx, line, root)?;
                     return Ok(());
                 }
                 match dispatch_name {
@@ -7081,16 +7204,9 @@ impl Compiler {
                         // Generic sub call: args are in list context so `f(1..10)`, `f(@a)`,
                         // `f(reverse LIST)` etc. flatten into `@_`. [`Self::pop_call_operands_flattened`]
                         // splats any array value at runtime, matching Perl's `@_` semantics.
-                        for arg in args {
-                            self.compile_expr_ctx(arg, WantarrayCtx::List)?;
-                        }
                         let q = self.qualify_sub_key(name);
                         let name_idx = self.chunk.intern_name(&q);
-                        self.emit_op(
-                            Op::Call(name_idx, args.len() as u8, ctx.as_byte()),
-                            line,
-                            Some(root),
-                        );
+                        self.compile_user_sub_call(name_idx, args, ctx, line, root)?;
                     }
                 }
             }
@@ -7134,6 +7250,7 @@ impl Compiler {
                     self.compile_expr_ctx(arg, WantarrayCtx::List)?;
                 }
                 let name_idx = self.chunk.intern_name(method);
+                let aliased = self.emit_arg_alias_call(args, line, root);
                 if *super_call {
                     self.emit_op(
                         Op::MethodCallSuper(name_idx, args.len() as u8, ctx.as_byte()),
@@ -7147,6 +7264,8 @@ impl Compiler {
                         Some(root),
                     );
                 }
+                // `$_[0]` is the invocant: argument N is `$_[N + 1]`.
+                self.emit_arg_alias_stores(&aliased, 1, line, root);
             }
             ExprKind::IndirectCall {
                 target,

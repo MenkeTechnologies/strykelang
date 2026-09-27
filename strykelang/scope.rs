@@ -137,6 +137,28 @@ enum LocalRestore {
     ArrayElement(String, i64, StrykeValue),
 }
 
+/// `--compat` aliasing of `@_` to the caller's variables (BUG-312).
+///
+/// Perl's `@_` elements *are* the caller's arguments, so `$_[0]++` or
+/// `$_[0] =~ s///` changes the variable that was passed. stryke copies the
+/// arguments; instead, a call site that passes plain variables asks for its
+/// sub frame to be tracked ([`Scope::track_arg_aliases`]), each write through
+/// `$_[N]` is logged here by original argument position, and when the frame
+/// is popped the log is handed back ([`Scope::arg_alias_writes`]) for the
+/// caller to store into the variables.
+#[derive(Debug, Clone, Default)]
+struct ArgAliasLog {
+    /// The call site asked for the writes.
+    tracking: bool,
+    /// False once `@_` is rebuilt (`@_ = …`, `unshift`, `splice`): its indices
+    /// no longer name the original arguments, so later writes are not logged.
+    live: bool,
+    /// Elements `shift`ed off `@_` so far: `$_[i]` is argument `i + shifted`.
+    shifted: usize,
+    /// Latest value written through `@_` for each argument position.
+    writes: Vec<(usize, StrykeValue)>,
+}
+
 /// A single lexical scope frame.
 /// Uses Vec instead of HashMap — for typical Perl code with < 10 variables per
 /// scope, linear scan is faster than hashing due to cache locality and zero
@@ -148,6 +170,8 @@ struct Frame {
     /// Subroutine (or bootstrap) `@_` — stored separately so call paths can move the arg
     /// [`Vec`] into the frame without an extra copy via [`Frame::arrays`].
     sub_underscore: Option<Vec<StrykeValue>>,
+    /// `--compat` `@_` aliasing for this sub frame (BUG-312); see [`ArgAliasLog`].
+    arg_alias: ArgAliasLog,
     hashes: Vec<(String, IndexMap<String, StrykeValue>)>,
     /// Slot-indexed scalars for O(1) access from compiled subroutines.
     /// Compiler assigns `my $x` declarations a u8 slot index; the VM accesses
@@ -230,6 +254,7 @@ impl Frame {
         self.scalars.clear();
         self.arrays.clear();
         self.sub_underscore = None;
+        self.arg_alias = ArgAliasLog::default();
         self.hashes.clear();
         self.scalar_slots.clear();
         self.scalar_slot_names.clear();
@@ -262,6 +287,7 @@ impl Frame {
             scalars: Vec::new(),
             arrays: Vec::new(),
             sub_underscore: None,
+            arg_alias: ArgAliasLog::default(),
             hashes: Vec::new(),
             scalar_slots: Vec::new(),
             scalar_slot_names: Vec::new(),
@@ -488,6 +514,9 @@ pub struct Scope {
     /// frames with no slot N still propagate the chain (with `undef` if they
     /// didn't bind that slot themselves).
     max_active_slot: usize,
+    /// Writes logged by the last tracked sub frame popped, with the depth that
+    /// frame had (see [`ArgAliasLog`]).
+    arg_alias_out: Option<(usize, Vec<(usize, StrykeValue)>)>,
 }
 
 impl Default for Scope {
@@ -505,9 +534,90 @@ impl Scope {
             parallel_guard: false,
             parallel_guard_baseline: 0,
             max_active_slot: 0,
+            arg_alias_out: None,
         };
         s.frames.push(Frame::new());
         s
+    }
+
+    // ── `--compat` `@_` aliasing (BUG-312, see [`ArgAliasLog`]) ──
+
+    /// Log writes through `@_` in the innermost frame (a sub frame whose `@_`
+    /// was just declared) for the caller to store back.
+    pub fn track_arg_aliases(&mut self) {
+        if let Some(frame) = self.frames.last_mut() {
+            frame.arg_alias = ArgAliasLog {
+                tracking: true,
+                live: true,
+                ..ArgAliasLog::default()
+            };
+        }
+    }
+
+    /// Forget the writes of an earlier tracked frame before a new tracked call.
+    pub fn clear_arg_alias_writes(&mut self) {
+        self.arg_alias_out = None;
+    }
+
+    /// The value written to argument `pos` by the tracked sub frame that was
+    /// pushed at depth `depth + 1` and has returned — the call made from depth
+    /// `depth`. `None` when that call wrote nothing to `pos`.
+    pub fn arg_alias_write(&self, depth: usize, pos: usize) -> Option<&StrykeValue> {
+        let (frame_depth, writes) = self.arg_alias_out.as_ref()?;
+        if *frame_depth != depth + 1 {
+            return None;
+        }
+        writes.iter().find(|(p, _)| *p == pos).map(|(_, v)| v)
+    }
+
+    /// Whether the tracked call made from depth `depth` wrote any argument.
+    pub fn arg_alias_wrote(&self, depth: usize) -> bool {
+        self.arg_alias_out
+            .as_ref()
+            .is_some_and(|(frame_depth, writes)| *frame_depth == depth + 1 && !writes.is_empty())
+    }
+
+    /// The innermost frame holding a sub's `@_`, if it is being tracked.
+    fn tracked_arg_alias_frame(&mut self) -> Option<&mut Frame> {
+        self.frames
+            .iter_mut()
+            .rev()
+            .find(|f| f.sub_underscore.is_some())
+            .filter(|f| f.arg_alias.tracking && f.arg_alias.live)
+    }
+
+    /// `$_[index] = val` in a tracked frame: log it by argument position.
+    fn note_arg_alias_write(&mut self, index: i64, val: &StrykeValue) {
+        let Some(frame) = self.tracked_arg_alias_frame() else {
+            return;
+        };
+        let len = frame.sub_underscore.as_ref().map_or(0, Vec::len) as i64;
+        let index = if index < 0 { len + index } else { index };
+        if index < 0 {
+            return;
+        }
+        let log = &mut frame.arg_alias;
+        let pos = index as usize + log.shifted;
+        match log.writes.iter_mut().find(|(p, _)| *p == pos) {
+            Some(entry) => entry.1 = val.clone(),
+            None => log.writes.push((pos, val.clone())),
+        }
+    }
+
+    /// `shift @_` in a tracked frame: the remaining elements move down one.
+    fn note_arg_alias_shift(&mut self) {
+        if let Some(frame) = self.tracked_arg_alias_frame() {
+            if frame.sub_underscore.as_ref().is_some_and(|v| !v.is_empty()) {
+                frame.arg_alias.shifted += 1;
+            }
+        }
+    }
+
+    /// `@_` rebuilt in a tracked frame: stop logging.
+    fn note_arg_alias_rebuilt(&mut self) {
+        if let Some(frame) = self.tracked_arg_alias_frame() {
+            frame.arg_alias.live = false;
+        }
     }
 
     /// Enable [`Self::parallel_guard`] for parallel worker interpreters (pmap, fan, …).
@@ -881,6 +991,10 @@ impl Scope {
                 }
             }
             self.parallel_guard = saved_guard;
+            if frame.arg_alias.tracking {
+                let depth = self.frames.len() + 1;
+                self.arg_alias_out = Some((depth, std::mem::take(&mut frame.arg_alias.writes)));
+            }
             frame.clear_all_bindings();
             // Return frame to pool for reuse (avoids allocation on next push_frame).
             if self.frame_pool.len() < 64 {
@@ -2134,6 +2248,9 @@ impl Scope {
         name: &str,
         vals: Vec<StrykeValue>,
     ) -> Result<usize, StrykeError> {
+        if name == "_" {
+            self.note_arg_alias_rebuilt();
+        }
         self.with_array_mut(name, |arr| {
             arr.splice(0..0, vals);
             arr.len()
@@ -2224,6 +2341,9 @@ impl Scope {
 
     /// Shift from array — works for regular, shared, and atomic arrays.
     pub fn shift_from_array(&mut self, name: &str) -> Result<StrykeValue, StrykeError> {
+        if name == "_" {
+            self.note_arg_alias_shift();
+        }
         if let Some(aa) = self.find_atomic_array(name) {
             let mut guard = aa.0.lock();
             return Ok(if guard.is_empty() {
@@ -2258,6 +2378,9 @@ impl Scope {
         end: usize,
         rep_vals: Vec<StrykeValue>,
     ) -> Result<Vec<StrykeValue>, StrykeError> {
+        if name == "_" {
+            self.note_arg_alias_rebuilt();
+        }
         if let Some(aa) = self.find_atomic_array(name) {
             let mut g = aa.0.lock();
             let removed: Vec<StrykeValue> = g.drain(off..end).collect();
@@ -2308,6 +2431,9 @@ impl Scope {
     }
     /// `set_array` — see implementation.
     pub fn set_array(&mut self, name: &str, val: Vec<StrykeValue>) -> Result<(), StrykeError> {
+        if name == "_" {
+            self.note_arg_alias_rebuilt();
+        }
         // Typed array (`var @a: List<T>`) — whole-array assignment must satisfy
         // the declared element type.
         if let Some(ty) = self.array_type_of(name) {
@@ -2375,6 +2501,9 @@ impl Scope {
         val: StrykeValue,
     ) -> Result<(), StrykeError> {
         let val = self.resolve_container_binding_ref(val);
+        if name == "_" {
+            self.note_arg_alias_write(index, &val);
+        }
         // Typed array element write (`$a[i] = v`, `push @a, v`) must satisfy the
         // declared element type.
         if let Some(PerlTypeName::List(elem)) = self.array_type_of(name) {

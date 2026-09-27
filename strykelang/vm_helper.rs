@@ -819,6 +819,9 @@ pub struct VMHelper {
     /// Sub keys imported from a native XS module (`main::floor` → `POSIX::floor`), set by
     /// `use POSIX qw(floor)`; see [`crate::xs_native`].
     pub(crate) xs_imports: HashMap<String, String>,
+    /// The next [`Self::call_sub_with_package`] tracks writes through `$_[N]` for the call
+    /// site (`--compat` `@_` aliasing, BUG-312). Consumed by that call.
+    pub(crate) arg_alias_pending: bool,
     /// Virtual modules: path → source (for AOT bundles). Checked before filesystem in `require`.
     pub(crate) virtual_modules: HashMap<String, String>,
     /// `tie %name, ...` — object that implements FETCH/STORE for that hash.
@@ -1762,6 +1765,7 @@ impl VMHelper {
             profiler: None,
             module_export_lists: HashMap::new(),
             xs_imports: HashMap::new(),
+            arg_alias_pending: false,
             virtual_modules: HashMap::new(),
             tied_hashes: HashMap::new(),
             tied_scalars: HashMap::new(),
@@ -2128,6 +2132,7 @@ impl VMHelper {
             profiler: None,
             module_export_lists: self.module_export_lists.clone(),
             xs_imports: self.xs_imports.clone(),
+            arg_alias_pending: false,
             virtual_modules: self.virtual_modules.clone(),
             tied_hashes: self.tied_hashes.clone(),
             tied_scalars: self.tied_scalars.clone(),
@@ -12072,9 +12077,11 @@ impl VMHelper {
                 }
                 if let Some(sub) = self.resolve_sub_by_name(name) {
                     self.wantarray_kind = saved_wa;
-                    let args = self.with_topic_default_args(arg_vals);
+                    let arg_vals = self.with_topic_default_args(arg_vals);
                     let pkg = name.rsplit_once("::").map(|(p, _)| p.to_string());
-                    return self.call_sub_with_package(&sub, args, ctx, line, pkg);
+                    return self.with_arg_aliases(args, 0, |interp| {
+                        interp.call_sub_with_package(&sub, arg_vals, ctx, line, pkg)
+                    });
                 }
                 // Compat mode: check builtins after user subs (Perl 5 semantics).
                 if crate::compat_mode() {
@@ -12249,7 +12256,10 @@ impl VMHelper {
                         )
                     })?;
                 if let Some(sub) = self.subs.get(&full_name).cloned() {
-                    self.call_sub(&sub, arg_vals, ctx, line)
+                    // `$_[0]` is the invocant, so argument N is `$_[N + 1]`.
+                    self.with_arg_aliases(args, 1, |interp| {
+                        interp.call_sub(&sub, arg_vals, ctx, line)
+                    })
                 } else if method == "new" && !*super_call {
                     // Default constructor
                     self.builtin_new(&class, arg_vals, line)
@@ -17616,6 +17626,9 @@ impl VMHelper {
             let pkg = name.rsplit_once("::").map(|(p, _)| p.to_string());
             return self.call_sub_with_package(&sub, args, want, line, pkg);
         }
+        if let Some(r) = self.call_xs_native(name, &args, want, line) {
+            return r;
+        }
         match name {
             "uniq" | "distinct" | "uq" | "uniqstr" | "uniqint" | "uniqnum" | "shuffle" | "shuf"
             | "sample" | "chunked" | "chk" | "windowed" | "win" | "zip" | "zp" | "zip_shortest"
@@ -21038,6 +21051,39 @@ impl VMHelper {
         Ok(())
     }
 
+    /// Make the sub call `call` with `--compat` `@_` aliasing (BUG-312): the
+    /// arguments of `args` that `@_` aliases (see [`crate::compiler::aliased_args`])
+    /// take back what the sub wrote to `$_[N + offset]`. Tree-walker twin of
+    /// `Compiler::compile_user_sub_call`.
+    fn with_arg_aliases(
+        &mut self,
+        args: &[Expr],
+        offset: usize,
+        call: impl FnOnce(&mut Self) -> ExecResult,
+    ) -> ExecResult {
+        let aliased = if crate::compat_mode() {
+            crate::compiler::aliased_args(args)
+        } else {
+            Vec::new()
+        };
+        if aliased.is_empty() {
+            return call(self);
+        }
+        self.arg_alias_pending = true;
+        self.scope.clear_arg_alias_writes();
+        let out = call(self);
+        // A call that never reached a sub frame leaves the flag set.
+        self.arg_alias_pending = false;
+        let out = out?;
+        let depth = self.scope.depth();
+        for (pos, _) in aliased {
+            if let Some(v) = self.scope.arg_alias_write(depth, pos + offset).cloned() {
+                self.assign_value(&args[pos], v)?;
+            }
+        }
+        Ok(out)
+    }
+
     pub(crate) fn call_sub(
         &mut self,
         sub: &StrykeSub,
@@ -21062,6 +21108,7 @@ impl VMHelper {
         _line: usize,
         home_package: Option<String>,
     ) -> ExecResult {
+        let track_arg_aliases = std::mem::take(&mut self.arg_alias_pending);
         // `caller` reports the qualified name; a cached bare `name` is
         // qualified by the home package the registry key carried.
         let frame_name = match &home_package {
@@ -21129,6 +21176,9 @@ impl VMHelper {
             }
         }
         self.scope.declare_array("_", argv.clone());
+        if track_arg_aliases {
+            self.scope.track_arg_aliases();
+        }
         // Note: set_closure_args was already called at line 15077; don't call it again
         // as that would incorrectly shift the outer topic stack a second time.
         let t0 = self.profiler.is_some().then(std::time::Instant::now);

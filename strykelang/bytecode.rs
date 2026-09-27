@@ -368,6 +368,17 @@ pub enum Op {
     /// Like `GotoSub`, always followed by a `ReturnValue` fallback op that is only reached when
     /// frame replacement is impossible (JIT trampoline frame).
     GotoSubRef,
+    /// `--compat` `@_` aliasing (BUG-312): the next user-sub call logs writes through `$_[N]`
+    /// by argument position, so the caller can store them into the variables it passed.
+    /// Emitted right before the call op at a call site that passes plain scalar variables.
+    ArgAliasCall,
+    /// After an [`Op::ArgAliasCall`] call: push whether the callee wrote any argument, so the
+    /// store-back sequence of [`Op::ArgAliasOut`]s can be skipped with one jump.
+    ArgAliasWrote,
+    /// After an [`Op::ArgAliasCall`] call: push the value the callee wrote to argument `pos`
+    /// and then `1`, or `undef` and then `0` when it wrote none. The compiler follows it with
+    /// a conditional store into the variable passed at `pos`.
+    ArgAliasOut(u16),
     /// `Return` variant.
     Return,
     /// `ReturnValue` variant.
