@@ -3767,11 +3767,11 @@ The other item recorded here — a user sub named for a count-family builtin
 losing its arguments — turned out not to be about matching at all and is now
 fixed; see BUG-315.
 
-## BUG-312 — `@_` aliasing and `foreach` aliasing are not implemented — **`parity`**
+## BUG-312 — `@_` aliasing and `foreach` aliasing — **`parity`** (mostly fixed)
 
 Perl aliases `@_` elements to the caller's actual arguments, and aliases the
 `foreach` loop variable (including `$_`) to the array elements, so mutating
-either writes through. stryke copies:
+either writes through. stryke copied:
 
 ```perl
 sub bump { $_[0]++ } my $x = 5; bump($x); print "$x\n";   # perl: 6      st: 5
@@ -3780,11 +3780,32 @@ my @a = (1,2,3); $_ *= 2 for @a; print "@a\n";            # perl: 2 4 6  st: 1 2
 
 The `foreach` half is done for a bare-array source: both `for (@a) { ... }`
 and the statement-modifier form `EXPR for @a` write the loop variable back to
-the element after each iteration (the second line above now prints `2 4 6`;
-`parity/cases/20070_postfix_for_aliases_and_localizes_topic.pl`). Still open:
-`@_` aliasing (`$_[0] =~ s///` and `$_[0]++` do not reach the caller's
-variable, so File::Basename's `dirname` returns `"/a/"`), and aliasing through
-non-array sources (`for ($x, $y)`, `for (@$ref)`).
+the element after each iteration
+(`parity/cases/20070_postfix_for_aliases_and_localizes_topic.pl`).
+
+The `@_` half is done under `--compat` for sub and method calls: a plain
+scalar variable (`$x`, `our $g`) or a caller's own `$_[N]` passed at a
+position fixed at compile time takes back what the sub writes through
+`$_[N]` — assignment, `++`, `s///`, `.=`, `chop`, a `foreach` over `@_` —
+when the sub returns. The alias follows `shift` (indices move down), ends when
+`@_` is rebuilt (`@_ = …`, `unshift`, `splice`), chains through wrapper subs,
+and reaches module subs, so `File::Basename::dirname("/a/b/")` is `/a` again.
+Native mode keeps copy semantics. Pins:
+`parity/cases/20077_sub_args_alias_caller_variables.pl`,
+`tests/suite/sub_arg_aliasing.rs`.
+
+Still open:
+
+- Arguments after one that can flatten to a list (`f(@a, $x)`, `f(g(), $x)`):
+  `$x`'s position in `@_` is only known at run time, so it is not aliased.
+- Other lvalue arguments: `$a[0]`, `$h{k}`, `$_`, and `$_[$i]` with a
+  non-literal index.
+- Calls through a code ref (`$code->($x)`, `&$code($x)`).
+- The write lands when the sub returns, not at the moment of the write: a sub
+  that reads the caller's variable directly after writing `$_[0]`, or dies
+  after writing it, does not see the new value there.
+- `foreach` aliasing through non-array sources (`for ($x, $y)`,
+  `for (@$ref)`).
 
 ## BUG-313 — `use utf8` is ignored inside a sub body — **`parity`**
 
