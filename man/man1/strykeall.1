@@ -1882,17 +1882,24 @@ Bless / OOP via
 .IP \(bu 2
 .BR BEGIN ", " END ", " INIT ", " CHECK ", " UNITCHECK ", " DESTROY ", " AUTOLOAD .
 .IP \(bu 2
-.B Carp::
-,
-.B Scalar::Util::
-,
-.B List::Util::
-,
-.B POSIX::
-shipped in
-.BR %INC .
+Pure-Perl core modules such as
+.B Carp
+load from the system perl's
+.BR @INC .
+.IP \(bu 2
+The XS modules
+.BR List::Util ,
+.B Scalar::Util
+and
+.B POSIX
+load without their compiled objects: their functions are implemented
+natively (the provided subset is listed under BUG-319 in
+.BR docs/BUGS.md ),
+and importing any other name is an error at
+.B use
+time.
 .PP
-Parity vs Perl is enforced by 20,056
+Parity vs Perl is enforced by 1,569
 .B parity/cases
 test cases that run both interpreters on every CI cycle and assert
 byte-identical output.

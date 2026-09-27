@@ -1957,7 +1957,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   reduce { |$acc, $val| $acc + $val }, 1..10         # 55
   ```
 
-`stryke` is **not** a full `perl` replacement: many real `.pm` files (especially XS modules) will not run. See [`PARITY_ROADMAP.md`](parity/PARITY_ROADMAP.md).
+`stryke` is **not** a full `perl` replacement: many real `.pm` files (especially XS modules) will not run. The core XS modules `List::Util`, `Scalar::Util` and `POSIX` are provided natively — a listed subset of their functions, with any other import rejected at `use` time (BUG-319 in [`docs/BUGS.md`](docs/BUGS.md)). See [`PARITY_ROADMAP.md`](parity/PARITY_ROADMAP.md).
 
 ---
 

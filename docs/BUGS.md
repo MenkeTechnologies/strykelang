@@ -3864,25 +3864,47 @@ Pinned by `parity/cases/20050_user_sub_shadows_count_family_builtin.pl`, which
 carries a non-colliding control sub alongside each colliding one so a future
 regression cannot be mistaken for a general argument-passing change.
 
-## BUG-319 — `--compat` cannot load core XS modules (List::Util, Scalar::Util, POSIX) — **`parity`**
+## BUG-319 — `--compat` could not load core XS modules (List::Util, Scalar::Util, POSIX) — **`parity`** [FIXED]
 
-Under `--compat`, `use Module` loads the module's `.pm` from the system perl's
-`@INC`. For modules whose functions are XS, the `.pm` defines no Perl body for
-them, and the loader path itself stops earlier:
+`use Module` loaded the module's `.pm` from the system perl's `@INC`. For these
+modules the functions are XS: the `.pm` defines no Perl body for them and ends
+in `XSLoader::load`, and the load itself stopped earlier:
 
 ```
 $ st --compat -e 'use List::Util qw(sum); print sum(1,2)'
-VM compile error (unsupported): goto with dynamic or sub-ref target at -e line 0.
-$ st --compat -e 'use Scalar::Util qw(blessed); print blessed(bless {}, "X")'
 VM compile error (unsupported): goto with dynamic or sub-ref target at -e line 0.
 $ st --compat -e 'use POSIX qw(floor); print floor(2.5)'
 `floor` is not defined in module `POSIX` (expected `POSIX::floor`) at -e line 1.
 ```
 
-The `goto` is Exporter's `goto &{as_heavy()}` (Exporter.pm lines 22, 78–90),
-reached from List::Util's `goto &Exporter::import`. Even with that lowered, the
-XS functions (`sum`, `blessed`, `floor`) have no Perl definition to import;
-they need to bind to stryke's native builtins of the same meaning.
+`use` / `require` of `List::Util`, `Scalar::Util` and `POSIX` no longer read
+the `.pm`: the module is recorded in `%INC` and its functions are implemented
+natively (`strykelang/xs_native.rs`), in both native and `--compat` mode.
+Under `--compat` an imported name, or the qualified `List::Util::first`, parses
+with the XS function's prototype (`first { ... } @list`, `reduce { $a + $b }
+LIST`; `INT_MAX + 1` takes no argument) and returns what the XS function returns
+in scalar context (`uniq`/`pairgrep`/`pairmap` count, `pairfirst` is 1 or
+undef, other list functions give their last element). `pairs` returns
+`List::Util::_Pair` objects with `key`/`value`/`TO_JSON`, and `head`/`tail`
+take `SIZE, LIST`. A user sub of the same name still wins.
+
+Provided: List::Util — `all any first none notall reduce reductions pairgrep
+pairmap pairfirst min max minstr maxstr product sum sum0 sample shuffle uniq
+uniqint uniqnum uniqstr zip zip_longest zip_shortest mesh mesh_longest
+mesh_shortest head tail pairs unpairs pairkeys pairvalues`; Scalar::Util —
+`blessed refaddr reftype looks_like_number`; POSIX — the C math functions
+(`floor ceil fmod pow fabs log10 log2 log1p expm1 cbrt tan acos asin atan cosh
+sinh tanh round trunc lround copysign fmin fmax hypot isnan isinf isfinite`) and
+`INT_MAX INT_MIN UINT_MAX LONG_MAX LONG_MIN DBL_MAX DBL_MIN DBL_EPSILON FLT_MAX
+EXIT_SUCCESS EXIT_FAILURE`. Importing any other name from these modules
+(`weaken`, `dualvar`, `strftime`, `:tags`, …) is an error at `use` time
+(`"weaken" is not provided by stryke's native Scalar::Util module`) rather than
+a sub that fails when called. `use POSIX;` imports the provided subset of
+POSIX's `@EXPORT`.
+
+`parity/cases/20074_list_util_xs_functions.pl`,
+`20075_scalar_util_xs_functions.pl`, `20076_posix_math_and_limits.pl`;
+`tests/suite/xs_native_modules.rs`.
 
 ## BUG-320 — a bare `/re/` used as a value was a regex object, not a `$_` match — **`parity`** [FIXED]
 
