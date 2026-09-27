@@ -2570,6 +2570,51 @@ impl VMHelper {
             .map(|pkg| format!("{}::{}", pkg, method))
     }
 
+    /// The sub `$class->can($method)` finds, looked up through the MRO. A
+    /// `main` sub is stored under its bare name, so `main::f` also tries `f`.
+    pub(crate) fn find_method_sub(&self, class: &str, method: &str) -> Option<Arc<StrykeSub>> {
+        let fq = self.resolve_method_full_name(class, method, false)?;
+        self.subs.get(&fq).cloned().or_else(|| {
+            fq.strip_prefix("main::")
+                .and_then(|bare| self.subs.get(bare).cloned())
+        })
+    }
+
+    /// `UNIVERSAL::isa(THING, TYPE)` called as a function: true when THING is
+    /// blessed into TYPE or a subclass, when THING's underlying reference type
+    /// is TYPE (`UNIVERSAL::isa([], "ARRAY")`), or when THING is a class name
+    /// inheriting from TYPE.
+    pub(crate) fn universal_isa(&self, thing: &StrykeValue, target: &str) -> bool {
+        if thing.is_undef() {
+            return false;
+        }
+        if let Some(b) = thing.as_blessed_ref() {
+            let reftype = b.data.read().type_name();
+            return reftype == target || self.mro_linearize(&b.class).iter().any(|c| c == target);
+        }
+        if thing.is_perl_reference() {
+            return thing.ref_type().to_string() == target;
+        }
+        self.mro_linearize(&thing.to_string())
+            .iter()
+            .any(|c| c == target)
+    }
+
+    /// `UNIVERSAL::can(THING, METHOD)` called as a function: the method's code
+    /// ref for a blessed THING or a class name, else undef.
+    pub(crate) fn universal_can(&self, thing: &StrykeValue, method: &str) -> StrykeValue {
+        let class = if let Some(b) = thing.as_blessed_ref() {
+            b.class.clone()
+        } else if thing.is_undef() || thing.is_perl_reference() {
+            return StrykeValue::UNDEF;
+        } else {
+            thing.to_string()
+        };
+        self.find_method_sub(&class, method)
+            .map(StrykeValue::code_ref)
+            .unwrap_or(StrykeValue::UNDEF)
+    }
+
     pub(crate) fn resolve_io_handle_name(&self, name: &str) -> String {
         if let Some(alias) = self.glob_handle_alias.get(name) {
             return alias.clone();
@@ -10335,6 +10380,15 @@ impl VMHelper {
                     let topic = self.scope.get_scalar("_");
                     let s = topic.to_string();
                     self.regex_match_execute(s, pattern, flags, false, "_", line)
+                } else if !*is_qr && crate::compat_mode() {
+                    // A bare `//` used as a value matches `$_` (Perl); only
+                    // `qr//` is a regex object. Mirrors the compiler's arm.
+                    let s = self.scope.get_scalar("_").to_string();
+                    let saved = self.wantarray_kind;
+                    self.wantarray_kind = ctx;
+                    let r = self.regex_match_execute(s, pattern, flags, false, "_", line);
+                    self.wantarray_kind = saved;
+                    r
                 } else {
                     let re = self.compile_regex(pattern, flags, line)?;
                     Ok(StrykeValue::regex(re, pattern.clone(), flags.clone()))

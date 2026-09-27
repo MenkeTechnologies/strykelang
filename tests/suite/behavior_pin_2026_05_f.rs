@@ -31,10 +31,9 @@ fn can_returns_falsy_for_missing_method() {
 }
 
 #[test]
-fn can_returns_coderef_but_invocation_returns_undef_today() {
-    // BUG-036: `$obj->can("method")` returns a CODE ref, but invoking that
-    // ref with the object as receiver yields undef instead of the method's
-    // return value. Direct method call works fine.
+fn can_returns_coderef_that_runs_the_method() {
+    // BUG-036 (fixed): `$obj->can("method")` returns the method's own CODE
+    // ref, so invoking it with the object runs the method.
     let out = eval_string(
         r#"package Cat; sub new { bless {}, shift } sub meow { "meow!" }
            package main;
@@ -44,7 +43,7 @@ fn can_returns_coderef_but_invocation_returns_undef_today() {
            my $via_can = $m->($c);
            "ref=" . ref($m) . " direct=$direct via_can=" . (defined $via_can ? $via_can : "U")"#,
     );
-    assert_eq!(out, "ref=CODE direct=meow! via_can=U");
+    assert_eq!(out, "ref=CODE direct=meow! via_can=meow!");
 }
 
 #[test]

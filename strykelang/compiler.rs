@@ -7655,6 +7655,16 @@ impl Compiler {
                 let lv = self.chunk.add_lvalue_expr(e.as_ref().clone());
                 self.emit_op(Op::ChopInPlace(lv), line, Some(root));
             }
+            ExprKind::Defined(e) if matches!(e.kind, ExprKind::SubroutineRef(_)) => {
+                // `defined &name` asks whether the sub is defined; it must not
+                // call it. Answered with the `exists &name` lookup, which does
+                // not tell a bodiless `sub name;` forward declaration apart.
+                let exists = Expr {
+                    kind: ExprKind::Exists(e.clone()),
+                    line,
+                };
+                self.compile_expr(&exists)?;
+            }
             ExprKind::Defined(e) => {
                 self.compile_expr(e)?;
                 self.emit_op(
@@ -8460,6 +8470,9 @@ impl Compiler {
                 }
             }
             ExprKind::Caller(e) => {
+                // Operands: level (or undef), whether a level was given (bare
+                // `caller` returns three fields, `caller(N)` eleven), and
+                // whether the context is scalar (the result is the package).
                 if let Some(inner) = e {
                     self.compile_expr(inner)?;
                 } else {

@@ -2261,27 +2261,14 @@ impl<'a> VM<'a> {
                     return Ok(());
                 }
                 "can" => {
+                    // The method's own code ref, so `$obj->can("m")->($obj)` runs it.
                     let target_method = args.first().map(|v| v.to_string()).unwrap_or_default();
-                    let found = self
-                        .interp
-                        .resolve_method_full_name(&class, &target_method, false)
-                        .and_then(|fq| self.interp.subs.get(&fq))
-                        .is_some();
-                    if found {
-                        self.push(StrykeValue::code_ref(std::sync::Arc::new(
-                            crate::value::StrykeSub {
-                                name: target_method,
-                                params: vec![],
-                                body: vec![],
-                                closure_env: None,
-                                prototype: None,
-                                fib_like: None,
-                                return_type: None,
-                            },
-                        )));
-                    } else {
-                        self.push(StrykeValue::UNDEF);
-                    }
+                    let found = self.interp.find_method_sub(&class, &target_method);
+                    self.push(
+                        found
+                            .map(StrykeValue::code_ref)
+                            .unwrap_or(StrykeValue::UNDEF),
+                    );
                     return Ok(());
                 }
                 "DOES" => {
@@ -3362,6 +3349,17 @@ impl<'a> VM<'a> {
                     }
                     self.interp.debugger_leave_sub();
                     self.interp.leave_caller_frame(caller_depth);
+                } else if matches!(name, "UNIVERSAL::isa" | "UNIVERSAL::can") {
+                    // Function-call form of the UNIVERSAL methods; these have no
+                    // Perl body to find (they are XS in perl).
+                    let thing = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
+                    let what = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+                    let out = if name == "UNIVERSAL::isa" {
+                        StrykeValue::perl_bool(self.interp.universal_isa(&thing, &what))
+                    } else {
+                        self.interp.universal_can(&thing, &what)
+                    };
+                    self.push(out);
                 } else if !name.contains("::")
                     && matches!(
                         name,
