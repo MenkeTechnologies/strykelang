@@ -13922,10 +13922,14 @@ impl Parser {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
+                // A postfix modifier (`exit if $done`) leaves `exit` with no
+                // argument, as for `return`; parsing `if` as the argument
+                // looked it up as a sub: "Undefined subroutine &if".
                 if matches!(
                     self.peek(),
                     Token::Semicolon | Token::RBrace | Token::Eof | Token::PipeForward
-                ) {
+                ) || self.peek_is_postfix_stmt_modifier_keyword()
+                {
                     Ok(Expr {
                         kind: ExprKind::Exit(None),
                         line,

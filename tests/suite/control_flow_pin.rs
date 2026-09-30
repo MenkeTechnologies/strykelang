@@ -184,6 +184,28 @@ fn postfix_for_modifier() {
     assert_eq!(eval_int(code), 1);
 }
 
+/// A valueless `exit` before a postfix modifier takes no argument, as in
+/// Perl; it used to parse `if` as its argument and die with
+/// "Undefined subroutine &if". Run as a process because `exit` ends it.
+#[test]
+fn exit_with_postfix_modifier() {
+    let run = |prog: &str| {
+        let out = std::process::Command::new(env!("CARGO_BIN_EXE_st"))
+            .args(["-e", prog])
+            .output()
+            .expect("spawn stryke");
+        (
+            out.status.code(),
+            String::from_utf8_lossy(&out.stdout).into_owned(),
+            String::from_utf8_lossy(&out.stderr).into_owned(),
+        )
+    };
+    assert_eq!(run(r#"print "a"; exit if 1; print "b""#), (Some(0), "a".into(), String::new()));
+    assert_eq!(run(r#"print "a"; exit if 0; print "b""#), (Some(0), "ab".into(), String::new()));
+    assert_eq!(run(r#"print "a"; exit unless 0; print "b""#), (Some(0), "a".into(), String::new()));
+    assert_eq!(run(r#"exit 3 if 1"#).0, Some(3));
+}
+
 // ── ternary nesting ─────────────────────────────────────────────────
 
 #[test]
