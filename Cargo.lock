@@ -7008,9 +7008,9 @@ checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
 
 [[package]]
 name = "znative"
-version = "0.12.41"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59b59ead5398c3e368428ee748ef9f0726ccd04d55c85ca960a1e632b57b1c11"
+checksum = "b0587545d2624657d77df26b6d5944354131fcc6673d1356a6a25d5f59b79749"
 
 [[package]]
 name = "zopfli"
@@ -7026,9 +7026,9 @@ dependencies = [
 
 [[package]]
 name = "zshrs"
-version = "0.12.42"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5629e5eba09abd0e9358adcb3e2ce6271454e30741a5b4e0edf33af9d7a8c63e"
+checksum = "e8dcb4e8cbefcbe6334d972a56b7a1476e9bb38b25cf88f38ecd419678a60c9a"
 dependencies = [
  "atty",
  "bincode",
@@ -7073,6 +7073,7 @@ dependencies = [
  "tracing-chrome",
  "tracing-subscriber",
  "unicode-width",
+ "ureq",
  "walkdir",
  "znative",
  "zshrs-daemon",
@@ -7081,9 +7082,9 @@ dependencies = [
 
 [[package]]
 name = "zshrs-daemon"
-version = "0.12.41"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07c0a9025e2c586389d5a3621af9276de5480554750241403f799a892bfb865f"
+checksum = "ec7ea037ae9be9ddbc437e75e53d553ffe28f9b9a3eec16839f7414fbb505828"
 dependencies = [
  "atty",
  "axum",
