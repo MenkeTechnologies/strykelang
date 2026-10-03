@@ -62,6 +62,44 @@ fn readme_stryke_lane_autosplit_field0() {
     assert_eq!(String::from_utf8_lossy(&out.stdout), "a\n");
 }
 
+/// perl `-a` is `split ' '`: leading whitespace is skipped and runs of it
+/// separate fields, so `fc -l` output (`   12  ls -la`) yields `12` in `$F[0]`.
+#[test]
+fn readme_stryke_lane_autosplit_awk_mode() {
+    let mut child = Command::new(stryke())
+        .args(["-lane", "print scalar(@F), q{|}, qq{@F[1..$#F]}"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn");
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"   12  git   status\t-s \n")
+        .unwrap();
+    let out = child.wait_with_output().expect("wait");
+    assert_success("stryke -lane", &out);
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "4|git status -s\n");
+}
+
+/// A `-F` regex split drops trailing empty fields, as perl's `split` does.
+#[test]
+fn readme_stryke_a_f_drops_trailing_empty_fields() {
+    let mut child = Command::new(stryke())
+        .args(["-laF:", "-ne", "print scalar(@F)"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn");
+    child.stdin.take().unwrap().write_all(b":a:b::\n").unwrap();
+    let out = child.wait_with_output().expect("wait");
+    assert_success("stryke -laF:", &out);
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "3\n");
+}
+
 #[test]
 fn readme_stryke_syntax_check() {
     let out = Command::new(stryke())

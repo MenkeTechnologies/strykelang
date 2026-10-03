@@ -860,12 +860,29 @@ pub fn run_line_body(
             .set_scalar("FNR", value::StrykeValue::integer(interp.line_number))?;
 
         if interp.auto_split {
-            let sep = interp.field_separator.as_deref().unwrap_or(" ");
-            let re = regex::Regex::new(sep).unwrap_or_else(|_| regex::Regex::new(" ").unwrap());
-            let fields: Vec<value::StrykeValue> = re
-                .split(line_str)
-                .map(|s| value::StrykeValue::string(s.to_string()))
-                .collect();
+            // perlrun: `-a` is `@F = split(' ', $_)` — the awk-mode split that
+            // skips leading whitespace and splits on runs of it. `-F' '` names
+            // the same single-space pattern, so it gets awk mode too. Any other
+            // `-F` pattern is a regex split, which (like `split`) drops trailing
+            // empty fields.
+            let fields: Vec<value::StrykeValue> = match interp.field_separator.as_deref() {
+                None | Some(" ") => line_str
+                    .split_whitespace()
+                    .map(|s| value::StrykeValue::string(s.to_string()))
+                    .collect(),
+                Some(sep) => {
+                    let re = regex::Regex::new(sep)
+                        .unwrap_or_else(|_| regex::Regex::new(&regex::escape(sep)).unwrap());
+                    let mut parts: Vec<&str> = re.split(line_str).collect();
+                    while parts.last().is_some_and(|s| s.is_empty()) {
+                        parts.pop();
+                    }
+                    parts
+                        .into_iter()
+                        .map(|s| value::StrykeValue::string(s.to_string()))
+                        .collect()
+                }
+            };
             // awk NF — the field count for the current record.
             interp
                 .scope
