@@ -403,7 +403,7 @@ The Rust side lives in:
 
 ## [0x0D] VERSION COMPATIBILITY
 
-Plugin version tracks the strykelang Cargo version. `gradle.properties` controls the supported IDE range via `pluginSinceBuild` / `pluginUntilBuild`. Currently targets `2025.2` SDK against builds `252..261.*` — every paid JetBrains IDE on **2025.2 +** loads it (RustRover, IDEA Ultimate, GoLand, PyCharm Pro, WebStorm, RubyMine, PhpStorm, CLion, Rider, DataGrip, Aqua). 2025.2 is the oldest platform with the `LspCustomization` API that RustRover 2026.1 ships; compiling against earlier platforms drops the customization hooks the LSP layer relies on. Community editions don't have the LSP API, so the plugin won't load there.
+Plugin version tracks the strykelang Cargo version. `gradle.properties` controls the supported IDE range via `pluginSinceBuild` / `pluginUntilBuild`. Currently targets `2025.2` SDK against builds `252..262.*` — every paid JetBrains IDE on **2025.2 +** loads it (RustRover, IDEA Ultimate, GoLand, PyCharm Pro, WebStorm, RubyMine, PhpStorm, CLion, Rider, DataGrip, Aqua). 2025.2 is the oldest platform with the `LspCustomization` API that RustRover 2026.1 ships; compiling against earlier platforms drops the customization hooks the LSP layer relies on. Community editions don't have the LSP API, so the plugin won't load there.
 
 ---
 
