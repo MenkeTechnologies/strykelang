@@ -137,6 +137,22 @@ fn bare_our_is_visible_in_subs_nested_in_blocks_under_strict() {
 }
 
 #[test]
+fn bare_our_binds_the_declaring_package_in_a_sub_of_another_package() {
+    // `our` aliases the package it is declared in. A sub named into another
+    // package (`sub A::add`) and registered at run time still updates `main`'s
+    // variables — resolving with the package the sub runs in went to `A::L`.
+    assert_eq!(
+        compat(
+            r#"use strict; our @L; our %S; our $X;
+               BEGIN { sub A::add { push @L, @_; $S{n} += 1; $X .= "x"; $L[3] = 9 } }
+               A::add(1); A::add(2);
+               print scalar(@L), " $S{n} $X [@main::L[0,1,3]] [$main::S{n}]""#
+        ),
+        "5 2 xx [1  9] [2]"
+    );
+}
+
+#[test]
 fn bare_our_does_not_reset_a_value_stored_by_begin() {
     assert_eq!(
         compat(r#"our $K; BEGIN { $K = "kept" } our $K; print $K"#),

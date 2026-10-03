@@ -13,14 +13,14 @@ package main
 val $name = Demo::Caller::top()
 ($name =~ /leaf/) |> assert_ok("caller field 3 names the running fn")
 
-# Sanity: 4-tuple shape with package + file + line + fn.
-# (Field 0 = package is still BUG-248: stryke reports "main" regardless;
-# only field 3 = fn name is what BUG-005 actually fixed.)
+# Shape: caller(N) returns perl's 11 fields (BUG-248) — package, file,
+# line, fn, then hasargs, wantarray and the rest; field 3 = fn name is what
+# BUG-005 fixed.
 package Demo::CallerShape
 fn probe = caller(0)
 package main
 val @frame = Demo::CallerShape::probe()
-len(@frame)        |> assert_eq(4, "caller frame is a 4-tuple")
+len(@frame)        |> assert_eq(11, "caller frame has perl's 11 fields")
 ($frame[2] > 0)    |> assert_ok("field 2 = line > 0")
 defined($frame[3]) |> assert_ok("field 3 = fn name (no longer undef)")
 

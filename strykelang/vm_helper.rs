@@ -884,15 +884,20 @@ pub struct VMHelper {
     pub(crate) english_match_vars_ever_enabled: bool,
     /// Lexical scalar names (`my`/`our`/`foreach`/`given`/`match`/`try` catch) per scope frame (parallel to [`Scope`] depth).
     english_lexical_scalars: Vec<HashSet<String>>,
-    /// Bare names from `our $x` per frame — same length as [`Self::english_lexical_scalars`].
-    our_lexical_scalars: Vec<HashSet<String>>,
-    /// Bare names from `our @arr` per frame — drives package qualification in
-    /// [`Self::tree_array_storage_name`] so `our @x` reads route through the
-    /// package stash while `my @x` stays lexical.
-    our_lexical_arrays: Vec<HashSet<String>>,
-    /// Bare names from `our %h` per frame — companion to
+    /// `our $x` per frame, bare name → the package stash key it was declared
+    /// under — same length as [`Self::english_lexical_scalars`]. The key is fixed
+    /// at the declaration because `our` aliases the DECLARING package's variable:
+    /// a sub that runs in another package (`sub Pkg::f { $x }` after `our $x` in
+    /// `main`) still reaches `main::x`.
+    our_lexical_scalars: Vec<HashMap<String, String>>,
+    /// `our @arr` per frame, bare name → declared stash key — drives package
+    /// qualification in [`Self::tree_array_storage_name`] so `our @x` reads route
+    /// through the package stash while `my @x` stays lexical. See
+    /// [`Self::our_lexical_scalars`] for why the key is fixed at the declaration.
+    our_lexical_arrays: Vec<HashMap<String, String>>,
+    /// `our %h` per frame, bare name → declared stash key — companion to
     /// [`Self::our_lexical_arrays`].
-    our_lexical_hashes: Vec<HashSet<String>>,
+    our_lexical_hashes: Vec<HashMap<String, String>>,
     /// When false, the bytecode VM runs without Cranelift (see [`crate::try_vm_execute`]). Disabled by
     /// `STRYKE_NO_JIT=1` / `true` / `yes`, or `stryke --no-jit` after [`Self::new`].
     pub vm_jit_enabled: bool,
@@ -1794,9 +1799,9 @@ impl VMHelper {
             english_no_match_vars: false,
             english_match_vars_ever_enabled: false,
             english_lexical_scalars: vec![HashSet::new()],
-            our_lexical_scalars: vec![HashSet::new()],
-            our_lexical_arrays: vec![HashSet::new()],
-            our_lexical_hashes: vec![HashSet::new()],
+            our_lexical_scalars: vec![HashMap::new()],
+            our_lexical_arrays: vec![HashMap::new()],
+            our_lexical_hashes: vec![HashMap::new()],
             vm_jit_enabled: !matches!(
                 std::env::var("STRYKE_NO_JIT"),
                 Ok(v)
@@ -2454,8 +2459,8 @@ impl VMHelper {
             .rev()
         {
             if lex.contains(name) {
-                if our.contains(name) {
-                    return self.stash_scalar_name_for_package(name);
+                if let Some(key) = our.get(name) {
+                    return key.clone();
                 }
                 return name.to_string();
             }
@@ -2886,9 +2891,9 @@ impl VMHelper {
         self.glob_restore_frames.push(Vec::new());
         self.special_var_restore_frames.push(Vec::new());
         self.english_lexical_scalars.push(HashSet::new());
-        self.our_lexical_scalars.push(HashSet::new());
-        self.our_lexical_arrays.push(HashSet::new());
-        self.our_lexical_hashes.push(HashSet::new());
+        self.our_lexical_scalars.push(HashMap::new());
+        self.our_lexical_arrays.push(HashMap::new());
+        self.our_lexical_hashes.push(HashMap::new());
         self.state_bindings_stack.push(Vec::new());
     }
 
@@ -2909,7 +2914,7 @@ impl VMHelper {
     /// Snapshot the `our_lexical_scalars` stack — companion to
     /// [`Self::english_lexical_scalars_clone`].
     #[inline]
-    pub(crate) fn our_lexical_scalars_clone(&self) -> Vec<HashSet<String>> {
+    pub(crate) fn our_lexical_scalars_clone(&self) -> Vec<HashMap<String, String>> {
         self.our_lexical_scalars.clone()
     }
 
@@ -2921,28 +2926,31 @@ impl VMHelper {
 
     /// Replace `our_lexical_scalars` wholesale (parallel-worker setup).
     #[inline]
-    pub(crate) fn set_our_lexical_scalars(&mut self, v: Vec<HashSet<String>>) {
+    pub(crate) fn set_our_lexical_scalars(&mut self, v: Vec<HashMap<String, String>>) {
         self.our_lexical_scalars = v;
     }
 
     #[inline]
     fn note_our_scalar(&mut self, bare_name: &str) {
+        let key = self.stash_scalar_name_for_package(bare_name);
         if let Some(s) = self.our_lexical_scalars.last_mut() {
-            s.insert(bare_name.to_string());
+            s.insert(bare_name.to_string(), key);
         }
     }
 
     #[inline]
     fn note_our_array(&mut self, bare_name: &str) {
+        let key = self.stash_array_full_name_for_package(bare_name);
         if let Some(s) = self.our_lexical_arrays.last_mut() {
-            s.insert(bare_name.to_string());
+            s.insert(bare_name.to_string(), key);
         }
     }
 
     #[inline]
     fn note_our_hash(&mut self, bare_name: &str) {
+        let key = self.stash_hash_full_name_for_package(bare_name);
         if let Some(s) = self.our_lexical_hashes.last_mut() {
-            s.insert(bare_name.to_string());
+            s.insert(bare_name.to_string(), key);
         }
     }
 
@@ -2984,8 +2992,8 @@ impl VMHelper {
             return name.to_string();
         }
         for ours in self.our_lexical_arrays.iter().rev() {
-            if ours.contains(name) {
-                return self.stash_array_full_name_for_package(name);
+            if let Some(key) = ours.get(name) {
+                return key.clone();
             }
         }
         self.package_global_fallback(name, |s, n| s.array_binding_exists(n))
@@ -3007,8 +3015,8 @@ impl VMHelper {
             return name.to_string();
         }
         for ours in self.our_lexical_hashes.iter().rev() {
-            if ours.contains(name) {
-                return self.stash_hash_full_name_for_package(name);
+            if let Some(key) = ours.get(name) {
+                return key.clone();
             }
         }
         self.package_global_fallback(name, |s, n| s.hash_binding_exists(n))
@@ -11363,7 +11371,8 @@ impl VMHelper {
                     self.check_strict_hash_var(hash, line)?;
                     let k = self.eval_expr(key)?.to_string();
                     let op = *op;
-                    return Ok(self.scope.atomic_hash_mutate(hash, &k, |old| match op {
+                    let hname = self.tree_hash_storage_name(hash);
+                    return Ok(self.scope.atomic_hash_mutate(&hname, &k, |old| match op {
                         BinOp::Add => {
                             if let (Some(a), Some(b)) = (old.as_integer(), rhs.as_integer()) {
                                 StrykeValue::integer(a.wrapping_add(b))
@@ -11391,59 +11400,62 @@ impl VMHelper {
                     self.check_strict_array_var(array, line)?;
                     let idx = self.eval_expr(index)?.to_int();
                     let op = *op;
-                    return Ok(self.scope.atomic_array_mutate(array, idx, |old| match op {
-                        BinOp::Add => {
-                            if let (Some(a), Some(b)) = (old.as_integer(), rhs.as_integer()) {
-                                StrykeValue::integer(a.wrapping_add(b))
-                            } else {
-                                StrykeValue::float(old.to_number() + rhs.to_number())
+                    let aname = self.tree_array_name(array);
+                    return Ok(self
+                        .scope
+                        .atomic_array_mutate(&aname, idx, |old| match op {
+                            BinOp::Add => {
+                                if let (Some(a), Some(b)) = (old.as_integer(), rhs.as_integer()) {
+                                    StrykeValue::integer(a.wrapping_add(b))
+                                } else {
+                                    StrykeValue::float(old.to_number() + rhs.to_number())
+                                }
                             }
-                        }
-                        BinOp::Sub => {
-                            if let (Some(a), Some(b)) = (old.as_integer(), rhs.as_integer()) {
-                                StrykeValue::integer(a.wrapping_sub(b))
-                            } else {
-                                StrykeValue::float(old.to_number() - rhs.to_number())
+                            BinOp::Sub => {
+                                if let (Some(a), Some(b)) = (old.as_integer(), rhs.as_integer()) {
+                                    StrykeValue::integer(a.wrapping_sub(b))
+                                } else {
+                                    StrykeValue::float(old.to_number() - rhs.to_number())
+                                }
                             }
-                        }
-                        BinOp::Mul => {
-                            if let (Some(a), Some(b)) = (old.as_integer(), rhs.as_integer()) {
-                                StrykeValue::integer(a.wrapping_mul(b))
-                            } else {
-                                StrykeValue::float(old.to_number() * rhs.to_number())
+                            BinOp::Mul => {
+                                if let (Some(a), Some(b)) = (old.as_integer(), rhs.as_integer()) {
+                                    StrykeValue::integer(a.wrapping_mul(b))
+                                } else {
+                                    StrykeValue::float(old.to_number() * rhs.to_number())
+                                }
                             }
-                        }
-                        BinOp::Div => StrykeValue::float(old.to_number() / rhs.to_number()),
-                        BinOp::Mod => {
-                            // Perl `%` is floored-division (sign-of-divisor),
-                            // not Rust's `%` (sign-of-dividend) nor
-                            // `rem_euclid` (always non-negative). Truncate
-                            // float operands to int first, matching Perl 5.
-                            let a = old.to_int();
-                            let b = rhs.to_int();
-                            if b == 0 {
-                                StrykeValue::integer(0)
-                            } else {
-                                StrykeValue::integer(crate::value::perl_mod_i64(a, b))
+                            BinOp::Div => StrykeValue::float(old.to_number() / rhs.to_number()),
+                            BinOp::Mod => {
+                                // Perl `%` is floored-division (sign-of-divisor),
+                                // not Rust's `%` (sign-of-dividend) nor
+                                // `rem_euclid` (always non-negative). Truncate
+                                // float operands to int first, matching Perl 5.
+                                let a = old.to_int();
+                                let b = rhs.to_int();
+                                if b == 0 {
+                                    StrykeValue::integer(0)
+                                } else {
+                                    StrykeValue::integer(crate::value::perl_mod_i64(a, b))
+                                }
                             }
-                        }
-                        BinOp::Concat => {
-                            let mut s = old.to_string();
-                            rhs.append_to(&mut s);
-                            StrykeValue::string(s)
-                        }
-                        BinOp::Pow => StrykeValue::float(old.to_number().powf(rhs.to_number())),
-                        BinOp::BitAnd => StrykeValue::integer(old.to_int() & rhs.to_int()),
-                        BinOp::BitOr => StrykeValue::integer(old.to_int() | rhs.to_int()),
-                        BinOp::BitXor => StrykeValue::integer(old.to_int() ^ rhs.to_int()),
-                        BinOp::ShiftLeft => {
-                            StrykeValue::integer(perl_shl_i64(old.to_int(), rhs.to_int()))
-                        }
-                        BinOp::ShiftRight => {
-                            StrykeValue::integer(perl_shr_i64(old.to_int(), rhs.to_int()))
-                        }
-                        _ => StrykeValue::float(old.to_number() + rhs.to_number()),
-                    })?);
+                            BinOp::Concat => {
+                                let mut s = old.to_string();
+                                rhs.append_to(&mut s);
+                                StrykeValue::string(s)
+                            }
+                            BinOp::Pow => StrykeValue::float(old.to_number().powf(rhs.to_number())),
+                            BinOp::BitAnd => StrykeValue::integer(old.to_int() & rhs.to_int()),
+                            BinOp::BitOr => StrykeValue::integer(old.to_int() | rhs.to_int()),
+                            BinOp::BitXor => StrykeValue::integer(old.to_int() ^ rhs.to_int()),
+                            BinOp::ShiftLeft => {
+                                StrykeValue::integer(perl_shl_i64(old.to_int(), rhs.to_int()))
+                            }
+                            BinOp::ShiftRight => {
+                                StrykeValue::integer(perl_shr_i64(old.to_int(), rhs.to_int()))
+                            }
+                            _ => StrykeValue::float(old.to_number() + rhs.to_number()),
+                        })?);
                 }
                 if let ExprKind::HashSliceDeref { container, keys } = &target.kind {
                     let href = self.eval_expr(container)?;
