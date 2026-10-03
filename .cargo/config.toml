@@ -1,0 +1,9 @@
+[env]
+# rustc lowers a `match` on string literals by recursing once per test, and the
+# dispatch matches in builtins.rs (try_builtin) and parser.rs
+# (stryke_extension_name) carry thousands of arms. rustc 1.99's default 8 MiB
+# main-thread stack overflows on them (SIGBUS in rustc_mir_build's
+# match_candidates/test_candidates on macOS); rustc sizes that thread from
+# RUST_MIN_STACK. The stack is reserved, not committed, so the size costs nothing
+# until the recursion reaches it.
+RUST_MIN_STACK = "268435456"
