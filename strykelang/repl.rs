@@ -315,7 +315,14 @@ fn term_cols() -> usize {
 ///
 /// The signal shape is reedline's so the caller's `match` is unchanged: EOF is
 /// `CtrlD`, which is what the REPL already treats as "leave".
-fn read_plain_line(cmd_count: u64) -> Signal {
+///
+/// The fallback is entered because the terminal answered crossterm's
+/// cursor-position query (`ESC [ 6 n`) too late, and those answers do still
+/// arrive: on a cooked tty they land in the line being read, ahead of what the
+/// user types (`^[[48;1R^[[48;1Rp 42`). They are stripped here so they never
+/// reach the parser, and the second value reports that one was seen — proof the
+/// terminal answers after all, so the caller can give the editor another try.
+fn read_plain_line(cmd_count: u64) -> (Signal, bool) {
     use std::io::{BufRead, Write};
 
     print!("stryke[{}]> ", cmd_count);
@@ -324,10 +331,46 @@ fn read_plain_line(cmd_count: u64) -> Signal {
     let mut line = String::new();
     match std::io::stdin().lock().read_line(&mut line) {
         // 0 bytes is end of input, not an empty line.
-        Ok(0) => Signal::CtrlD,
-        Ok(_) => Signal::Success(line.trim_end_matches(['\n', '\r']).to_string()),
-        Err(_) => Signal::CtrlD,
+        Ok(0) => (Signal::CtrlD, false),
+        Ok(_) => {
+            let (clean, saw_reply) = strip_cursor_reports(line.trim_end_matches(['\n', '\r']));
+            (Signal::Success(clean), saw_reply)
+        }
+        Err(_) => (Signal::CtrlD, false),
     }
+}
+
+/// Remove every cursor-position report — `ESC [ <row> ; <col> R`, the answer to
+/// `ESC [ 6 n` — from `s`, and say whether there was one. Anything else that
+/// starts with `ESC [` is left alone.
+fn strip_cursor_reports(s: &str) -> (String, bool) {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut saw = false;
+    let mut i = 0;
+    while i < b.len() {
+        if let Some(end) = cursor_report_end(&b[i..]) {
+            saw = true;
+            i += end;
+        } else {
+            out.push(b[i]);
+            i += 1;
+        }
+    }
+    // Only whole ASCII sequences were removed, so the rest is still UTF-8.
+    (String::from_utf8(out).unwrap_or_default(), saw)
+}
+
+/// Length of the cursor-position report at the start of `b`, if there is one.
+fn cursor_report_end(b: &[u8]) -> Option<usize> {
+    let rest = b.strip_prefix(b"\x1b[")?;
+    let row = rest.iter().take_while(|c| c.is_ascii_digit()).count();
+    let rest = rest[row..].strip_prefix(b";")?;
+    let col = rest.iter().take_while(|c| c.is_ascii_digit()).count();
+    if row == 0 || col == 0 || rest.get(col) != Some(&b'R') {
+        return None;
+    }
+    Some(2 + row + 1 + col + 1)
 }
 
 fn render_status_bar(cmd_count: u64) -> String {
@@ -534,6 +577,12 @@ pub fn run(cli: &Cli) {
     // from stdin. No completion, no history keys, no menus, but every other
     // thing the REPL does still works, which is the difference between a
     // degraded prompt and no prompt at all.
+    //
+    // Past three attempts the answers are more than ~6 s late, not lost: they
+    // reach the tty after crossterm has stopped waiting and land in the next
+    // plain line. `read_plain_line` strips them, and seeing one sends the REPL
+    // back to the editor, so a burst of load does not cost the session its
+    // line editor.
     let mut editor_failures = 0usize;
     let mut plain_input = false;
 
@@ -550,7 +599,15 @@ pub fn run(cli: &Cli) {
         }
 
         let sig = if plain_input {
-            read_plain_line(cmd_count.lock().map(|g| *g).unwrap_or(0))
+            let (sig, terminal_answered) =
+                read_plain_line(cmd_count.lock().map(|g| *g).unwrap_or(0));
+            // A late cursor report in the line means the terminal does answer,
+            // only slower than crossterm waits: try the editor again next prompt.
+            if terminal_answered {
+                plain_input = false;
+                editor_failures = 0;
+            }
+            sig
         } else {
             match line_editor.read_line(&prompt) {
                 Ok(s) => {
@@ -622,6 +679,23 @@ pub fn run(cli: &Cli) {
 mod tests {
     use super::*;
     use std::collections::HashMap;
+
+    #[test]
+    fn late_cursor_reports_are_stripped_from_a_plain_line() {
+        // What a cooked tty delivers after three timed-out queries and `p 42`.
+        let (line, saw) = strip_cursor_reports("\x1b[48;1R\x1b[48;1R\x1b[48;1Rp 42");
+        assert_eq!(line, "p 42");
+        assert!(saw);
+    }
+
+    #[test]
+    fn other_escapes_and_plain_text_are_left_alone() {
+        for s in ["p 42", "\x1b[31mred", "\x1b[48R", "\x1b[;1R", "\x1b[48;R", "say \"\x1b[\""] {
+            assert_eq!(strip_cursor_reports(s), (s.to_string(), false), "{s:?}");
+        }
+        // A report in the middle still goes; the text around it stays put.
+        assert_eq!(strip_cursor_reports("a\x1b[1;80Rb"), ("ab".to_string(), true));
+    }
 
     #[test]
     fn arrow_method_completion_uses_blessed_class_and_subs() {
