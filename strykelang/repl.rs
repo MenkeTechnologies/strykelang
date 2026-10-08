@@ -328,7 +328,19 @@ fn read_plain_line(cmd_count: u64) -> (Signal, bool) {
     print!("stryke[{}]> ", cmd_count);
     let _ = std::io::stdout().flush();
 
-    let mut line = String::new();
+    let carried =
+        std::mem::take(&mut *TYPED_DURING_DRAIN.lock().unwrap_or_else(|e| e.into_inner()));
+    let mut line = String::from_utf8_lossy(&carried).replace('\r', "\n");
+    if let Some(nl) = line.find('\n') {
+        // The user already pressed Enter while the drain was waiting.
+        let rest = line.split_off(nl + 1);
+        *TYPED_DURING_DRAIN.lock().unwrap_or_else(|e| e.into_inner()) = rest.into_bytes();
+        print!("{line}");
+        let (clean, saw_reply) = strip_cursor_reports(line.trim_end_matches('\n'));
+        return (Signal::Success(clean), saw_reply);
+    }
+    print!("{line}");
+    let _ = std::io::stdout().flush();
     match std::io::stdin().lock().read_line(&mut line) {
         // 0 bytes is end of input, not an empty line.
         Ok(0) => (Signal::CtrlD, false),
@@ -344,21 +356,75 @@ fn read_plain_line(cmd_count: u64) -> (Signal, bool) {
 /// `ESC [ 6 n` — from `s`, and say whether there was one. Anything else that
 /// starts with `ESC [` is left alone.
 fn strip_cursor_reports(s: &str) -> (String, bool) {
-    let b = s.as_bytes();
+    let (rest, count) = split_cursor_reports(s.as_bytes());
+    // Only whole ASCII sequences were removed, so the rest is still UTF-8.
+    (String::from_utf8(rest).unwrap_or_default(), count > 0)
+}
+
+/// `b` without its cursor-position reports, and how many there were.
+fn split_cursor_reports(b: &[u8]) -> (Vec<u8>, usize) {
     let mut out = Vec::with_capacity(b.len());
-    let mut saw = false;
+    let mut count = 0;
     let mut i = 0;
     while i < b.len() {
         if let Some(end) = cursor_report_end(&b[i..]) {
-            saw = true;
+            count += 1;
             i += end;
         } else {
             out.push(b[i]);
             i += 1;
         }
     }
-    // Only whole ASCII sequences were removed, so the rest is still UTF-8.
-    (String::from_utf8(out).unwrap_or_default(), saw)
+    (out, count)
+}
+
+/// Keystrokes typed while [`drain_cursor_reports`] was waiting; the plain-line
+/// reader puts them back in front of the next line so none are lost.
+static TYPED_DURING_DRAIN: Mutex<Vec<u8>> = Mutex::new(Vec::new());
+
+/// Wait up to `budget` for `expected` late cursor-position reports to arrive on
+/// `fd` and swallow them without echo, so they never show up as `^[[43;1R` at
+/// the prompt. Returns how many arrived. Anything else the user typed meanwhile
+/// is kept in [`TYPED_DURING_DRAIN`]. The tty's modes are restored on return.
+///
+/// Called when the editor gave up on the terminal: every query it sent is still
+/// owed an answer, and a terminal that is merely slow delivers them a few
+/// seconds later onto a cooked tty, which echoes them.
+#[cfg(unix)]
+fn drain_cursor_reports(fd: i32, expected: usize, budget: std::time::Duration) -> usize {
+    let mut saved: libc::termios = unsafe { std::mem::zeroed() };
+    if unsafe { libc::tcgetattr(fd, &mut saved) } != 0 {
+        return 0;
+    }
+    let mut raw = saved;
+    raw.c_lflag &= !(libc::ECHO | libc::ICANON);
+    raw.c_cc[libc::VMIN] = 0;
+    raw.c_cc[libc::VTIME] = 1; // 100 ms per read
+    if unsafe { libc::tcsetattr(fd, libc::TCSANOW, &raw) } != 0 {
+        return 0;
+    }
+
+    let deadline = std::time::Instant::now() + budget;
+    let mut got = Vec::new();
+    let mut seen = 0;
+    let mut chunk = [0u8; 256];
+    while seen < expected && std::time::Instant::now() < deadline {
+        let n = unsafe { libc::read(fd, chunk.as_mut_ptr().cast(), chunk.len()) };
+        if n > 0 {
+            got.extend_from_slice(&chunk[..n as usize]);
+            seen = split_cursor_reports(&got).1;
+        } else if n < 0 && std::io::Error::last_os_error().kind() != std::io::ErrorKind::Interrupted
+        {
+            break;
+        }
+    }
+    unsafe { libc::tcsetattr(fd, libc::TCSANOW, &saved) };
+
+    let (typed, _) = split_cursor_reports(&got);
+    if let Ok(mut t) = TYPED_DURING_DRAIN.lock() {
+        t.extend_from_slice(&typed);
+    }
+    seen
 }
 
 /// Length of the cursor-position report at the start of `b`, if there is one.
@@ -485,6 +551,14 @@ impl Prompt for StrykePrompt {
 pub fn print_cyberpunk_banner() {
     crate::banner::print_banner(true);
 }
+/// Editor attempts before the REPL drops to plain lines. Each failed attempt
+/// waits crossterm's 2 s for the cursor report, and a report that is late for
+/// one query answers a later one, so a terminal up to ~2 s × this late recovers.
+const EDITOR_ATTEMPTS: usize = 6;
+
+/// Seconds to wait for the reports still owed when the editor gives up.
+const DRAIN_BUDGET_SECS: u64 = 8;
+
 /// `run` — see implementation.
 pub fn run(cli: &Cli) {
     let mut interp = VMHelper::new();
@@ -572,19 +646,22 @@ pub fn run(cli: &Cli) {
     // the shell. A query the terminal was slow to answer is not a reason to
     // refuse to run a language.
     //
-    // So a failure is retried twice — the race is usually transient — and if
-    // the editor still cannot paint, the REPL drops to reading plain lines
-    // from stdin. No completion, no history keys, no menus, but every other
-    // thing the REPL does still works, which is the difference between a
-    // degraded prompt and no prompt at all.
+    // So a failure is retried up to `EDITOR_ATTEMPTS` times. Each retry sends a
+    // fresh query, and an answer that was late for an earlier query satisfies
+    // the one in flight, so a terminal that is merely slow recovers on its own.
     //
-    // Past three attempts the answers are more than ~6 s late, not lost: they
-    // reach the tty after crossterm has stopped waiting and land in the next
-    // plain line. `read_plain_line` strips them, and seeing one sends the REPL
-    // back to the editor, so a burst of load does not cost the session its
-    // line editor.
+    // If every attempt fails, the answers still owed are not lost, only late:
+    // left alone they reach the cooked tty and echo as `^[[43;1R`.
+    // `drain_cursor_reports` swallows them silently; if any arrive the terminal
+    // does answer and the editor gets one more try. Otherwise the REPL drops to
+    // reading plain lines from stdin. No completion, no history keys, no menus,
+    // but every other thing the REPL does still works, which is the difference
+    // between a degraded prompt and no prompt at all. `read_plain_line` still
+    // strips any report that straggles in later, and seeing one sends the REPL
+    // back to the editor.
     let mut editor_failures = 0usize;
     let mut plain_input = false;
+    let mut drained = false;
 
     loop {
         // Refresh `%main::` / `%Pkg::` so each prompt sees the current symbol
@@ -616,8 +693,24 @@ pub fn run(cli: &Cli) {
                 }
                 Err(e) => {
                     editor_failures += 1;
-                    if editor_failures <= 2 {
+                    if editor_failures < EDITOR_ATTEMPTS {
                         continue;
+                    }
+                    // Every failed attempt left one query unanswered. Swallow
+                    // the answers silently; if any come, the terminal works and
+                    // is only slow, so the editor gets one more try.
+                    #[cfg(unix)]
+                    if !drained {
+                        drained = true;
+                        let arrived = drain_cursor_reports(
+                            0,
+                            editor_failures,
+                            std::time::Duration::from_secs(DRAIN_BUDGET_SECS),
+                        );
+                        if arrived > 0 {
+                            editor_failures = 0;
+                            continue;
+                        }
                     }
                     eprintln!("repl: {}", e);
                     eprintln!("repl: line editor unavailable — reading plain lines instead");
@@ -690,11 +783,106 @@ mod tests {
 
     #[test]
     fn other_escapes_and_plain_text_are_left_alone() {
-        for s in ["p 42", "\x1b[31mred", "\x1b[48R", "\x1b[;1R", "\x1b[48;R", "say \"\x1b[\""] {
+        for s in [
+            "p 42",
+            "\x1b[31mred",
+            "\x1b[48R",
+            "\x1b[;1R",
+            "\x1b[48;R",
+            "say \"\x1b[\"",
+        ] {
             assert_eq!(strip_cursor_reports(s), (s.to_string(), false), "{s:?}");
         }
         // A report in the middle still goes; the text around it stays put.
-        assert_eq!(strip_cursor_reports("a\x1b[1;80Rb"), ("ab".to_string(), true));
+        assert_eq!(
+            strip_cursor_reports("a\x1b[1;80Rb"),
+            ("ab".to_string(), true)
+        );
+    }
+
+    #[test]
+    fn split_counts_every_report_and_keeps_the_rest() {
+        let (rest, n) = split_cursor_reports(b"a\x1b[43;1Rb\x1b[43;1R\x1b[3");
+        assert_eq!((rest.as_slice(), n), (&b"ab\x1b[3"[..], 2));
+    }
+
+    /// A pty master/slave pair, so the drain can be driven without a terminal.
+    #[cfg(unix)]
+    fn open_pty() -> (i32, i32) {
+        unsafe {
+            let master = libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY);
+            assert!(master >= 0 && libc::grantpt(master) == 0 && libc::unlockpt(master) == 0);
+            let name = libc::ptsname(master);
+            assert!(!name.is_null());
+            let slave = libc::open(name, libc::O_RDWR | libc::O_NOCTTY);
+            assert!(slave >= 0);
+            (master, slave)
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn drain_swallows_late_reports_without_echo_and_restores_the_tty() {
+        let (master, slave) = open_pty();
+        let before = unsafe {
+            let mut t: libc::termios = std::mem::zeroed();
+            libc::tcgetattr(slave, &mut t);
+            t
+        };
+        assert_ne!(before.c_lflag & libc::ECHO, 0, "pty starts cooked");
+
+        // Two owed reports, with a keystroke typed in between, arriving after
+        // the drain has started waiting — as late answers do.
+        let writer = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            let input = b"\x1b[43;1Rx\x1b[43;1R";
+            unsafe { libc::write(master, input.as_ptr().cast(), input.len()) };
+        });
+
+        TYPED_DURING_DRAIN.lock().unwrap().clear();
+        let seen = drain_cursor_reports(slave, 2, std::time::Duration::from_secs(5));
+        writer.join().unwrap();
+        assert_eq!(seen, 2);
+        assert_eq!(TYPED_DURING_DRAIN.lock().unwrap().as_slice(), b"x");
+
+        // Echo would have written the bytes back to the master side.
+        let mut echoed = [0u8; 64];
+        let flags = unsafe { libc::fcntl(master, libc::F_GETFL) };
+        unsafe { libc::fcntl(master, libc::F_SETFL, flags | libc::O_NONBLOCK) };
+        let n = unsafe { libc::read(master, echoed.as_mut_ptr().cast(), echoed.len()) };
+        assert!(n <= 0, "drain echoed {n} bytes back to the terminal");
+
+        let after = unsafe {
+            let mut t: libc::termios = std::mem::zeroed();
+            libc::tcgetattr(slave, &mut t);
+            t
+        };
+        // PENDIN is set by the kernel itself after a tcsetattr with input queued.
+        let user_flags = !libc::PENDIN;
+        assert_eq!(
+            after.c_lflag & user_flags,
+            before.c_lflag & user_flags,
+            "termios not restored"
+        );
+        unsafe {
+            libc::close(slave);
+            libc::close(master);
+        }
+        TYPED_DURING_DRAIN.lock().unwrap().clear();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn drain_gives_up_at_the_budget_when_no_report_comes() {
+        let (master, slave) = open_pty();
+        let start = std::time::Instant::now();
+        let seen = drain_cursor_reports(slave, 1, std::time::Duration::from_millis(300));
+        assert_eq!(seen, 0);
+        assert!(start.elapsed() < std::time::Duration::from_secs(3));
+        unsafe {
+            libc::close(slave);
+            libc::close(master);
+        }
     }
 
     #[test]
