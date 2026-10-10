@@ -1,0 +1,27 @@
+my $x = 1;
+{ my $x = 2; $x++; }
+for my $i (1 .. 3) { my $x = $i; }
+our %g = (a => 1, b => 2);
+our @g = (1, 2, 3);
+sub f { local @g{qw(a b)} = (9, 8); local @g[0, 2] = (7, 6); delete local $g{a}; join ",", sort keys %g }
+sub arr { my @a = (1, 2, 3); return @a }
+sub nothing { return }
+my @u = (undef);
+my @n = nothing();
+my $c = arr();
+my @cl = (my ($p, $q) = (5, 6, 7));
+my %h = (a => 1, b => 2, c => 3);
+my @v = @h{(sort keys %h)[0, 1]};
+my $r = { a => 1 };
+my %kv = $r->%{qw(a)};
+my $s = "abc";
+$s =~ s/(?<f>.)(.)/$2$+{f}/;
+print "$-[0] @h{qw(a b)}\n" if "ab" =~ /b/;
+print <<"EOT";
+v: $x \$x\t@{[ 1 + 1 ]}
+EOT
+my @b = unpack("(A2)*", pack("N/a* n", "hi", 3));
+my @cs = (unpack("%32C*", "abc"), unpack("B8", "a"), pack("s< l> q", 1, 2, 3));
+my @w = (~0, 18446744073709551615, 0xFFFFFFFFFFFFFFFF, ~0 % 10, ~0 / 5);
+open(my $fh, '<', \"abcdef");
+{ local $/ = \2; my @recs = <$fh>; }

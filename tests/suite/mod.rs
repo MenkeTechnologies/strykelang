@@ -185,6 +185,7 @@ mod defined_or_pin;
 mod demos_no_interop;
 mod demos_pin;
 mod diff_perl_gen;
+mod diff_perl_gen_stmt;
 mod dispatch_table_pin;
 mod dist_thread;
 mod do_block_pin;
