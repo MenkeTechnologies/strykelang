@@ -256,6 +256,9 @@ mod nops {
     pub const ARROW_HASH_AUTOVIV: u16 = BASE + 91;
     /// Autovivifying [`ARROW_ARRAY`].
     pub const ARROW_ARRAY_AUTOVIV: u16 = BASE + 92;
+    /// Perl unary minus under `--compat`: numeric negate, plus string negation
+    /// (`-"foo"` is `"-foo"`) that fusevm's native `Negate` does not model.
+    pub const NEGATE: u16 = BASE + 93;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -546,19 +549,13 @@ fn num_cmp(a: &StrykeValue, b: &StrykeValue, id: u16) -> bool {
 }
 
 /// `<=>`: integer compare when both are integers, else float (matches vm.rs).
-fn spaceship(a: &StrykeValue, b: &StrykeValue) -> i64 {
+/// `None` when either side is NaN: perl yields `undef` for an unordered pair.
+fn spaceship(a: &StrykeValue, b: &StrykeValue) -> Option<i64> {
     if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
-        (x > y) as i64 - (x < y) as i64
-    } else {
-        let (x, y) = (a.to_number(), b.to_number());
-        if x < y {
-            -1
-        } else if x > y {
-            1
-        } else {
-            0
-        }
+        return Some((x > y) as i64 - (x < y) as i64);
     }
+    let (x, y) = (a.to_number(), b.to_number());
+    x.partial_cmp(&y).map(|o| o as i64)
 }
 
 /// Reflection hashes are frozen builtins (mirrors vm.rs `is_reflection_hash`).
@@ -618,10 +615,17 @@ pub(crate) fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
             let a = pop_stryke(vm);
             vm.push(fusevm::Value::Int(if num_cmp(&a, &b, id) { 1 } else { 0 }));
         }
+        nops::NEGATE => {
+            let a = pop_stryke(vm);
+            vm.push(stryke_to_fusevm(&crate::value::perl_negate(&a)));
+        }
         nops::SPACESHIP => {
             let b = pop_stryke(vm);
             let a = pop_stryke(vm);
-            vm.push(fusevm::Value::Int(spaceship(&a, &b)));
+            vm.push(match spaceship(&a, &b) {
+                Some(n) => fusevm::Value::Int(n),
+                None => fusevm::Value::Undef,
+            });
         }
         nops::LOG_NOT => {
             let a = pop_stryke(vm);
@@ -1172,6 +1176,10 @@ pub(crate) fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
             let res = if let Some(s) = crate::value::set_intersection(&lv, &rv) {
                 s
             } else if let Some(s) =
+                crate::value::perl_string_bitop(&lv, &rv, crate::value::StringBitOp::And)
+            {
+                s
+            } else if let Some(s) =
                 crate::sketches::try_sketch_binop(crate::sketches::SketchOp::And, &lv, &rv)
             {
                 s
@@ -1186,6 +1194,10 @@ pub(crate) fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
             let res = if let Some(s) = crate::value::set_union(&lv, &rv) {
                 s
             } else if let Some(s) =
+                crate::value::perl_string_bitop(&lv, &rv, crate::value::StringBitOp::Or)
+            {
+                s
+            } else if let Some(s) =
                 crate::sketches::try_sketch_binop(crate::sketches::SketchOp::Or, &lv, &rv)
             {
                 s
@@ -1198,6 +1210,10 @@ pub(crate) fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
             let rv = pop_stryke(vm);
             let lv = pop_stryke(vm);
             let res = if let Some(s) =
+                crate::value::perl_string_bitop(&lv, &rv, crate::value::StringBitOp::Xor)
+            {
+                s
+            } else if let Some(s) =
                 crate::sketches::try_sketch_binop(crate::sketches::SketchOp::Xor, &lv, &rv)
             {
                 s
@@ -1994,6 +2010,9 @@ pub(crate) fn lower_to_fusevm(chunk: &Chunk) -> Option<fusevm::Chunk> {
             }
             Op::Printf(None, argc) => {
                 b.emit(fusevm::Op::Extended(nops::PRINTF, *argc), 0);
+            }
+            Op::Negate if crate::compat_mode() => {
+                b.emit(fusevm::Op::Extended(nops::NEGATE, 0), 0);
             }
             Op::Negate => {
                 b.emit(fusevm::Op::Negate, 0);

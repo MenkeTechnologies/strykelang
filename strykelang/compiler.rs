@@ -3733,6 +3733,25 @@ impl Compiler {
                     // `return (1, 2, 3)` semantics. (BUG-010)
                     if return_operand_is_list_shaped(expr) {
                         self.compile_expr_ctx(expr, WantarrayCtx::List)?;
+                    } else if matches!(
+                        expr.kind,
+                        ExprKind::FuncCall { .. }
+                            | ExprKind::MethodCall { .. }
+                            | ExprKind::IndirectCall { .. }
+                    ) {
+                        // `return f(...)` calls `f` in the context this sub was called
+                        // in, which is only known at run time: branch on `wantarray`.
+                        self.emit_op(
+                            Op::CallBuiltin(BuiltinId::Wantarray as u16, 0),
+                            line,
+                            None,
+                        );
+                        let to_scalar = self.emit_op(Op::JumpIfFalse(0), line, None);
+                        self.compile_expr_ctx(expr, WantarrayCtx::List)?;
+                        let to_end = self.emit_op(Op::Jump(0), line, None);
+                        self.chunk.patch_jump_here(to_scalar);
+                        self.compile_expr_ctx(expr, WantarrayCtx::Scalar)?;
+                        self.chunk.patch_jump_here(to_end);
                     } else {
                         self.compile_expr(expr)?;
                     }
@@ -3854,6 +3873,8 @@ impl Compiler {
                     break_jumps: vec![],
                     continue_jumps: vec![],
                 });
+                // A `package NAME;` statement lasts to the end of the enclosing block.
+                let outer_package = self.current_package.clone();
                 let res = self.compile_block_inner(block);
                 let ctx = self.loop_stack.pop().expect("bare block loop ctx");
                 res?;
@@ -3862,6 +3883,13 @@ impl Compiler {
                 // does — just past the block.
                 for j in ctx.break_jumps.into_iter().chain(ctx.continue_jumps) {
                     self.chunk.patch_jump_here(j);
+                }
+                if self.current_package != outer_package {
+                    self.current_package = outer_package.clone();
+                    let val_idx = self.chunk.add_constant(StrykeValue::string(outer_package));
+                    let name_idx = self.chunk.intern_name("__PACKAGE__");
+                    self.chunk.emit(Op::LoadConst(val_idx), line);
+                    self.emit_set_scalar(name_idx, line, None);
                 }
             }
             StmtKind::StmtGroup(block) => {
@@ -7749,6 +7777,13 @@ impl Compiler {
                     } else {
                         self.emit_op(Op::HashEachScalar(idx), line, Some(root));
                     }
+                } else if let Some(target) = VMHelper::each_operand_ref_expr(e) {
+                    // `each %$r` / `each @a`: the cursor lives with the referent, so
+                    // pass the reference plus the call-site context flag.
+                    self.compile_expr(&target)?;
+                    let list = (ctx == WantarrayCtx::List) as i64;
+                    self.emit_op(Op::LoadInt(list), line, Some(root));
+                    self.emit_op(Op::CallBuiltin(BuiltinId::Each as u16, 2), line, Some(root));
                 } else {
                     self.compile_expr(e)?;
                     self.emit_op(Op::CallBuiltin(BuiltinId::Each as u16, 1), line, Some(root));
@@ -8837,8 +8872,13 @@ impl Compiler {
             // ── List ──
             ExprKind::List(exprs) => {
                 if ctx == WantarrayCtx::Scalar {
-                    // Perl: comma-list in scalar context evaluates to the **last** element (`(1,2)` → 2).
-                    if let Some(last) = exprs.last() {
+                    // Perl: comma-list in scalar context evaluates to the **last** element (`(1,2)` → 2);
+                    // the earlier elements still run for their side effects (`($i++, $j--)`).
+                    if let Some((last, rest)) = exprs.split_last() {
+                        for e in rest {
+                            self.compile_expr_ctx(e, WantarrayCtx::Scalar)?;
+                            self.emit_op(Op::Pop, line, Some(root));
+                        }
                         self.compile_expr_ctx(last, WantarrayCtx::Scalar)?;
                     } else {
                         self.emit_op(Op::LoadUndef, line, Some(root));

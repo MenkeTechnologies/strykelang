@@ -167,9 +167,12 @@ fn builtin_time_epoch_sane() {
 }
 
 #[test]
-fn localtime_scalar_ends_with_newline() {
+fn localtime_scalar_is_ctime_without_trailing_newline() {
+    // perl's `scalar localtime` is the 24-character ctime string; unlike C's
+    // `ctime(3)` it carries no trailing newline.
     let s = eval_string("scalar localtime(1234567890)");
-    assert!(s.ends_with('\n'), "got {:?}", s);
+    assert_eq!(s.len(), 24, "got {:?}", s);
+    assert!(!s.ends_with('\n'), "got {:?}", s);
 }
 
 #[test]

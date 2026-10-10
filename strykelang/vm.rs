@@ -2247,7 +2247,7 @@ impl<'a> VM<'a> {
             s
         } else {
             return Err(StrykeError::runtime(
-                "Can't call method on non-object",
+                crate::vm_helper::non_object_method_message(&obj, method),
                 self.line(),
             ));
         };
@@ -2297,10 +2297,7 @@ impl<'a> VM<'a> {
             Some(f) => f,
             None => {
                 return Err(StrykeError::runtime(
-                    format!(
-                        "Can't locate method \"{}\" via inheritance (invocant \"{}\")",
-                        method, class
-                    ),
+                    self.interp.no_method_message(&class, method),
                     self.line(),
                 ));
             }
@@ -2411,10 +2408,7 @@ impl<'a> VM<'a> {
             }
         } else {
             return Err(StrykeError::runtime(
-                format!(
-                    "Can't locate method \"{}\" in package \"{}\"",
-                    method, class
-                ),
+                self.interp.no_method_message(&class, method),
                 self.line(),
             ));
         }
@@ -5083,7 +5077,9 @@ impl<'a> VM<'a> {
                         {
                             self.push(vm_interp_result(exec_res, line)?);
                         } else {
-                            self.push(if let Some(n) = a.as_integer() {
+                            self.push(if crate::compat_mode() {
+                                crate::value::perl_negate(&a)
+                            } else if let Some(n) = a.as_integer() {
                                 StrykeValue::integer(-n)
                             } else {
                                 StrykeValue::float(-a.to_number())
@@ -5256,15 +5252,11 @@ impl<'a> VM<'a> {
                                         0
                                     })
                                 } else {
-                                    let x = a.to_number();
-                                    let y = b.to_number();
-                                    StrykeValue::integer(if x < y {
-                                        -1
-                                    } else if x > y {
-                                        1
-                                    } else {
-                                        0
-                                    })
+                                    // NaN is unordered: perl yields undef.
+                                    match a.to_number().partial_cmp(&b.to_number()) {
+                                        Some(o) => StrykeValue::integer(o as i64),
+                                        None => StrykeValue::UNDEF,
+                                    }
                                 },
                             )
                         })
@@ -5357,6 +5349,12 @@ impl<'a> VM<'a> {
                         let lv = self.pop();
                         if let Some(s) = crate::value::set_intersection(&lv, &rv) {
                             self.push(s);
+                        } else if let Some(s) = crate::value::perl_string_bitop(
+                            &lv,
+                            &rv,
+                            crate::value::StringBitOp::And,
+                        ) {
+                            self.push(s);
                         } else if let Some(s) = crate::sketches::try_sketch_binop(
                             crate::sketches::SketchOp::And,
                             &lv,
@@ -5373,6 +5371,12 @@ impl<'a> VM<'a> {
                         let lv = self.pop();
                         if let Some(s) = crate::value::set_union(&lv, &rv) {
                             self.push(s);
+                        } else if let Some(s) = crate::value::perl_string_bitop(
+                            &lv,
+                            &rv,
+                            crate::value::StringBitOp::Or,
+                        ) {
+                            self.push(s);
                         } else if let Some(s) = crate::sketches::try_sketch_binop(
                             crate::sketches::SketchOp::Or,
                             &lv,
@@ -5387,7 +5391,13 @@ impl<'a> VM<'a> {
                     Op::BitXor => {
                         let rv = self.pop();
                         let lv = self.pop();
-                        if let Some(s) = crate::sketches::try_sketch_binop(
+                        if let Some(s) = crate::value::perl_string_bitop(
+                            &lv,
+                            &rv,
+                            crate::value::StringBitOp::Xor,
+                        ) {
+                            self.push(s);
+                        } else if let Some(s) = crate::sketches::try_sketch_binop(
                             crate::sketches::SketchOp::Xor,
                             &lv,
                             &rv,
@@ -5480,7 +5490,7 @@ impl<'a> VM<'a> {
                         let new_val = self
                             .interp
                             .scope
-                            .atomic_mutate(en, |v| StrykeValue::integer(v.to_int() - 1))
+                            .atomic_mutate(en, crate::vm_helper::perl_dec)
                             .map_err(|e| e.at_line(self.line()))?;
                         self.push(new_val);
                         Ok(())
@@ -5512,14 +5522,14 @@ impl<'a> VM<'a> {
                         if self.ip < len && matches!(ops[self.ip], Op::Pop) {
                             self.interp
                                 .scope
-                                .atomic_mutate_post(en, |v| StrykeValue::integer(v.to_int() - 1))
+                                .atomic_mutate_post(en, crate::vm_helper::perl_dec)
                                 .map_err(|e| e.at_line(self.line()))?;
                             self.ip += 1;
                         } else {
                             let old = self
                                 .interp
                                 .scope
-                                .atomic_mutate_post(en, |v| StrykeValue::integer(v.to_int() - 1))
+                                .atomic_mutate_post(en, crate::vm_helper::perl_dec)
                                 .map_err(|e| e.at_line(self.line()))?;
                             self.push(old);
                         }
@@ -5539,8 +5549,7 @@ impl<'a> VM<'a> {
                         Ok(())
                     }
                     Op::PreDecSlot(slot) => {
-                        let val = self.interp.scope.get_scalar_slot(*slot).to_int() - 1;
-                        let new_val = StrykeValue::integer(val);
+                        let new_val = crate::vm_helper::perl_dec(&self.interp.scope.get_scalar_slot(*slot));
                         self.interp.scope.set_scalar_slot(*slot, new_val.clone());
                         self.push(new_val);
                         Ok(())
@@ -5562,14 +5571,12 @@ impl<'a> VM<'a> {
                     }
                     Op::PostDecSlot(slot) => {
                         if self.ip < len && matches!(ops[self.ip], Op::Pop) {
-                            let val = self.interp.scope.get_scalar_slot(*slot).to_int() - 1;
-                            self.interp
-                                .scope
-                                .set_scalar_slot(*slot, StrykeValue::integer(val));
+                            let new_val = crate::vm_helper::perl_dec(&self.interp.scope.get_scalar_slot(*slot));
+                            self.interp.scope.set_scalar_slot(*slot, new_val);
                             self.ip += 1;
                         } else {
                             let old = self.interp.scope.get_scalar_slot(*slot);
-                            let new_val = StrykeValue::integer(old.to_int() - 1);
+                            let new_val = crate::vm_helper::perl_dec(&old);
                             self.interp.scope.set_scalar_slot(*slot, new_val);
                             self.push(old);
                         }

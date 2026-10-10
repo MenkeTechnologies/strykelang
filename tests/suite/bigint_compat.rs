@@ -1,4 +1,6 @@
-//! `--compat` arithmetic promotes to BigInt on i64 overflow; native stryke wraps.
+//! `--compat` integer arithmetic follows perl on i64 overflow: the result stays an exact
+//! integer while it fits an unsigned 64-bit value and becomes an NV beyond it. Exact
+//! arbitrary precision is what `use bigint;` is for. Native stryke wraps.
 //!
 //! `**` is the exception, and deliberately so: perl's `pp_pow` decides integer
 //! vs. floating point from the operand bit widths *before* multiplying, so
@@ -29,9 +31,18 @@ fn run_native(code: &str) -> String {
 }
 
 #[test]
-fn compat_2_to_the_100_via_repeated_mul() {
+fn compat_repeated_mul_past_uv_max_is_an_nv() {
+    // perl: `$x *= 2` a hundred times ends as the NV 1.26765060022823e+30.
     assert_eq!(
         run_compat("my $x = 1; for (1..100) { $x *= 2 } print $x"),
+        "1.26765060022823e+30"
+    );
+}
+
+#[test]
+fn bigint_pragma_repeated_mul_is_exact() {
+    assert_eq!(
+        run_compat("use bigint; my $x = 1; for (1..100) { $x *= 2 } print $x"),
         "1267650600228229401496703205376"
     );
 }
@@ -63,9 +74,17 @@ fn compat_pow_follows_perl_not_bigint() {
 }
 
 #[test]
-fn compat_factorial_30() {
+fn compat_factorial_30_is_an_nv() {
     assert_eq!(
         run_compat("my $f = 1; $f *= $_ for 1..30; print $f"),
+        "2.65252859812191e+32"
+    );
+}
+
+#[test]
+fn bigint_pragma_factorial_30_is_exact() {
+    assert_eq!(
+        run_compat("use bigint; my $f = 1; $f *= $_ for 1..30; print $f"),
         "265252859812191058636308480000000"
     );
 }
@@ -80,13 +99,11 @@ fn compat_add_overflow_promotes() {
 }
 
 #[test]
-fn compat_sub_overflow_promotes() {
-    // (-i64::MAX) - 2 = -9223372036854775809 — phrased to dodge lexer's rejection
-    // of `-9223372036854775808` as a single literal (it would overflow i64 by 1
-    // before the unary minus folds in).
+fn compat_sub_overflow_below_iv_min_is_an_nv() {
+    // A negative result below IV_MIN has no unsigned form, so perl yields an NV.
     assert_eq!(
         run_compat("print -9223372036854775807 - 2"),
-        "-9223372036854775809"
+        "-9.22337203685478e+18"
     );
 }
 

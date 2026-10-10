@@ -553,6 +553,79 @@ struct FlipFlopTreeState {
     exclusive_left_line: Option<i64>,
 }
 
+/// perl's diagnostic for `EXPR->method` when `EXPR` is neither an object nor a
+/// package name.
+pub(crate) fn non_object_method_message(obj: &StrykeValue, method: &str) -> String {
+    if obj.is_undef() {
+        format!("Can't call method \"{method}\" on an undefined value")
+    } else if obj.is_perl_reference() {
+        format!("Can't call method \"{method}\" on unblessed reference")
+    } else {
+        format!("Can't call method \"{method}\" without a package or object reference")
+    }
+}
+
+/// Pad `body` to `width` characters with `fill`, on the right when `left`.
+/// `format!`'s `width$` argument cannot exceed `u16::MAX` (it panics), while
+/// perl's `%100000s` is valid, so `sprintf` pads through this instead.
+fn pad_str(body: &str, width: usize, left: bool, fill: char) -> String {
+    let have = body.chars().count();
+    if have >= width {
+        return body.to_string();
+    }
+    let pad: String = std::iter::repeat_n(fill, width - have).collect();
+    if left {
+        format!("{body}{pad}")
+    } else {
+        format!("{pad}{body}")
+    }
+}
+
+/// Read one record from `r` into `buf` under perl's `$/`: `None` slurps the rest,
+/// `""` is paragraph mode (runs of blank lines separate records and collapse to
+/// one `"\n\n"` terminator), `"\n"` is a plain line, and any other string
+/// terminates a record when the bytes read so far end with it. Returns the number
+/// of bytes appended, `0` at EOF.
+pub(crate) fn read_perl_record<R: BufRead>(
+    r: &mut R,
+    sep: Option<&str>,
+    buf: &mut Vec<u8>,
+) -> io::Result<usize> {
+    let start = buf.len();
+    match sep {
+        None => {
+            r.read_to_end(buf)?;
+        }
+        Some("\n") => {
+            r.read_until(b'\n', buf)?;
+        }
+        Some("") => {
+            let skip_newlines = |r: &mut R| -> io::Result<()> {
+                while r.fill_buf()?.first() == Some(&b'\n') {
+                    r.consume(1);
+                }
+                Ok(())
+            };
+            skip_newlines(r)?;
+            loop {
+                if r.read_until(b'\n', buf)? == 0 || buf.ends_with(b"\n\n") {
+                    break;
+                }
+            }
+            skip_newlines(r)?;
+        }
+        Some(sep) => {
+            let last = *sep.as_bytes().last().expect("non-empty separator");
+            loop {
+                if r.read_until(last, buf)? == 0 || buf.ends_with(sep.as_bytes()) {
+                    break;
+                }
+            }
+        }
+    }
+    Ok(buf.len() - start)
+}
+
 /// `BufReader` / `print` / `sysread` / `tell` on the same handle share this [`File`] cursor.
 #[derive(Clone)]
 pub(crate) struct IoSharedFile(pub Arc<Mutex<File>>);
@@ -564,6 +637,24 @@ impl Read for IoSharedFile {
 }
 
 pub(crate) struct IoSharedFileWrite(pub Arc<Mutex<File>>);
+
+/// Write half of an in-memory filehandle (`open $fh, '>', \$buf`): every write
+/// is appended to the referenced scalar, so `$buf` is current after each `print`.
+pub(crate) struct ScalarSinkWrite(pub Arc<RwLock<StrykeValue>>);
+
+impl IoWrite for ScalarSinkWrite {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let mut slot = self.0.write();
+        let mut s = slot.to_string();
+        s.push_str(&String::from_utf8_lossy(buf));
+        *slot = StrykeValue::string(s);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
 
 impl IoWrite for IoSharedFileWrite {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
@@ -747,6 +838,9 @@ pub struct VMHelper {
     /// hand out; `each` removes the entry when it walks off the end (returning the
     /// empty list), and `keys` / `values` reset it, exactly as perl does.
     pub(crate) each_cursors: HashMap<String, usize>,
+    /// In-memory write handles opened on a `\$lexical`: handle name -> (variable
+    /// name, buffer). The buffer is copied into the variable after every write.
+    pub(crate) mem_sinks: HashMap<String, (String, Arc<RwLock<StrykeValue>>)>,
     /// `$ARGV` — name of the file last opened by `<>` (empty for stdin or before first file).
     pub argv_current_file: String,
     /// Next `@ARGV` index to open for `<>` (after `ARGV` is exhausted, `<>` returns undef).
@@ -1743,6 +1837,7 @@ impl VMHelper {
             perl_debug_flags: 0,
             eval_nesting: 0,
             each_cursors: HashMap::new(),
+            mem_sinks: HashMap::new(),
             argv_current_file: String::new(),
             diamond_next_idx: 0,
             diamond_reader: None,
@@ -2111,6 +2206,7 @@ impl VMHelper {
             perl_debug_flags: self.perl_debug_flags,
             eval_nesting: self.eval_nesting,
             each_cursors: HashMap::new(),
+            mem_sinks: HashMap::new(),
             argv_current_file: String::new(),
             diamond_next_idx: 0,
             diamond_reader: None,
@@ -2400,7 +2496,23 @@ impl VMHelper {
     }
 
     pub(crate) fn set_eval_error_from_perl_error(&mut self, e: &StrykeError) {
-        self.eval_error = e.to_string();
+        // A runtime error raised by a builtin carries the placeholder file `-e` and no
+        // trailing newline; perl's `$@` names the running script and ends in "\n".
+        let mut text = if e.file == "-e" && !self.file.is_empty() {
+            let mut stamped = e.clone();
+            stamped.file = self.file.clone();
+            stamped.to_string()
+        } else {
+            e.to_string()
+        };
+        let is_plain_message = matches!(
+            e.kind,
+            ErrorKind::Runtime | ErrorKind::Type | ErrorKind::DivisionByZero
+        );
+        if is_plain_message && !text.is_empty() && !text.ends_with('\n') {
+            text.push('\n');
+        }
+        self.eval_error = text;
         self.eval_error_code = if self.eval_error.is_empty() { 0 } else { 1 };
         self.eval_error_value = e.die_value.clone();
     }
@@ -3393,6 +3505,91 @@ impl VMHelper {
         }
     }
 
+    /// One step of `each` over the array or hash a reference points at (`each %$h`,
+    /// `each @{$r}`, `each @a`). The cursor is keyed by the referent's address, so
+    /// every alias of the container shares one iterator, as in perl. `list` selects
+    /// list context (`(key, value)` pair, or `()` once exhausted) over scalar
+    /// context (the key or index, or undef once exhausted). Exhaustion rewinds.
+    pub(crate) fn each_step_ref(&mut self, target: &StrykeValue, list: bool) -> StrykeValue {
+        let exhausted = || {
+            if list {
+                StrykeValue::array(vec![])
+            } else {
+                StrykeValue::UNDEF
+            }
+        };
+        let (cursor_key, entry) = if let Some(h) = target.as_hash_ref() {
+            let key = format!("{:p}", Arc::as_ptr(&h));
+            let cursor = self.each_cursors.get(&key).copied().unwrap_or(0);
+            let entry = h
+                .read()
+                .get_index(cursor)
+                .map(|(k, v)| (StrykeValue::string(k.clone()), v.clone()));
+            (key, entry)
+        } else if let Some(a) = target.as_array_ref() {
+            let key = format!("{:p}", Arc::as_ptr(&a));
+            let cursor = self.each_cursors.get(&key).copied().unwrap_or(0);
+            let entry = a
+                .read()
+                .get(cursor)
+                .map(|v| (StrykeValue::integer(cursor as i64), v.clone()));
+            (key, entry)
+        } else {
+            return exhausted();
+        };
+        match entry {
+            Some((k, v)) => {
+                *self.each_cursors.entry(cursor_key).or_insert(0) += 1;
+                if list {
+                    StrykeValue::array(vec![k, v])
+                } else {
+                    k
+                }
+            }
+            None => {
+                self.each_cursors.remove(&cursor_key);
+                exhausted()
+            }
+        }
+    }
+
+    /// The reference-producing expression for the operand of `each` when it is
+    /// not a plain named hash: `%$r` / `%{...}` / `@$r` yield the inner reference,
+    /// a named `@a` or `%h` yields `\@a` / `\%h`. `None` for anything else.
+    pub(crate) fn each_operand_ref_expr(e: &Expr) -> Option<Expr> {
+        match &e.kind {
+            ExprKind::Deref {
+                expr,
+                kind: Sigil::Hash | Sigil::Array,
+            } => Some((**expr).clone()),
+            ExprKind::ArrayVar(_) | ExprKind::HashVar(_) => Some(Expr {
+                kind: ExprKind::ScalarRef(Box::new(e.clone())),
+                line: e.line,
+            }),
+            _ => None,
+        }
+    }
+
+    /// perl's diagnostic for a method that resolves nowhere in `class`'s MRO. The
+    /// "forgot to load" hint is appended when no sub is defined in `class` at all.
+    pub(crate) fn no_method_message(&self, class: &str, method: &str) -> String {
+        if class.is_empty() {
+            return format!(
+                "Can't call method \"{method}\" without a package or object reference"
+            );
+        }
+        let prefix = format!("{class}::");
+        let known = self.subs.keys().any(|k| k.starts_with(&prefix));
+        if known {
+            format!("Can't locate object method \"{method}\" via package \"{class}\"")
+        } else {
+            format!(
+                "Can't locate object method \"{method}\" via package \"{class}\" \
+                 (perhaps you forgot to load \"{class}\"?)"
+            )
+        }
+    }
+
     /// Rewind the `each` cursor for a hash. Perl resets it whenever `keys` or
     /// `values` is called on the hash.
     #[inline]
@@ -3809,6 +4006,15 @@ impl VMHelper {
 
     /// `Undefined subroutine &name` (bare calls) with optional `strict subs` hint.
     pub(crate) fn undefined_subroutine_call_message(&self, name: &str) -> String {
+        if crate::compat_mode() {
+            // perl: `Undefined subroutine &main::name called`.
+            let qualified = if name.contains("::") {
+                name.to_string()
+            } else {
+                format!("{}::{}", self.current_package(), name)
+            };
+            return format!("Undefined subroutine &{} called", qualified);
+        }
         let mut msg = format!("Undefined subroutine &{}", name);
         if self.strict_subs {
             msg.push_str(
@@ -5114,6 +5320,7 @@ impl VMHelper {
             }
         };
         let handle_return = handle_name.clone();
+        self.handle_line_numbers.remove(&handle_name);
         let file_path = match actual_mode.as_str() {
             "<" | ">" | ">>" => self.resolve_stryke_path_string(&path),
             _ => path.clone(),
@@ -5209,6 +5416,73 @@ impl VMHelper {
             }
         }
         Ok(StrykeValue::io_handle(handle_return))
+    }
+
+    /// `open($fh, MODE, \$scalar)`: an in-memory filehandle. Reading snapshots the
+    /// scalar's current string; `>` truncates the scalar and `>>` appends to it,
+    /// with each write landing in the scalar immediately.
+    pub(crate) fn open_scalar_ref_execute(
+        &mut self,
+        handle_name: String,
+        mode: &str,
+        target: &StrykeValue,
+        line: usize,
+    ) -> StrykeResult<StrykeValue> {
+        // `\$lexical` is a name-carrying binding ref; `\"lit"` / `\my $x` are Arc cells.
+        let binding = target.as_scalar_binding_name();
+        let cell = match (&binding, target.as_scalar_ref()) {
+            (_, Some(cell)) => cell,
+            (Some(name), None) => Arc::new(RwLock::new(self.get_special_var(name))),
+            (None, None) => {
+                return Err(StrykeError::runtime(
+                    "open: in-memory filehandle target is not a scalar reference",
+                    line,
+                ))
+            }
+        };
+        self.handle_line_numbers.remove(&handle_name);
+        match mode.trim() {
+            "<" => {
+                let data = cell.read().to_string().into_bytes();
+                self.input_handles.insert(
+                    handle_name.clone(),
+                    BufReader::new(Box::new(Cursor::new(data)) as Box<dyn Read + Send>),
+                );
+            }
+            ">" | ">>" => {
+                if mode.trim() == ">" || cell.read().is_undef() {
+                    *cell.write() = StrykeValue::string(String::new());
+                }
+                if let Some(name) = binding {
+                    let current = cell.read().clone();
+                    self.set_special_var(&name, &current)
+                        .map_err(|e| e.at_line(line))?;
+                    self.mem_sinks
+                        .insert(handle_name.clone(), (name, Arc::clone(&cell)));
+                }
+                self.output_handles
+                    .insert(handle_name.clone(), Box::new(ScalarSinkWrite(cell)));
+            }
+            other => {
+                return Err(StrykeError::runtime(
+                    format!("Unknown open mode '{}' for in-memory filehandle", other),
+                    line,
+                ));
+            }
+        }
+        Ok(StrykeValue::io_handle(handle_name))
+    }
+
+    /// Copy an in-memory write handle's buffer into the variable it was opened
+    /// on, so the variable is current after every `print` / `printf`.
+    pub(crate) fn sync_mem_sink(&mut self, handle: &str) {
+        if self.mem_sinks.is_empty() {
+            return;
+        }
+        if let Some((name, cell)) = self.mem_sinks.get(handle).cloned() {
+            let value = cell.read().clone();
+            let _ = self.set_special_var(&name, &value);
+        }
     }
 
     /// List-form pipe open: `open($fh, "-|", "cmd", @args)` / `open($fh, "|-", @cmd)`.
@@ -5797,6 +6071,10 @@ impl VMHelper {
     }
 
     pub(crate) fn close_builtin_execute(&mut self, name: String) -> StrykeResult<StrykeValue> {
+        self.sync_mem_sink(&name);
+        self.mem_sinks.remove(&name);
+        // perl resets `$.` when the handle is closed.
+        self.handle_line_numbers.remove(&name);
         self.output_handles.remove(&name);
         self.input_handles.remove(&name);
         self.io_file_slots.remove(&name);
@@ -5866,6 +6144,7 @@ impl VMHelper {
         &mut self,
         handle: Option<&str>,
     ) -> StrykeResult<StrykeValue> {
+        let irs = self.irs.clone();
         // `<>` / `readline` with no handle: iterate `@ARGV` files, else stdin.
         if handle.is_none() {
             let argv = self.scope.get_array("ARGV");
@@ -5897,14 +6176,14 @@ impl VMHelper {
                         if let Some(reader) = self.diamond_reader.as_mut() {
                             if self.open_pragma_utf8 {
                                 let mut buf = Vec::new();
-                                reader.read_until(b'\n', &mut buf).inspect(|n| {
+                                read_perl_record(reader, irs.as_deref(), &mut buf).inspect(|n| {
                                     if *n > 0 {
                                         line_str = String::from_utf8_lossy(&buf).into_owned();
                                     }
                                 })
                             } else {
                                 let mut buf = Vec::new();
-                                match reader.read_until(b'\n', &mut buf) {
+                                match read_perl_record(reader, irs.as_deref(), &mut buf) {
                                     Ok(n) => {
                                         if n > 0 {
                                             line_str =
@@ -5955,7 +6234,7 @@ impl VMHelper {
             }
             let r: Result<usize, io::Error> = if self.open_pragma_utf8 {
                 let mut buf = Vec::new();
-                io::stdin().lock().read_until(b'\n', &mut buf).inspect(|n| {
+                read_perl_record(&mut io::stdin().lock(), irs.as_deref(), &mut buf).inspect(|n| {
                     if *n > 0 {
                         line_str = String::from_utf8_lossy(&buf).into_owned();
                     }
@@ -5963,7 +6242,7 @@ impl VMHelper {
             } else {
                 let mut buf = Vec::new();
                 let mut lock = io::stdin().lock();
-                match lock.read_until(b'\n', &mut buf) {
+                match read_perl_record(&mut lock, irs.as_deref(), &mut buf) {
                     Ok(n) => {
                         if n > 0 {
                             line_str = crate::perl_decode::decode_utf8_or_latin1_read_until(&buf);
@@ -6010,14 +6289,14 @@ impl VMHelper {
                 }
             } else if self.open_pragma_utf8 {
                 let mut buf = Vec::new();
-                reader.read_until(b'\n', &mut buf).inspect(|n| {
+                read_perl_record(reader, irs.as_deref(), &mut buf).inspect(|n| {
                     if *n > 0 {
                         line_str = String::from_utf8_lossy(&buf).into_owned();
                     }
                 })
             } else {
                 let mut buf = Vec::new();
-                match reader.read_until(b'\n', &mut buf) {
+                match read_perl_record(reader, irs.as_deref(), &mut buf) {
                     Ok(n) => {
                         if n > 0 {
                             line_str = crate::perl_decode::decode_utf8_or_latin1_read_until(&buf);
@@ -7001,7 +7280,11 @@ impl VMHelper {
             Ok(StrykeValue::string(new_s))
         } else {
             self.assign_value(target, StrykeValue::string(new_s))?;
-            Ok(StrykeValue::integer(count as i64))
+            Ok(if count == 0 {
+                StrykeValue::perl_false()
+            } else {
+                StrykeValue::integer(count as i64)
+            })
         }
     }
 
@@ -7083,7 +7366,8 @@ impl VMHelper {
             return Ok(StrykeValue::string(s));
         }
         self.assign_value(target, StrykeValue::string(s))?;
-        Ok(StrykeValue::integer(0))
+        // A failed `s///` is perl's empty-string false, not the integer 0.
+        Ok(StrykeValue::perl_false())
     }
 
     /// Shared `tr///` implementation.
@@ -8446,9 +8730,9 @@ impl VMHelper {
             .cloned()
             .unwrap_or(StrykeValue::UNDEF);
         let new_val = if kind & 1 == 0 {
-            StrykeValue::integer(last_old.to_int() + 1)
+            perl_inc(&last_old)
         } else {
-            StrykeValue::integer(last_old.to_int() - 1)
+            perl_dec(&last_old)
         };
         let mut ks: Vec<String> = Vec::new();
         for kv in &key_values {
@@ -8530,9 +8814,9 @@ impl VMHelper {
             .cloned()
             .unwrap_or(StrykeValue::UNDEF);
         let new_val = if kind & 1 == 0 {
-            StrykeValue::integer(last_old.to_int() + 1)
+            perl_inc(&last_old)
         } else {
-            StrykeValue::integer(last_old.to_int() - 1)
+            perl_dec(&last_old)
         };
         let mut ks: Vec<String> = Vec::new();
         for kv in &key_values {
@@ -10009,12 +10293,20 @@ impl VMHelper {
             BinOp::BitAnd => {
                 if let Some(s) = crate::value::set_intersection(old, rhs) {
                     s
+                } else if let Some(s) =
+                    crate::value::perl_string_bitop(old, rhs, crate::value::StringBitOp::And)
+                {
+                    s
                 } else {
                     StrykeValue::integer(old.to_int() & rhs.to_int())
                 }
             }
             BinOp::BitOr => {
                 if let Some(s) = crate::value::set_union(old, rhs) {
+                    s
+                } else if let Some(s) =
+                    crate::value::perl_string_bitop(old, rhs, crate::value::StringBitOp::Or)
+                {
                     s
                 } else {
                     StrykeValue::integer(old.to_int() | rhs.to_int())
@@ -11155,7 +11447,7 @@ impl VMHelper {
                         let n = self.resolved_scalar_storage_name(name);
                         return Ok(self
                             .scope
-                            .atomic_mutate(&n, |v| StrykeValue::integer(v.to_int() - 1))
+                            .atomic_mutate(&n, |v| perl_dec(v))
                             .map_err(|e| e.at_line(line))?);
                     }
                     if let ExprKind::Deref { kind, .. } = &expr.kind {
@@ -11189,7 +11481,7 @@ impl VMHelper {
                         }
                     }
                     let val = self.eval_expr(expr)?;
-                    let new_val = StrykeValue::integer(val.to_int() - 1);
+                    let new_val = perl_dec(&val);
                     self.assign_value(expr, new_val.clone())?;
                     Ok(new_val)
                 }
@@ -11253,7 +11545,7 @@ impl VMHelper {
                     let n = self.resolved_scalar_storage_name(name);
                     let f: fn(&StrykeValue) -> StrykeValue = match op {
                         PostfixOp::Increment => |v| perl_inc(v),
-                        PostfixOp::Decrement => |v| StrykeValue::integer(v.to_int() - 1),
+                        PostfixOp::Decrement => |v| perl_dec(v),
                     };
                     return Ok(self
                         .scope
@@ -11303,7 +11595,7 @@ impl VMHelper {
                 let old = val.clone();
                 let new_val = match op {
                     PostfixOp::Increment => perl_inc(&val),
-                    PostfixOp::Decrement => StrykeValue::integer(val.to_int() - 1),
+                    PostfixOp::Decrement => perl_dec(&val),
                 };
                 self.assign_value(expr, new_val)?;
                 Ok(old)
@@ -12209,7 +12501,7 @@ impl VMHelper {
                     s // Class->method()
                 } else {
                     return Err(
-                        StrykeError::runtime("Can't call method on non-object", line).into(),
+                        StrykeError::runtime(non_object_method_message(&obj, method), line).into(),
                     );
                 };
                 if method == "VERSION" && !*super_call {
@@ -12260,10 +12552,7 @@ impl VMHelper {
                     .resolve_method_full_name(&class, method, *super_call)
                     .ok_or_else(|| {
                         StrykeError::runtime(
-                            format!(
-                                "Can't locate method \"{}\" for invocant \"{}\"",
-                                method, class
-                            ),
+                            self.no_method_message(&class, method),
                             line,
                         )
                     })?;
@@ -12281,10 +12570,7 @@ impl VMHelper {
                     r
                 } else {
                     Err(StrykeError::runtime(
-                        format!(
-                            "Can't locate method \"{}\" in package \"{}\"",
-                            method, class
-                        ),
+                        self.no_method_message(&class, method),
                         line,
                     )
                     .into())
@@ -13968,9 +14254,23 @@ impl VMHelper {
                     Ok(StrykeValue::integer(n as i64))
                 }
             }
-            ExprKind::Each(_) => {
-                // Simplified: returns empty list (full iterator state would need more work)
-                Ok(StrykeValue::array(vec![]))
+            ExprKind::Each(operand) => {
+                let list = ctx != WantarrayCtx::Scalar;
+                if let ExprKind::HashVar(name) = &operand.kind {
+                    return Ok(match (self.hash_each_step(name), list) {
+                        (Some((k, v)), true) => StrykeValue::array(vec![StrykeValue::string(k), v]),
+                        (Some((k, _)), false) => StrykeValue::string(k),
+                        (None, true) => StrykeValue::array(vec![]),
+                        (None, false) => StrykeValue::UNDEF,
+                    });
+                }
+                match Self::each_operand_ref_expr(operand) {
+                    Some(r) => {
+                        let target = self.eval_expr(&r)?;
+                        Ok(self.each_step_ref(&target, list))
+                    }
+                    None => Ok(StrykeValue::array(vec![])),
+                }
             }
 
             // String ops
@@ -14204,10 +14504,17 @@ impl VMHelper {
             }
             ExprKind::Int(expr) => {
                 let val = self.eval_expr(expr)?;
-                Ok(StrykeValue::integer(val.to_number() as i64))
+                Ok(crate::value::perl_int(&val))
             }
             ExprKind::Sqrt(expr) => {
                 let val = self.eval_expr(expr)?;
+                if crate::compat_mode() && val.to_number() < 0.0 {
+                    return Err(StrykeError::runtime(
+                        format!("Can't take sqrt of {}", val.to_string()),
+                        line,
+                    )
+                    .into());
+                }
                 Ok(StrykeValue::float(val.to_number().sqrt()))
             }
             ExprKind::Sin(expr) => {
@@ -14229,6 +14536,13 @@ impl VMHelper {
             }
             ExprKind::Log(expr) => {
                 let val = self.eval_expr(expr)?;
+                if crate::compat_mode() && val.to_number() <= 0.0 {
+                    return Err(StrykeError::runtime(
+                        format!("Can't take log of {}", val.to_string()),
+                        line,
+                    )
+                    .into());
+                }
                 Ok(StrykeValue::float(val.to_number().ln()))
             }
             ExprKind::Rand(upper) => {
@@ -14245,26 +14559,8 @@ impl VMHelper {
                 };
                 Ok(StrykeValue::integer(self.perl_srand(s)))
             }
-            ExprKind::Hex(expr) => {
-                let val = self.eval_expr(expr)?.to_string();
-                let clean = val.trim().trim_start_matches("0x").trim_start_matches("0X");
-                let n = i64::from_str_radix(clean, 16).unwrap_or(0);
-                Ok(StrykeValue::integer(n))
-            }
-            ExprKind::Oct(expr) => {
-                let val = self.eval_expr(expr)?.to_string();
-                let s = val.trim();
-                let n = if s.starts_with("0x") || s.starts_with("0X") {
-                    i64::from_str_radix(&s[2..], 16).unwrap_or(0)
-                } else if s.starts_with("0b") || s.starts_with("0B") {
-                    i64::from_str_radix(&s[2..], 2).unwrap_or(0)
-                } else if s.starts_with("0o") || s.starts_with("0O") {
-                    i64::from_str_radix(&s[2..], 8).unwrap_or(0)
-                } else {
-                    i64::from_str_radix(s.trim_start_matches('0'), 8).unwrap_or(0)
-                };
-                Ok(StrykeValue::integer(n))
-            }
+            ExprKind::Hex(expr) => Ok(StrykeValue::integer(self.eval_expr(expr)?.hex_value())),
+            ExprKind::Oct(expr) => Ok(StrykeValue::integer(self.eval_expr(expr)?.oct_value())),
 
             // Case
             ExprKind::Lc(expr) => Ok(StrykeValue::string(
@@ -14373,23 +14669,41 @@ impl VMHelper {
                         .declare_scalar_frozen(name, StrykeValue::UNDEF, false, None)?;
                     self.english_note_lexical_scalar(name);
                     let mode_s = self.eval_expr(mode)?.to_string();
-                    let file_opt = if let Some(f) = file {
-                        Some(self.eval_expr(f)?.to_string())
-                    } else {
-                        None
+                    let file_val = match file {
+                        Some(f) => Some(self.eval_expr(f)?),
+                        None => None,
                     };
-                    let ret = self.open_builtin_execute(name.clone(), mode_s, file_opt, line)?;
+                    let in_memory = file_val.as_ref().filter(|v| {
+                        v.as_scalar_ref().is_some() || v.as_scalar_binding_name().is_some()
+                    });
+                    let ret = match in_memory {
+                        Some(target) => {
+                            self.open_scalar_ref_execute(name.clone(), &mode_s, target, line)?
+                        }
+                        None => {
+                            let file_opt = file_val.map(|v| v.to_string());
+                            self.open_builtin_execute(name.clone(), mode_s, file_opt, line)?
+                        }
+                    };
                     self.scope.set_scalar(name, ret.clone())?;
                     return Ok(ret);
                 }
                 let handle_s = self.eval_expr(handle)?.to_string();
                 let handle_name = self.resolve_io_handle_name(&handle_s);
                 let mode_s = self.eval_expr(mode)?.to_string();
-                let file_opt = if let Some(f) = file {
-                    Some(self.eval_expr(f)?.to_string())
-                } else {
-                    None
+                let file_val = match file {
+                    Some(f) => Some(self.eval_expr(f)?),
+                    None => None,
                 };
+                let in_memory = file_val
+                    .as_ref()
+                    .filter(|v| v.as_scalar_ref().is_some() || v.as_scalar_binding_name().is_some());
+                if let Some(target) = in_memory {
+                    return self
+                        .open_scalar_ref_execute(handle_name, &mode_s, target, line)
+                        .map_err(Into::into);
+                }
+                let file_opt = file_val.map(|v| v.to_string());
                 self.open_builtin_execute(handle_name, mode_s, file_opt, line)
                     .map_err(Into::into)
             }
@@ -14943,9 +15257,10 @@ impl VMHelper {
                 };
                 Ok(self.caller_value(level, ctx == WantarrayCtx::Scalar))
             }
+            ExprKind::Wantarray if self.caller_frames.is_empty() => Ok(StrykeValue::UNDEF),
             ExprKind::Wantarray => Ok(match self.wantarray_kind {
                 WantarrayCtx::Void => StrykeValue::UNDEF,
-                WantarrayCtx::Scalar => StrykeValue::integer(0),
+                WantarrayCtx::Scalar => StrykeValue::perl_false(),
                 WantarrayCtx::List => StrykeValue::integer(1),
             }),
 
@@ -15554,13 +15869,10 @@ impl VMHelper {
                 } else {
                     let a = lv.to_number();
                     let b = rv.to_number();
-                    StrykeValue::integer(if a < b {
-                        -1
-                    } else if a > b {
-                        1
-                    } else {
-                        0
-                    })
+                    match a.partial_cmp(&b) {
+                        Some(o) => StrykeValue::integer(o as i64),
+                        None => StrykeValue::UNDEF,
+                    }
                 }
             }
             BinOp::StrEq => StrykeValue::perl_bool(lv.to_string() == rv.to_string()),
@@ -15580,6 +15892,10 @@ impl VMHelper {
             BinOp::BitAnd => {
                 if let Some(s) = crate::value::set_intersection(lv, rv) {
                     s
+                } else if let Some(s) =
+                    crate::value::perl_string_bitop(lv, rv, crate::value::StringBitOp::And)
+                {
+                    s
                 } else {
                     StrykeValue::integer(lv.to_int() & rv.to_int())
                 }
@@ -15587,11 +15903,16 @@ impl VMHelper {
             BinOp::BitOr => {
                 if let Some(s) = crate::value::set_union(lv, rv) {
                     s
+                } else if let Some(s) =
+                    crate::value::perl_string_bitop(lv, rv, crate::value::StringBitOp::Or)
+                {
+                    s
                 } else {
                     StrykeValue::integer(lv.to_int() | rv.to_int())
                 }
             }
-            BinOp::BitXor => StrykeValue::integer(lv.to_int() ^ rv.to_int()),
+            BinOp::BitXor => crate::value::perl_string_bitop(lv, rv, crate::value::StringBitOp::Xor)
+                .unwrap_or_else(|| StrykeValue::integer(lv.to_int() ^ rv.to_int())),
             BinOp::ShiftLeft => StrykeValue::integer(perl_shl_i64(lv.to_int(), rv.to_int())),
             BinOp::ShiftRight => StrykeValue::integer(perl_shr_i64(lv.to_int(), rv.to_int())),
             // These should have been handled by short-circuit above
@@ -16443,9 +16764,9 @@ impl VMHelper {
         let last_idx = *indices.last().expect("non-empty indices");
         let last_old = self.read_arrow_array_element(container.clone(), last_idx, line)?;
         let new_val = if kind & 1 == 0 {
-            StrykeValue::integer(last_old.to_int() + 1)
+            perl_inc(&last_old)
         } else {
-            StrykeValue::integer(last_old.to_int() - 1)
+            perl_dec(&last_old)
         };
         self.assign_arrow_array_deref(container, last_idx, new_val.clone(), line)?;
         Ok(if kind < 2 { new_val } else { last_old })
@@ -16465,9 +16786,9 @@ impl VMHelper {
         })?;
         let last_old = self.scope.get_array_element(stash_array_name, last_idx);
         let new_val = if kind & 1 == 0 {
-            StrykeValue::integer(last_old.to_int() + 1)
+            perl_inc(&last_old)
         } else {
-            StrykeValue::integer(last_old.to_int() - 1)
+            perl_dec(&last_old)
         };
         self.scope
             .set_array_element(stash_array_name, last_idx, new_val.clone())
@@ -18438,6 +18759,7 @@ impl VMHelper {
                     if self.output_autoflush {
                         let _ = writer.flush();
                     }
+                    self.sync_mem_sink(name);
                 } else {
                     return Err(StrykeError::runtime(
                         format!("print on unopened filehandle {}", name),
@@ -18499,6 +18821,7 @@ impl VMHelper {
                     if self.output_autoflush {
                         let _ = writer.flush();
                     }
+                    self.sync_mem_sink(name);
                 } else {
                     return Err(StrykeError::runtime(
                         format!("printf on unopened filehandle {}", name),
@@ -21643,6 +21966,7 @@ impl VMHelper {
                     if self.output_autoflush {
                         let _ = writer.flush();
                     }
+                    self.sync_mem_sink(name);
                 }
             }
         }
@@ -21660,6 +21984,11 @@ impl VMHelper {
     ) -> Result<StrykeValue, FlowOrError> {
         let s = self.eval_expr(string)?.to_string();
         let off = self.eval_expr(offset)?.to_int();
+        // An offset past the end is outside the string: undef (the empty string is
+        // only for an offset equal to the length).
+        if off > s.len() as i64 && replacement.is_none() {
+            return Ok(StrykeValue::UNDEF);
+        }
         let start = if off < 0 {
             (s.len() as i64 + off).max(0) as usize
         } else {
@@ -23316,7 +23645,42 @@ pub(crate) fn perl_inc(v: &StrykeValue) -> StrykeValue {
             return StrykeValue::string(new_s);
         }
     }
+    let one = StrykeValue::integer(1);
+    if v.as_bigint().is_some() {
+        return crate::value::compat_add(v, &one);
+    }
+    if let Some(i) = v.as_integer() {
+        return i
+            .checked_add(1)
+            .map(StrykeValue::integer)
+            .unwrap_or_else(|| crate::value::compat_add(v, &one));
+    }
+    // A fractional or out-of-IV-range numeric (string) stays an NV: `"1.5"++` is 2.5.
+    let n = v.to_number();
+    if n.fract() != 0.0 || n.abs() >= 9.2e18 {
+        return StrykeValue::float(n + 1.0);
+    }
     StrykeValue::integer(v.to_int() + 1)
+}
+
+/// `--$x` / `$x--` numeric decrement. Perl has no magic string decrement: a
+/// string is used as a number, and a fractional value stays an NV.
+pub(crate) fn perl_dec(v: &StrykeValue) -> StrykeValue {
+    let one = StrykeValue::integer(1);
+    if v.as_bigint().is_some() {
+        return crate::value::compat_sub(v, &one);
+    }
+    if let Some(i) = v.as_integer() {
+        return i
+            .checked_sub(1)
+            .map(StrykeValue::integer)
+            .unwrap_or_else(|| crate::value::compat_sub(v, &one));
+    }
+    let n = v.to_number();
+    if n.fract() != 0.0 || n.abs() >= 9.2e18 {
+        return StrykeValue::float(n - 1.0);
+    }
+    StrykeValue::integer(v.to_int() - 1)
 }
 
 /// Build the field list for a `split` whose pattern has capture groups, which
@@ -23592,6 +23956,37 @@ where
             let spec = chars[i];
             i += 1;
 
+            // perl refuses a width or precision beyond INT_MAX instead of trying to
+            // build a multi-gigabyte string.
+            let exceeds_int_max = |digits: &str| {
+                digits
+                    .parse::<u64>()
+                    .map_or(!digits.is_empty(), |n| n > i32::MAX as u64)
+            };
+            if exceeds_int_max(&width) || exceeds_int_max(&precision) {
+                return Err(StrykeError::runtime(
+                    "Integer overflow in format string for sprintf",
+                    0,
+                )
+                .into());
+            }
+
+            // `%5%`: a literal percent that still honors width and flags
+            // (`%-5%`, `%05%`) and consumes no argument.
+            if spec == '%' {
+                let w: usize = width.parse().unwrap_or(0);
+                let pad = w.saturating_sub(1);
+                if left_align {
+                    result.push('%');
+                    result.extend(std::iter::repeat(' ').take(pad));
+                } else {
+                    let fill = if flags.contains('0') { '0' } else { ' ' };
+                    result.extend(std::iter::repeat(fill).take(pad));
+                    result.push('%');
+                }
+                continue;
+            }
+
             // For vector conversions the conversion's value-arg is the
             // string whose bytes we'll iterate; for non-vector, it's the
             // value we format. Either way the index resolution is the
@@ -23606,6 +24001,9 @@ where
 
             let w: usize = width.parse().unwrap_or(0);
             let p: usize = precision.parse().unwrap_or(6);
+            // `{:.*}` panics for a precision above `u16::MAX`; no float has that many
+            // significant digits, so the float conversions clamp to it.
+            let float_p = p.min(usize::from(u16::MAX));
 
             let zero_pad = flags.contains('0') && !left_align;
             let plus = flags.contains('+');
@@ -23621,17 +24019,17 @@ where
                 }
                 if zero && !left {
                     if let Some(rest) = body.strip_prefix('-') {
-                        return format!("-{:0>width$}", rest, width = width - 1);
+                        return format!("-{}", pad_str(rest, width - 1, false, '0'));
                     }
                     if let Some(rest) = body.strip_prefix('+') {
-                        return format!("+{:0>width$}", rest, width = width - 1);
+                        return format!("+{}", pad_str(rest, width - 1, false, '0'));
                     }
-                    return format!("{:0>width$}", body, width = width);
+                    return pad_str(body, width, false, '0');
                 }
                 if left {
-                    format!("{:<width$}", body, width = width)
+                    pad_str(body, width, true, ' ')
                 } else {
-                    format!("{:>width$}", body, width = width)
+                    pad_str(body, width, false, ' ')
                 }
             };
 
@@ -23647,7 +24045,7 @@ where
              -> String {
                 let body = format!("{}{}", prefix, digits);
                 if zero && !left && width > body.len() {
-                    return format!("{}{:0>rest$}", prefix, digits, rest = width - prefix.len());
+                    return format!("{}{}", prefix, pad_str(digits, width - prefix.len(), false, '0'));
                 }
                 pad_align(&body, width, left, false)
             };
@@ -23707,9 +24105,9 @@ where
                 let final_body = if width.is_empty() {
                     body
                 } else if left_align {
-                    format!("{:<width$}", body, width = w)
+                    pad_str(&body, w, true, ' ')
                 } else {
-                    format!("{:>width$}", body, width = w)
+                    pad_str(&body, w, false, ' ')
                 };
                 result.push_str(&final_body);
                 continue;
@@ -23734,17 +24132,17 @@ where
                 'f' => {
                     let n = arg.to_number();
                     let body = if plus && n.is_sign_positive() {
-                        format!("+{:.*}", p, n)
+                        format!("+{:.*}", float_p, n)
                     } else if space && n.is_sign_positive() {
-                        format!(" {:.*}", p, n)
+                        format!(" {:.*}", float_p, n)
                     } else {
-                        format!("{:.*}", p, n)
+                        format!("{:.*}", float_p, n)
                     };
                     pad_align(&body, w, left_align, zero_pad)
                 }
                 'e' => {
                     let n = arg.to_number();
-                    let raw = format!("{:.*e}", p, n);
+                    let raw = format!("{:.*e}", float_p, n);
                     let body0 = perl_exponent_form(&raw, false);
                     let body = if plus && n.is_sign_positive() {
                         format!("+{}", body0)
@@ -23757,7 +24155,7 @@ where
                 }
                 'E' => {
                     let n = arg.to_number();
-                    let raw = format!("{:.*E}", p, n);
+                    let raw = format!("{:.*E}", float_p, n);
                     let body0 = perl_exponent_form(&raw, true);
                     let body = if plus && n.is_sign_positive() {
                         format!("+{}", body0)
@@ -23771,7 +24169,7 @@ where
                 'g' => {
                     let n = arg.to_number();
                     // For %g, precision means "significant digits" (default 6).
-                    let prec_g = if precision.is_empty() { 6 } else { p };
+                    let prec_g = if precision.is_empty() { 6 } else { float_p };
                     let body0 = perl_g_form(n, prec_g, false);
                     let body = if plus && n.is_sign_positive() {
                         format!("+{}", body0)
@@ -23784,7 +24182,7 @@ where
                 }
                 'G' => {
                     let n = arg.to_number();
-                    let prec_g = if precision.is_empty() { 6 } else { p };
+                    let prec_g = if precision.is_empty() { 6 } else { float_p };
                     let body0 = perl_g_form(n, prec_g, true);
                     let body = if plus && n.is_sign_positive() {
                         format!("+{}", body0)
@@ -23803,9 +24201,9 @@ where
                         s
                     };
                     if left_align {
-                        format!("{:<width$}", body, width = w)
+                        pad_str(&body, w, true, ' ')
                     } else {
-                        format!("{:>width$}", body, width = w)
+                        pad_str(&body, w, false, ' ')
                     }
                 }
                 'x' => {
@@ -23828,9 +24226,19 @@ where
                     let prefix = if hash && v != 0 { "0b" } else { "" };
                     pad_align_radix(prefix, &format!("{:b}", v), w, left_align, zero_pad)
                 }
-                'c' => char::from_u32(arg.to_int() as u32)
-                    .map(|c| c.to_string())
-                    .unwrap_or_default(),
+                'c' => {
+                    let code = arg.to_int();
+                    if code < 0 && crate::compat_mode() {
+                        return Err(StrykeError::runtime(
+                            format!("Cannot printf {} with 'c'", arg.to_string()),
+                            0,
+                        )
+                        .into());
+                    }
+                    char::from_u32(code as u32)
+                        .map(|c| c.to_string())
+                        .unwrap_or_default()
+                }
                 'a' | 'A' => {
                     let upper = spec == 'A';
                     let body0 = perl_hex_float(arg.to_number(), upper);
@@ -24012,10 +24420,17 @@ pub(crate) fn exec_builtin(
         }
         Some(BuiltinId::Int) => {
             let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
-            Ok(StrykeValue::integer(val.to_number() as i64))
+            Ok(crate::value::perl_int(&val))
         }
         Some(BuiltinId::Sqrt) => {
             let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+            if crate::compat_mode() && val.to_number() < 0.0 {
+                return Err(StrykeError::runtime(
+                    format!("Can't take sqrt of {}", val.to_string()),
+                    line,
+                )
+                .into());
+            }
             Ok(StrykeValue::float(val.to_number().sqrt()))
         }
         Some(BuiltinId::Sin) => {
@@ -24038,6 +24453,13 @@ pub(crate) fn exec_builtin(
         }
         Some(BuiltinId::Log) => {
             let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+            if crate::compat_mode() && val.to_number() <= 0.0 {
+                return Err(StrykeError::runtime(
+                    format!("Can't take log of {}", val.to_string()),
+                    line,
+                )
+                .into());
+            }
             Ok(StrykeValue::float(val.to_number().ln()))
         }
         Some(BuiltinId::Rand) => {
@@ -24477,13 +24899,15 @@ pub(crate) fn exec_builtin(
                 .unwrap_or(StrykeValue::UNDEF))
         }
         Some(BuiltinId::Substr) => {
-            if args.len() < 3 {
-                let s = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
-                let off = args.get(1).map(|v| v.to_int()).unwrap_or(0);
-                return Ok(StrykeValue::string(s.substr2_value(off)));
-            }
             let s = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
             let off = args.get(1).map(|v| v.to_int()).unwrap_or(0);
+            // An offset past the end is outside the string: undef.
+            if off > s.to_string().len() as i64 {
+                return Ok(StrykeValue::UNDEF);
+            }
+            if args.len() < 3 {
+                return Ok(StrykeValue::string(s.substr2_value(off)));
+            }
             let len = args.get(2).map(|v| v.to_int()).unwrap_or(0);
             Ok(StrykeValue::string(s.substr3_value(off, len)))
         }
@@ -24613,6 +25037,11 @@ pub(crate) fn exec_builtin(
                     }
                 }
                 return this.open_pipe_list_execute(handle_name, &mode_s, argv, line);
+            }
+            if let Some(target) = args.get(2).filter(|v| {
+                v.as_scalar_ref().is_some() || v.as_scalar_binding_name().is_some()
+            }) {
+                return this.open_scalar_ref_execute(handle_name, &mode_s, target, line);
             }
             let file_opt = args.get(2).map(|v| v.to_string());
             this.open_builtin_execute(handle_name, mode_s, file_opt, line)
@@ -24973,9 +25402,11 @@ pub(crate) fn exec_builtin(
                 .unwrap_or(1);
             crate::ppool::create_pool(n)
         }
+        // Outside any sub or eval frame perl has no calling context: undef.
+        Some(BuiltinId::Wantarray) if this.caller_frames.is_empty() => Ok(StrykeValue::UNDEF),
         Some(BuiltinId::Wantarray) => Ok(match this.wantarray_kind {
             crate::vm_helper::WantarrayCtx::Void => StrykeValue::UNDEF,
-            crate::vm_helper::WantarrayCtx::Scalar => StrykeValue::integer(0),
+            crate::vm_helper::WantarrayCtx::Scalar => StrykeValue::perl_false(),
             crate::vm_helper::WantarrayCtx::List => StrykeValue::integer(1),
         }),
         Some(BuiltinId::FetchUrl) => {
@@ -25102,9 +25533,12 @@ pub(crate) fn exec_builtin(
             }
             this.builtin_par_pipeline_stream_new(&args, line)
         }
+        // `each REF-OPERAND`: args are the container reference and a list-context flag.
         Some(BuiltinId::Each) => {
-            let _arg = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
-            Ok(StrykeValue::array(vec![]))
+            let mut it = args.into_iter();
+            let target = it.next().unwrap_or(StrykeValue::UNDEF);
+            let list = it.next().is_none_or(|f| f.to_int() != 0);
+            Ok(this.each_step_ref(&target, list))
         }
         Some(BuiltinId::Readpipe) => {
             let cmd = args

@@ -1570,25 +1570,35 @@ impl StrykeValue {
     /// prefix), 0 on failure. Shared by the interpreter and the fusevm JIT helper.
     pub fn hex_value(&self) -> i64 {
         let s = self.to_string();
-        let clean = s.trim().trim_start_matches("0x").trim_start_matches("0X");
-        i64::from_str_radix(clean, 16).unwrap_or(0)
+        let s = s.trim_start();
+        let digits = s
+            .strip_prefix("0x")
+            .or_else(|| s.strip_prefix("0X"))
+            .or_else(|| s.strip_prefix('x'))
+            .or_else(|| s.strip_prefix('X'))
+            .unwrap_or(s);
+        perl_radix_prefix(digits, 16)
     }
 
-    /// `oct` builtin: parse the stringified value per Perl `oct` (`0x`/`0X` hex,
-    /// `0b`/`0B` binary, `0o`/`0O` or bare-leading-zero octal), 0 on failure. Shared
-    /// by the interpreter and the fusevm JIT helper.
+    /// `oct` builtin: parse the stringified value per Perl `oct` (`0x`/`x` hex,
+    /// `0b`/`b` binary, `0o`/`o` or bare-leading-zero octal). Parsing stops at the
+    /// first character that is not a digit of the radix, so `oct("789")` is 7 and
+    /// `hex("0xFG")` is 15. Shared by the interpreter and the fusevm JIT helper.
     pub fn oct_value(&self) -> i64 {
         let s = self.to_string();
-        let s = s.trim();
-        if s.starts_with("0x") || s.starts_with("0X") {
-            i64::from_str_radix(&s[2..], 16).unwrap_or(0)
-        } else if s.starts_with("0b") || s.starts_with("0B") {
-            i64::from_str_radix(&s[2..], 2).unwrap_or(0)
-        } else if s.starts_with("0o") || s.starts_with("0O") {
-            i64::from_str_radix(&s[2..], 8).unwrap_or(0)
+        let s = s.trim_start();
+        let lower = s.to_ascii_lowercase();
+        let (radix, digits) = if let Some(rest) = lower.strip_prefix("0x").or(lower.strip_prefix('x'))
+        {
+            (16, rest)
+        } else if let Some(rest) = lower.strip_prefix("0b").or(lower.strip_prefix('b')) {
+            (2, rest)
+        } else if let Some(rest) = lower.strip_prefix("0o").or(lower.strip_prefix('o')) {
+            (8, rest)
         } else {
-            i64::from_str_radix(s.trim_start_matches('0'), 8).unwrap_or(0)
-        }
+            (8, lower.as_str())
+        };
+        perl_radix_prefix(digits, radix)
     }
 
     /// `uc` builtin: the stringified value upper-cased. Shared by the interpreter
@@ -3477,8 +3487,9 @@ pub fn perl_shr_i64(a: i64, b: i64) -> i64 {
     }
 }
 
-/// Perl's `SvIV_please_nomg`: an NV whose value is a whole number inside the IV
-/// range is treated as an IV by `pp_add` / `pp_subtract` / `pp_multiply`, so
+/// Perl's `SvIV_please_nomg`: an NV whose value is a whole number with magnitude
+/// below 2**53 (`NV_PRESERVES_UV_BITS`; beyond it only `pIOK` is set, so the NV
+/// path still runs) is treated as an IV by `pp_add` / `pp_subtract` / `pp_multiply`, so
 /// `1e15 + 1` is the integer `1000000000000001` rather than an NV that
 /// stringifies through `%.15g` as `1e+15`. `pp_divide` has no such step, which
 /// is why `1e15 / 1` stays `1e+15`. Only active under `--compat`; native stryke
@@ -3493,10 +3504,120 @@ fn perl_iv_please(v: &StrykeValue) -> Option<i64> {
     }
     let f = v.as_float()?;
     // `fract` is NaN for infinities and NaN, so those fall through to the NV path.
-    if f.fract() != 0.0 || !(-9.223372036854776e18..9.223372036854776e18).contains(&f) {
+    if f.fract() != 0.0 || !(-9007199254740992.0..9007199254740992.0).contains(&f) {
         return None;
     }
     Some(f as i64)
+}
+
+/// Perl's `pp_negate` for a value that is not a plain number: an identifier-like
+/// string gains a leading `-`, a string that already starts with `-` or `+` has
+/// that sign flipped, and a numeric-looking string negates numerically.
+pub fn perl_negate(v: &StrykeValue) -> StrykeValue {
+    if let Some(n) = v.as_integer() {
+        return n
+            .checked_neg()
+            .map_or_else(|| StrykeValue::float(-(n as f64)), StrykeValue::integer);
+    }
+    if let Some(s) = v.as_str() {
+        let mut chars = s.chars();
+        match chars.next() {
+            Some(c) if c.is_alphabetic() || c == '_' => {
+                return StrykeValue::string(format!("-{s}"));
+            }
+            Some('-') if chars.next().is_some_and(|c| c.is_alphabetic() || c == '_') => {
+                return StrykeValue::string(format!("+{}", &s[1..]));
+            }
+            Some('+') if chars.next().is_some_and(|c| c.is_alphabetic() || c == '_') => {
+                return StrykeValue::string(format!("-{}", &s[1..]));
+            }
+            _ => {}
+        }
+    }
+    StrykeValue::float(-v.to_number())
+}
+
+/// Value of the longest prefix of `s` made of radix-`radix` digits (with `_`
+/// separators), as perl's `hex` / `oct` read it; 0 when there is none.
+fn perl_radix_prefix(s: &str, radix: u32) -> i64 {
+    let mut acc: i64 = 0;
+    for c in s.chars() {
+        if c == '_' {
+            continue;
+        }
+        let Some(d) = c.to_digit(radix) else { break };
+        acc = acc.saturating_mul(radix as i64).saturating_add(d as i64);
+    }
+    acc
+}
+
+/// Which bitwise operator [`perl_string_bitop`] applies.
+#[derive(Clone, Copy)]
+pub enum StringBitOp {
+    And,
+    Or,
+    Xor,
+}
+
+/// Perl's string bitwise operators: when *both* operands are strings, `& | ^`
+/// work byte by byte and yield a string (`"AB" | "  "` is `"ab"`). `&` stops at
+/// the shorter operand; `|` and `^` pad the shorter one with NULs. Returns
+/// `None` outside `--compat`, when either side is not a string, or when a
+/// character does not fit a byte.
+pub fn perl_string_bitop(l: &StrykeValue, r: &StrykeValue, op: StringBitOp) -> Option<StrykeValue> {
+    if !crate::compat_mode() {
+        return None;
+    }
+    let (ls, rs) = (l.as_str()?, r.as_str()?);
+    let to_bytes = |s: &str| -> Option<Vec<u8>> {
+        s.chars().map(|c| u8::try_from(u32::from(c)).ok()).collect()
+    };
+    let (lb, rb) = (to_bytes(&ls)?, to_bytes(&rs)?);
+    let len = match op {
+        StringBitOp::And => lb.len().min(rb.len()),
+        StringBitOp::Or | StringBitOp::Xor => lb.len().max(rb.len()),
+    };
+    let out: String = (0..len)
+        .map(|i| {
+            let (a, b) = (lb.get(i).copied().unwrap_or(0), rb.get(i).copied().unwrap_or(0));
+            char::from(match op {
+                StringBitOp::And => a & b,
+                StringBitOp::Or => a | b,
+                StringBitOp::Xor => a ^ b,
+            })
+        })
+        .collect();
+    Some(StrykeValue::string(out))
+}
+
+/// perl `int`: truncate toward zero. An NV inside the IV range becomes an IV,
+/// one inside `IV_MAX+1..=UV_MAX` the exact unsigned value, and anything wider
+/// (or NaN/Inf) stays an NV, as `pp_int` does.
+pub fn perl_int(v: &StrykeValue) -> StrykeValue {
+    if v.as_integer().is_some() || v.as_bigint().is_some() {
+        return v.clone();
+    }
+    let t = v.to_number().trunc();
+    if (-9.223372036854776e18..9.223372036854776e18).contains(&t) {
+        StrykeValue::integer(t as i64)
+    } else if (0.0..1.8446744073709552e19).contains(&t) {
+        StrykeValue::bigint(BigInt::from(t as u64))
+    } else {
+        StrykeValue::float(t)
+    }
+}
+
+/// Result of an IV-overflowing `+` `-` `*`. perl widens to a UV, so the exact
+/// integer survives only inside `0..=u64::MAX`; anything else becomes an NV.
+/// `use bigint` keeps the exact value, and native mode never reaches here.
+fn widen_or_nv(exact: BigInt, nv: f64) -> StrykeValue {
+    if crate::bigint_pragma() {
+        return StrykeValue::bigint(exact);
+    }
+    match u64::try_from(&exact) {
+        Ok(_) => StrykeValue::bigint(exact),
+        Err(_) => StrykeValue::float(nv),
+    }
 }
 
 /// `--compat`-aware integer multiply. In compat mode, promotes to `BigInt` on
@@ -3505,7 +3626,7 @@ fn perl_iv_please(v: &StrykeValue) -> Option<i64> {
 #[inline]
 pub fn compat_mul(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
     if a.as_bigint().is_some() || b.as_bigint().is_some() {
-        return StrykeValue::bigint(a.to_bigint() * b.to_bigint());
+        return widen_or_nv(a.to_bigint() * b.to_bigint(), a.to_number() * b.to_number());
     }
     let (Some(x), Some(y)) = (perl_iv_please(a), perl_iv_please(b)) else {
         return StrykeValue::float(a.to_number() * b.to_number());
@@ -3513,7 +3634,7 @@ pub fn compat_mul(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
     if crate::compat_mode() || crate::bigint_pragma() {
         match x.checked_mul(y) {
             Some(r) => StrykeValue::integer(r),
-            None => StrykeValue::bigint(BigInt::from(x) * BigInt::from(y)),
+            None => widen_or_nv(BigInt::from(x) * BigInt::from(y), x as f64 * y as f64),
         }
     } else {
         StrykeValue::integer(x.wrapping_mul(y))
@@ -3523,7 +3644,7 @@ pub fn compat_mul(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
 #[inline]
 pub fn compat_add(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
     if a.as_bigint().is_some() || b.as_bigint().is_some() {
-        return StrykeValue::bigint(a.to_bigint() + b.to_bigint());
+        return widen_or_nv(a.to_bigint() + b.to_bigint(), a.to_number() + b.to_number());
     }
     let (Some(x), Some(y)) = (perl_iv_please(a), perl_iv_please(b)) else {
         return StrykeValue::float(a.to_number() + b.to_number());
@@ -3531,7 +3652,7 @@ pub fn compat_add(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
     if crate::compat_mode() || crate::bigint_pragma() {
         match x.checked_add(y) {
             Some(r) => StrykeValue::integer(r),
-            None => StrykeValue::bigint(BigInt::from(x) + BigInt::from(y)),
+            None => widen_or_nv(BigInt::from(x) + BigInt::from(y), x as f64 + y as f64),
         }
     } else {
         StrykeValue::integer(x.wrapping_add(y))
@@ -3541,7 +3662,7 @@ pub fn compat_add(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
 #[inline]
 pub fn compat_sub(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
     if a.as_bigint().is_some() || b.as_bigint().is_some() {
-        return StrykeValue::bigint(a.to_bigint() - b.to_bigint());
+        return widen_or_nv(a.to_bigint() - b.to_bigint(), a.to_number() - b.to_number());
     }
     let (Some(x), Some(y)) = (perl_iv_please(a), perl_iv_please(b)) else {
         return StrykeValue::float(a.to_number() - b.to_number());
@@ -3549,7 +3670,7 @@ pub fn compat_sub(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
     if crate::compat_mode() || crate::bigint_pragma() {
         match x.checked_sub(y) {
             Some(r) => StrykeValue::integer(r),
-            None => StrykeValue::bigint(BigInt::from(x) - BigInt::from(y)),
+            None => widen_or_nv(BigInt::from(x) - BigInt::from(y), x as f64 - y as f64),
         }
     } else {
         StrykeValue::integer(x.wrapping_sub(y))

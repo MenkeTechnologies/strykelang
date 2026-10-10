@@ -42133,12 +42133,12 @@ fn localtime_parts(secs: i64, utc: bool) -> Option<LocaltimeParts> {
 fn localtime_scalar(secs: i64, utc: bool) -> String {
     if utc {
         if let Some(dt) = Utc.timestamp_opt(secs, 0).single() {
-            return format!("{}\n", dt.format("%a %b %e %H:%M:%S %Y"));
+            return dt.format("%a %b %e %H:%M:%S %Y").to_string();
         }
     } else if let Some(dt) = Local.timestamp_opt(secs, 0).latest() {
-        return format!("{}\n", dt.format("%a %b %e %H:%M:%S %Y"));
+        return dt.format("%a %b %e %H:%M:%S %Y").to_string();
     }
-    "\n".to_string()
+    String::new()
 }
 
 /// `getlogin` — Getlogin. Returns a string.

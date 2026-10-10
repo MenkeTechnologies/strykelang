@@ -186,8 +186,9 @@ fn oct_garbage_is_zero() {
 }
 
 #[test]
-fn oct_negative_octal() {
-    assert_eq!(eval_int(r#"oct("-010") == -8 ? 1 : 0"#), 1);
+fn oct_does_not_accept_a_sign() {
+    // perl's `oct` stops at the first non-digit, so a leading `-` yields 0.
+    assert_eq!(eval_int(r#"oct("-010")"#), 0);
 }
 
 #[test]

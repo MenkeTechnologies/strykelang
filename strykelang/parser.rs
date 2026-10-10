@@ -9160,7 +9160,15 @@ impl Parser {
         match self.peek().clone() {
             Token::Minus => {
                 self.advance();
-                let expr = self.parse_power()?;
+                // Unary minus is right-associative: `- -1`, `-!$x`, `-~$x`.
+                let expr = if matches!(
+                    self.peek(),
+                    Token::Minus | Token::LogNot | Token::BitNot | Token::Plus
+                ) {
+                    self.parse_unary()?
+                } else {
+                    self.parse_power()?
+                };
                 Ok(Expr {
                     kind: ExprKind::UnaryOp {
                         op: UnaryOp::Negate,

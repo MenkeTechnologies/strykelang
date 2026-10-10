@@ -4005,3 +4005,107 @@ without running it, and treats those names as user subs, as it already did for
 builds `@EXPORT` at run time is not seen.
 `parity/cases/20078_use_file_basename_default_exports.pl`;
 `use_without_a_list_imports_the_modules_export_list`.
+
+## BUG-327 — `each` through a reference or on an array returned the empty list — **`bug`** [FIXED]
+
+`each %$ref`, `each %{...}`, `each @a` and `each @$ref` were a stub; only a
+named hash worked. The cursor now lives with the referent (keyed by the
+container's address), so every alias shares one iterator, exhaustion rewinds
+it, and scalar context yields the key or index. `parity/cases/344_*`.
+
+## BUG-328 — in-memory filehandles (`open $fh, '<', \$buf`) failed with ENOENT — **`parity`** [FIXED]
+
+A scalar reference as the third `open` argument was stringified and treated as a
+path. Reading now snapshots the scalar; `>` truncates it and `>>` appends, and
+the scalar is current after every `print` / `printf`. `parity/cases/354_*`.
+
+## BUG-329 — a comma expression in scalar context skipped its earlier operands — **`bug`** [FIXED]
+
+`my $v = ($i++, $j--, "x")` and the C-style `for` step `$i++, $j--` evaluated
+only the last operand, so such loops never advanced the first counter. Every
+operand now runs, in order. `parity/cases/352_*`.
+
+## BUG-330 — `return f()` ignored the caller's context — **`parity`** [FIXED]
+
+The operand of `return` was always called in scalar context, so a callee that
+inspects `wantarray` saw the wrong answer when the enclosing sub was called in
+list context. A call operand now runs in the context the sub itself was called
+in. `parity/cases/349_*`.
+
+## BUG-331 — numeric edge semantics — **`parity`** [FIXED]
+
+- `<=>` with a NaN operand returns `undef`, not `0`.
+- `int` of a value beyond the IV range stays a number (`int(1e20)` is `1e+20`,
+  `int(1e19)` is exact) instead of saturating at `IV_MAX`.
+- `+ - *` that overflow the IV range stay exact only up to `UV_MAX` and become an
+  NV beyond it; decimal literals above `UV_MAX` are NVs.
+- A whole-number NV is treated as an IV only below 2**53 (`2**53 + 1` is an NV).
+- `++` / `--` on a numeric string keep a fractional part (`"1.5"++` is `2.5`) and
+  `++` at `IV_MAX` widens instead of wrapping.
+- `-"foo"` is `"-foo"`, `-"-bar"` is `"+bar"`, and unary minus nests (`- -1`).
+- `hex` / `oct` stop at the first invalid digit (`oct("789")` is `7`).
+- `sprintf("%5%")` pads the percent sign; widths above 65535 no longer panic.
+- `sqrt` of a negative number and `log` of a non-positive number die.
+
+`parity/cases/345_*` through `parity/cases/351_*`, `353_*`, `356_*`.
+
+## BUG-332 — string bitwise operators — **`parity`** [FIXED]
+
+When both operands are strings `& | ^` work byte by byte and return a string
+(`"AB" | "  "` is `"ab"`). `parity/cases/357_*`.
+
+## BUG-333 — `$/` and `$.` — **`parity`** [FIXED]
+
+`readline` always split on `"\n"`. It now honours `$/` as a custom separator,
+paragraph mode (`""`) and slurp (`undef`) for files, in-memory handles, STDIN and
+`<>`. `$.` is reset by `close` and by re-opening a handle. `parity/cases/358_*`,
+`parity/cases/354_*`.
+
+## BUG-334 — runtime errors in `$@` — **`parity`** [FIXED]
+
+An error raised by a builtin and caught by `eval` named `-e` instead of the
+script and lacked the trailing newline. Method-call failures use perl's wording
+(`Can't call method "m" on an undefined value`, `... on unblessed reference`,
+`Can't locate object method "m" via package "P"`), and `Undefined subroutine
+&main::f called`. `parity/cases/360_*`.
+
+## BUG-335 — smaller `--compat` divergences — **`parity`** [FIXED]
+
+`scalar(gmtime)` / `scalar(localtime)` had a trailing newline; `wantarray` in a
+scalar call returned `0` instead of the empty string and at file scope returned
+a defined value instead of `undef`; a failed `s///` returned `0` instead of the
+empty string; `substr` with an offset past the end returned `""` instead of
+`undef`; `printf("%c", -1)` did not die; `x` directly followed by a count
+(`"ab"x3`, `)x2`) lexed as an identifier; a `package NAME;` inside a bare block
+leaked past the block. `parity/cases/349_*`, `350_*`, `355_*`, `359_*`.
+
+## BUG-336 — no unsigned (UV) scalar — **`parity`**
+
+`~0`, `-1 & 0xFFFFFFFFFFFFFFFF`, `1 << 63`, `-8 >> 1` and integer literals in
+`IV_MAX+1 ..= UV_MAX` (`18446744073709551615`, `0xFFFFFFFFFFFFFFFF`) need an
+unsigned integer representation. The scalar model has `i64` plus a `BigInt`
+approximation that the bit operators narrow back to `i64`, so these give signed
+results and the literals are rejected. Needs an unsigned arm in the value
+representation and the matching bit-operator semantics (including the fusevm
+`BitNot` / `Shl` / `Shr` ops).
+
+## BUG-337 — undef scalar assigned to an array vanishes — **`parity`**
+
+`my @a = (undef)`, `my @a = $undef_scalar`, `my @a = $h{missing}` and
+`my @a = f()` where `f` returns `undef` produce an empty array; perl produces a
+one-element array. A scalar `undef` and the empty list are the same value on the
+stack, so list assignment cannot tell them apart. Needs a distinct empty-list
+representation (or context-aware `return`) in the call protocol.
+
+## BUG-338 — unsupported forms — **`parity`**
+
+- `local @a[0,1] = ...`, `local @h{qw(a b)} = ...` and `delete local $h{k}`
+  (compile error: `local on this lvalue`).
+- `my @c = (my $p, my $q) = (5, 6, 7)`: a list assignment used as the right-hand
+  side of another list assignment (`Assign to complex lvalue`).
+- `my $ref = \substr($s, 0, 2); $$ref = "XX"` (magic `substr` lvalue reference).
+- `local $/ = \N` (fixed-size record reads).
+- `Class->new` on a package that defines no `new` constructs an object under
+  `--compat` instead of dying with `Can't locate object method`.
+- `lc` / `uc` of non-ASCII bytes without `use utf8` fold as Unicode; perl leaves
+  the bytes alone.

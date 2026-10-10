@@ -666,11 +666,17 @@ impl Lexer {
             let val = i64::from_str_radix(&clean[1..], 8)
                 .map_err(|_| self.syntax_err("Invalid octal literal", self.line))?;
             Ok(Token::Integer(val))
-        } else {
-            let val: i64 = clean
+        } else if let Ok(val) = clean.parse::<i64>() {
+            Ok(Token::Integer(val))
+        } else if clean.parse::<u64>().is_err() {
+            // Beyond UV_MAX perl falls back to an NV literal. The IV_MAX+1..=UV_MAX
+            // band needs an unsigned scalar, which stryke lacks, so it stays an error.
+            let val: f64 = clean
                 .parse()
                 .map_err(|_| self.syntax_err("Invalid integer literal", self.line))?;
-            Ok(Token::Integer(val))
+            Ok(Token::Float(val))
+        } else {
+            Err(self.syntax_err("Invalid integer literal", self.line))
         }
     }
 
@@ -3296,6 +3302,20 @@ impl Lexer {
                 // operator. Without these gates, `keyword_or_ident("eq")` returns
                 // `Token::StrEq` so `Mat::eq` fails to parse and `$obj->eq(...)`
                 // silently degrades to `$obj eq …`.
+                // `x3` / `)x2`: after a complete term, `x` directly followed by digits is the
+                // repetition operator and a count, not an identifier named `x3`.
+                let ident = if self.last_was_term
+                    && !after_package_sep
+                    && !self.prev_arrow
+                    && ident.len() > 1
+                    && ident.starts_with('x')
+                    && ident[1..].chars().all(|c| c.is_ascii_digit())
+                {
+                    self.pos -= ident.len() - 1;
+                    "x".to_string()
+                } else {
+                    ident
+                };
                 let tok = if after_package_sep || self.prev_arrow {
                     Token::Ident(ident.clone())
                 } else if ident == "x" && !self.last_was_term {
