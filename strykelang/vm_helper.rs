@@ -1341,7 +1341,7 @@ fn rewrite_perl_regex_dollar_end_anchor(pat: &str, multiline_flag: bool) -> Stri
 /// Rust `regex` engine: `qr/ab/i` inside `/x$re/` keeps its `/i`, and `qr/ab/`
 /// inside `/x$re/i` stays case-sensitive. Flags without an inline equivalent
 /// (`n`, `p`, and the `a`/`u`/`l`/`d` charset modifiers) are dropped.
-fn rewrite_perl_caret_flag_groups(pat: &str) -> std::borrow::Cow<'_, str> {
+pub(crate) fn rewrite_perl_caret_flag_groups(pat: &str) -> std::borrow::Cow<'_, str> {
     if !pat.contains("(?^") {
         return std::borrow::Cow::Borrowed(pat);
     }

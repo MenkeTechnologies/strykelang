@@ -66,3 +66,21 @@ fn interpolated_qr_keeps_its_own_flags() {
     );
     assert_eq!(eval_string(r#"my $re = qr/ab/i; "$re""#), "(?^i:ab)");
 }
+
+#[test]
+fn regex_builtins_accept_a_stringified_qr_value() {
+    // `qr//` reaches a builtin as Perl's `(?^FLAGS:...)` text; the Rust regex
+    // engine rejects the `^` group unless it is rewritten first.
+    assert_eq!(
+        eval_string(r#"assert_match(qr/^\d+\.\d+\.\d+$/, "1.2.3")"#),
+        "1"
+    );
+    assert_eq!(
+        eval_string(r#"is_match(qr/ab/i, "xAB") . is_match(qr/ab/, "xAB")"#),
+        "10"
+    );
+    assert_eq!(
+        eval_string(r#"join ",", match_all(qr/\d+/, "a1b22c333")"#),
+        "1,22,333"
+    );
+}
