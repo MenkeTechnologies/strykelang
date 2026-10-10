@@ -4097,7 +4097,8 @@ like perl while `%u %x %o %b` print the full 64 bits. `parity/cases/362_*`,
 `my @a = (undef)`, `my @a = $undef_scalar`, `@a = $h{missing}` and `my @a = f()`
 with `return undef` give a one-element array. A statically scalar right-hand
 side is wrapped as a one-element list, `return undef` in list context returns a
-one-element list, and a bare `return` (or a body with no value) returns the empty
+one-element list under `--compat` (native stryke keeps `return undef` as the
+empty list), and a bare `return` (or a body with no value) returns the empty
 list in list context. `parity/cases/366_*`.
 
 ## BUG-338 — unsupported forms — **`parity`**
@@ -4130,7 +4131,8 @@ compile time. Names declared in a bare block, a loop body, `foreach` / C-style
 Found by `tests/suite/diff_perl_gen_stmt.rs`: `return @a` and a trailing `@a` /
 `%h` give the element count in scalar context; interpolating here-docs process
 `\n`, `\$`, `\@` and the rest of the double-quote escapes; `"$-[0]"` / `"$+[0]"`
-interpolate `@-` / `@+`; `"@h{@k}"` interpolates a hash slice; `$+{name}` works
+interpolate `@-` / `@+`; `"@h{@k}"` interpolates a hash slice (`--compat` only);
+`$+{name}` works
 in an `s///` replacement; a slice subscript such as `@h{(LIST)[0,1]}` is
 evaluated in list context; `$r->%{...}` / `$r->%[...]` key/value slices; `length`
 counts characters of a string holding a wide character; `pack` / `unpack` gained
