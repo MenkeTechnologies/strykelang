@@ -27,7 +27,7 @@ stryke, s \- highly parallel Perl 5 interpreter with shell-grade REPL
 is a single-binary Perl 5 interpreter written in Rust, with parallel
 extensions (pmap / pgrep / pfor / psort / preduce), a Cranelift JIT,
 pipe-forward (\fB|>\fR) syntax, the thread macro (\fB~>\fR), and a
-shell-grade REPL exposing 10,506 builtins as immediately-callable
+shell-grade REPL exposing its builtins as immediately-callable
 barewords (no \fBuse\fR / \fBrequire\fR / \fBimport\fR).
 .PP
 The binary is invoked as \fBs\fR by default; \fBstryke\fR and \fBst\fR
@@ -80,11 +80,18 @@ Print the compiled fusevm bytecode ops and exit (no execution).
 .B --fmt
 Pretty-print parsed Perl to stdout and exit.
 .TP
+.B --from-zsh
+Transpile the input file from zsh to stryke on stdout and exit (no execution).
+.TP
 .B --explain \fICODE\fR
 Print expanded hint for an error code (e.g. \fBE0001\fR) and exit.
 .TP
 .B --profile
 Wall-clock profile to stderr (VM op lines; flamegraph-ready).
+.TP
+.B --record
+Record wall-clock time of this run (and child stryke processes) to
+\fI~/.stryke/perf.sqlite\fR; same as \fBSTRYKE_RECORD=1\fR.
 .TP
 .B --flame
 Flamegraph: terminal bars (TTY) or SVG (piped to file).
@@ -203,7 +210,7 @@ Print configuration summary.
 Print help.
 .SH PARALLEL EXTENSIONS
 .TP
-.B -j \fIN\fR
+.BR -j ", " --threads " \fIN\fR"
 Set number of parallel threads (rayon pool).
 .TP
 .BR pmap " {BLOCK} @list [, progress => EXPR]"
@@ -381,8 +388,8 @@ client over the same archive format.
 The
 .B s
 binary doubles as an interactive REPL via reedline:
-persistent history, tab completion against the full 22,071-name
-corpus, sub-10 ms cold start. Over 80 coreutils-shaped builtins
+persistent history, tab completion against the builtin name
+corpus. Coreutils-shaped builtins
 work as immediately-callable barewords with no fork or exec
 (every result is a stryke value, composable with \fB|>\fR pipelines).
 .PP
@@ -419,7 +426,6 @@ work as immediately-callable barewords with no fork or exec
 .IR whoami ,
 .IR groups ,
 .IR id ,
-.IR hostname ,
 .IR getpwuid ,
 .IR getpwnam ,
 .IR getgrgid ,
@@ -499,8 +505,7 @@ work as immediately-callable barewords with no fork or exec
 .B Search:
 .IR which ,
 .IR whereis ,
-.IR type ,
-.IR command .
+.IR type .
 .PP
 .B Encoding:
 .IR iconv ,
@@ -520,8 +525,9 @@ Drops into a TUI hover-doc reader with vi-style navigation
 .B repl \fR[\fB--load \fIFILE\fR]
 Interactive REPL with optional pre-load.
 .TP
-.B serve \fR[\fIPORT\fR] [\fISCRIPT\fR]
-HTTP server (\fBs serve\fR, \fBs serve 8080 app.stk\fR).
+.B serve \fR[\fIPORT\fR] [\fISCRIPT\fR | \fB-e \fICODE\fR]
+HTTP server. Port defaults to 8000; with no script, serves \fI$PWD\fR as static files
+(\fBs serve\fR, \fBs serve 8080 app.stk\fR, \fBs serve 3000 -e 'CODE'\fR).
 .TP
 .B fmt \fR[\fB-i\fR] \fIFILE\fR...
 Format source files (\fBs fmt -i .\fR for in-place recursive).
@@ -530,13 +536,15 @@ Format source files (\fBs fmt -i .\fR for in-place recursive).
 Run benchmarks from \fIbench/\fR or \fIbenches/\fR.
 .TP
 .B init \fR[\fINAME\fR]
-Scaffold project in cwd: \fIstryke.toml\fR + \fIlib/\fR, \fIt/\fR, \fIbenches/\fR.
+Scaffold project in cwd: \fIstryke.toml\fR, \fImain.stk\fR, and \fIlib/\fR, \fIt/\fR, \fIbenches/\fR,
+\fIbin/\fR, \fIexamples/\fR.
 .TP
 .B new \fINAME\fR
 Scaffold a new project at \fI./NAME/\fR.
 .TP
 .B install \fR[\fB--offline\fR]
 Resolve manifest deps; populate \fIstryke.lock\fR and \fI~/.stryke/store\fR.
+\fB-g\fR installs a package globally.
 .TP
 .B add \fINAME\fR[\fB@\fIVER\fR] ...
 Add a dep to \fIstryke.toml\fR. Flags:
@@ -552,10 +560,74 @@ Print resolved dep graph from \fIstryke.lock\fR.
 Show lockfile entry + store path for a dep.
 .TP
 .B pkg \fISUBCOMMAND\fR
-Dispatcher for package commands (init/new/install/add/remove/tree/info).
+Dispatcher for package commands (init, new, install, uninstall, use, list, gc, add,
+remove, update, upgrade, outdated, audit, tree, info, vendor, clean, search,
+publish, yank, run). The same handlers are reachable as top-level commands.
 .TP
-.B build \fISCRIPT\fR \fR[\fB-o \fIOUT\fR]
-AOT: copy this binary with SCRIPT embedded (standalone exe).
+.B build \fISCRIPT\fR \fR[\fB-o \fIOUT\fR] [\fB--native\fR] [\fB--mcp-server\fR]
+Copy this binary with SCRIPT embedded (standalone exe). \fB--project DIR\fR bundles
+\fImain.stk\fR + \fIlib/\fR; \fB--native\fR compiles via Cranelift AOT; \fB--mcp-server\fR
+wraps the script as an MCP server.
+.TP
+.BR update " [\fINAME\fR], " upgrade " [\fINAME\fR]"
+\fBupdate\fR re-resolves within manifest constraints; \fBupgrade\fR bumps pins to
+latest upstream first. \fB-g\fR operates on global packages.
+.TP
+.BR outdated ", " audit ", " vendor ", " clean ", " search ", " publish ", " yank
+Package-manager commands; \fBsearch\fR, \fBpublish\fR and \fByank\fR report that the
+registry is not deployed.
+.TP
+.BR uninstall " \fB-g\fR \fINAME\fR, " list " \fB-g\fR"
+Remove / list globally installed packages.
+.TP
+.B run \fR[\fINAME\fR|\fIFILE\fR]
+Run a \fB[scripts]\fR entry from \fIstryke.toml\fR, or a \fB.stk\fR file
+(default \fI./main.stk\fR, then \fI./src/main.stk\fR).
+.TP
+.BR "t " "[\fB--quiet\fR] [\fB--fork\fR|\fB--inproc\fR] [\fIFILE|DIR\fR]..., " test
+Run test files named \fBtest_*\fR / \fBt_*\fR (\fB.stk\fR, \fB.st\fR, \fB.pl\fR) under
+\fIt/\fR or the given paths, on a persistent worker pool by default.
+.TP
+.B prun \fIFILE\fR...
+Run several script files in parallel.
+.TP
+.B check \fIFILE\fR...
+Parse and compile without running.
+.TP
+.B disasm \fR[\fB--jit\fR] \fIFILE\fR
+Print bytecode disassembly.
+.TP
+.B profile \fR[\fIOPTIONS\fR] \fIFILE\fR
+Run with profiling and structured output.
+.TP
+.B ast \fIFILE\fR
+Dump the AST as JSON.
+.TP
+.B completions \fR[\fISHELL\fR]
+Emit shell completions.
+.TP
+.B convert \fR[\fB-i\fR] [\fB-d \fIDELIM\fR] \fIFILE\fR...
+Convert Perl source to stryke syntax;
+.B deconvert
+converts back.
+.TP
+.B minify \fR[\fB-i\fR] \fIFILE\fR...
+Minify source files.
+.TP
+.B ai \fR[\fIPROMPT\fR]
+Call the \fBai\fR builtin from the command line (reads stdin if no prompt).
+.TP
+.B gen\-docs \fR[\fIPATH\fR] [\fB--out \fIDIR\fR]
+Generate Markdown documentation for \fB.stk\fR / \fB.pl\fR / \fB.pm\fR sources.
+.TP
+.B agent\fR, \fBcontroller
+Distributed load-testing agent and controller REPL (\fB--help\fR for options).
+.TP
+.B lsp
+Language Server on stdio (same as \fB--lsp\fR).
+.TP
+.B --dap \fR[\fIHOST:PORT\fR]
+Debug Adapter Protocol server on stdio or TCP.
 .TP
 .B --lsp
 Language Server (JSON-RPC on stdio); must be the only argument.
@@ -566,13 +638,6 @@ Persistent cluster worker (stdio); only argument.
 .B --remote-worker-v1
 Legacy one-shot worker (stdio); only argument.
 .SH ENVIRONMENT
-.TP
-.B PERL5LIB
-Colon-separated list of dirs prepended to
-.BR @INC .
-.TP
-.B PERL5OPT
-Default command-line options.
 .TP
 .B STRYKE_RECORD
 If set to \fB1\fR, records every run to \fI~/.stryke/perf.sqlite\fR for
@@ -595,7 +660,7 @@ Default install location via \fBcargo install strykelang\fR.
 .TP
 .I ~/.stryke/
 Per-user state: \fBstore/\fR (dep blobs), \fBperf.sqlite\fR (run log),
-\fBaudit.log\fR (JSONL audit), \fBscripts.db\fR (bytecode cache).
+\fBaudit.log\fR (JSONL audit), \fBscripts.rkyv\fR (bytecode cache).
 .TP
 .I ./stryke.toml
 Per-project manifest (deps, features, package metadata).
@@ -617,37 +682,37 @@ hashes, queryable at the REPL with \fBkeys %\fIHASH\fR:
 .PP
 .RS 4
 .B %b
-.RB "\(em " "10,506 primary builtins (callable-only)"
+.RB "\(em " "primary builtins (callable-only)"
 .br
 .B %a
-.RB "\(em " "694 aliases (name \(-> primary)"
+.RB "\(em " "aliases (name \(-> primary)"
 .br
 .B %all
-.RB "\(em " "11,291 keys: %b + %a + %k"
+.RB "\(em " "every callable name: %b + %a + %k"
 .br
 .B %k
-.RB "\(em " "91 keywords (if/while/sub/...)"
+.RB "\(em " "keywords (if/while/sub/...)"
 .br
 .B %pc
-.RB "\(em " "195 Perl 5 core names (subset of %b)"
+.RB "\(em " "Perl 5 core names (subset of %b)"
 .br
 .B %e
-.RB "\(em " "10,311 stryke extension names (subset of %b)"
+.RB "\(em " "stryke extension names (subset of %b)"
 .br
 .B %d
-.RB "\(em " "4,421 names with LSP hover documentation"
+.RB "\(em " "names with LSP hover documentation"
 .br
 .B %c
-.RB "\(em " "319 distinct category strings"
+.RB "\(em " "distinct category strings"
 .br
 .B %p
-.RB "\(em " "8,982 primaries (after alias dedup)"
+.RB "\(em " "primaries (after alias dedup)"
 .br
 .B %o
-.RB "\(em " "72 operators"
+.RB "\(em " "operators"
 .br
 .B %v
-.RB "\(em " "100 special variables ($_, $!, @ARGV, %ENV, ...)"
+.RB "\(em " "special variables ($_, $!, @ARGV, %ENV, ...)"
 .br
 .B %parameters
 .RB "\(em " "live binding view (every named pad slot)"
@@ -709,7 +774,7 @@ Build a standalone binary that bundles a script:
 .RS 4
 .EX
 s build mytool.stk -o ./mytool
-./mytool                 # runs without stryke installed
+\&./mytool                 # runs without stryke installed
 .EE
 .RE
 .PP
@@ -749,7 +814,7 @@ raising a "Broken pipe" runtime error.
 https://github.com/MenkeTechnologies/strykelang
 .br
 .B Full reference:
-\fIhttps://stryke.menketech.com/reference.html\fR (10,322 topics)
+\fIhttps://stryke.menketech.com/reference.html\fR 
 .br
 .B Engineering report:
 \fIhttps://stryke.menketech.com/report.html\fR

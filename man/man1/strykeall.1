@@ -59,7 +59,7 @@ single page so you can grep with `/`:
 .RB "\(em " "%b %a %all %k %d %c %o %v %pc %e %p"
 .br
 .B BUILTINS
-.RB "\(em " "categorical tour of " 10292 " primaries"
+.RB "\(em " "categorical tour of the primary builtins"
 .br
 .B REPL
 .RB "\(em " "shell-like primitives, history, aliases, prompt"
@@ -68,7 +68,7 @@ single page so you can grep with `/`:
 .RB "\(em " "ai, prompt, embed, tool fn, MCP, agent loop"
 .br
 .B WEB
-.RB "\(em " "web_serve, route DSL, ORM, sessions, templates, s_web"
+.RB "\(em " "route DSL, ORM, sessions, templates, s_web"
 .br
 .B PACKAGE MGR
 .RB "\(em " "stryke.toml, stryke.lock, ~/.stryke/store, add/remove/install"
@@ -83,7 +83,7 @@ single page so you can grep with `/`:
 .RB "\(em " "strict, warnings, utf8, feature, --compat, --no-interop"
 .br
 .B ENVIRONMENT
-.RB "\(em " "PERL5LIB, STRYKE_RECORD, STRYKE_AI_MODE, …"
+.RB "\(em " "STRYKE_RECORD, STRYKE_AI_MODE, STRYKE_AUDIT_LOG, STRYKE_HOME"
 .br
 .B FILES
 .RB "\(em " "~/.cargo/bin/s, ~/.stryke/, stryke.toml, stryke.lock"
@@ -119,12 +119,11 @@ stryke, s \- highly parallel Perl 5 interpreter with shell-grade REPL
 .B stryke
 is a single-binary Perl 5 interpreter written in Rust with parallel
 extensions, a Cranelift JIT, pipe-forward (\fB|>\fR), the thread macro
-(\fB~>\fR), 10,506 primary builtins in
+(\fB~>\fR), primary builtins in
 .BR %b ,
 and an interactive REPL that doubles as a Unix shell.
 .PP
-The interpreter compiles source to a 369-opcode bytecode running on a
-register+stack hybrid VM; hot blocks are JIT'd to native code via
+The interpreter compiles source to bytecode running on the fusevm VM; hot blocks are JIT'd to native code via
 Cranelift. Parallel primitives (\fBpmap\fR / \fBpgrep\fR / \fBpfor\fR /
 \fBpsort\fR / \fBpreduce\fR) ride on rayon work-stealing across every
 available core.
@@ -184,6 +183,18 @@ Dump parsed AST as JSON and exit (no execution).
 .B --fmt
 Pretty-print parsed Perl to stdout and exit.
 .TP
+.B --from-zsh
+Transpile the input file from zsh to stryke on stdout and exit (no execution).
+.TP
+.B --dump-tokens
+Print the lexer token stream and exit (no execution).
+.TP
+.B --dump-bytecode
+Print the compiled fusevm bytecode ops and exit (no execution).
+.TP
+.B --tiers
+Run the program, then report which fusevm execution tier took its chunk.
+.TP
 .B --explain \fICODE\fR
 Print expanded hint for an error code (e.g. \fBE0001\fR) and exit.
 .TP
@@ -198,6 +209,11 @@ Disable Cranelift JIT (bytecode interpreter only).
 .TP
 .B --compat
 Perl 5 strict-compat: disable all stryke extensions.
+.TP
+.B --static
+Mandatory static typing: require a type on every function parameter, return
+type and variable declaration (or an inferable initializer); abort before
+running on statically-known type mismatches.
 .TP
 .B --no-interop
 Reject Perl-isms; force idiomatic stryke
@@ -297,7 +313,7 @@ Configuration summary.
 Help.
 .SS "1.7  Parallelism"
 .TP
-.B -j \fIN\fR
+.BR -j ", " --threads " \fIN\fR"
 Set rayon pool size to \fIN\fR threads.
 .SS "1.8  Subcommands"
 .TP
@@ -309,8 +325,8 @@ Aliases:
 .B repl \fR[\fB--load \fIFILE\fR]
 Interactive REPL with optional pre-load.
 .TP
-.B serve \fR[\fIPORT\fR] [\fISCRIPT\fR]
-HTTP server.
+.B serve \fR[\fIPORT\fR] [\fISCRIPT\fR | \fB-e \fICODE\fR]
+HTTP server. Port defaults to 8000; with no script, serves \fI$PWD\fR as static files.
 .TP
 .B fmt \fR[\fB-i\fR] \fIFILE\fR...
 Format source files.
@@ -319,7 +335,8 @@ Format source files.
 Run benchmarks.
 .TP
 .B init \fR[\fINAME\fR]
-Scaffold project in cwd.
+Scaffold project in cwd (\fIstryke.toml\fR, \fImain.stk\fR, \fIlib/\fR, \fIt/\fR,
+\fIbenches/\fR, \fIbin/\fR, \fIexamples/\fR).
 .TP
 .B new \fINAME\fR
 Scaffold project at \fI./NAME/\fR.
@@ -341,10 +358,14 @@ Print resolved dep graph from \fIstryke.lock\fR.
 Show lockfile entry + store path.
 .TP
 .B pkg \fISUBCOMMAND\fR
-Dispatcher for package commands.
+Dispatcher for package commands (init, new, install, uninstall, use, list, gc, add,
+remove, update, upgrade, outdated, audit, tree, info, vendor, clean, search,
+publish, yank, run). The same handlers are reachable as top-level commands.
 .TP
-.B build \fISCRIPT\fR \fR[\fB-o \fIOUT\fR]
-AOT bundle SCRIPT into a copy of this binary as a standalone exe.
+.B build \fISCRIPT\fR \fR[\fB-o \fIOUT\fR] [\fB--native\fR] [\fB--mcp-server\fR]
+Bundle SCRIPT into a copy of this binary as a standalone exe.
+\fB--project DIR\fR bundles \fImain.stk\fR + \fIlib/\fR; \fB--native\fR compiles via
+Cranelift AOT; \fB--mcp-server\fR wraps the script as an MCP server.
 .TP
 .B --lsp
 Language Server (JSON-RPC on stdio); must be sole arg.
@@ -355,9 +376,65 @@ Persistent cluster worker (stdio); sole arg.
 .B --remote-worker-v1
 Legacy one-shot worker (stdio); sole arg.
 .TP
-.B t \fR[\fIFILE|DIR\fR]
-Run tests from \fIt/\fR (test files matching \fItest_*.stk\fR).
-Parallel by default; flags \fB--quiet\fR, \fB--summary\fR.
+.B t \fR[\fB--quiet\fR] [\fB--fork\fR|\fB--inproc\fR] [\fIFILE|DIR\fR]...
+Run test files from \fIt/\fR or the given paths (names starting with
+\fBtest_\fR or \fBt_\fR, extensions \fB.stk\fR, \fB.st\fR, \fB.pl\fR). Default is a
+persistent worker pool; \fB--fork\fR spawns a process per test, \fB--inproc\fR
+runs tests on threads in one process. \fBtest\fR is an alias.
+.TP
+.B update \fR[\fINAME\fR], \fBupgrade \fR[\fINAME\fR]
+\fBupdate\fR re-resolves within manifest constraints; \fBupgrade\fR bumps pins to
+latest upstream first. \fB-g\fR operates on global packages.
+.TP
+.BR outdated ", " audit ", " vendor ", " clean ", " search ", " publish ", " yank
+Package-manager commands; \fBsearch\fR, \fBpublish\fR and \fByank\fR report that the
+registry is not deployed.
+.TP
+.BR uninstall " \fB-g\fR \fINAME\fR, " list " \fB-g\fR"
+Remove / list globally installed packages.
+.TP
+.B run \fR[\fINAME\fR|\fIFILE\fR]
+Run a \fB[scripts]\fR entry from \fIstryke.toml\fR, or a \fB.stk\fR file
+(default \fI./main.stk\fR, then \fI./src/main.stk\fR).
+.TP
+.B prun \fIFILE\fR...
+Run several script files in parallel.
+.TP
+.B check \fIFILE\fR...
+Parse and compile without running.
+.TP
+.B disasm \fR[\fB--jit\fR] \fIFILE\fR
+Print bytecode disassembly.
+.TP
+.B profile \fR[\fIOPTIONS\fR] \fIFILE\fR
+Run with profiling and structured output.
+.TP
+.B ast \fIFILE\fR
+Dump the AST as JSON.
+.TP
+.B completions \fR[\fISHELL\fR]
+Emit shell completions.
+.TP
+.B convert \fR[\fB-i\fR] [\fB-d \fIDELIM\fR] \fIFILE\fR...
+Convert Perl source to stryke syntax; \fBdeconvert\fR converts back.
+.TP
+.B minify \fR[\fB-i\fR] \fIFILE\fR...
+Minify source files.
+.TP
+.B ai \fR[\fIPROMPT\fR]
+Call the \fBai\fR builtin from the command line (reads stdin if no prompt).
+.TP
+.B gen\-docs \fR[\fIPATH\fR] [\fB--out \fIDIR\fR]
+Generate Markdown documentation for \fB.stk\fR / \fB.pl\fR / \fB.pm\fR sources.
+.TP
+.BR agent ", " controller
+Distributed load-testing agent and controller REPL (\fB--help\fR for options).
+.TP
+.B lsp
+Language Server on stdio (same as \fB--lsp\fR).
+.TP
+.B --dap \fR[\fIHOST:PORT\fR]
+Debug Adapter Protocol server on stdio or TCP.
 .TP
 .B perfview \fR[options]
 Read the wall-clock perf log from \fI~/.stryke/perf.sqlite\fR.
@@ -1162,17 +1239,17 @@ climbs one nesting level.
 .PP
 .RS 4
 .EX
-keys %b           # 10,506 primary builtin names → category
-keys %a           # 694 aliases (name → primary)
-keys %all         # 11,291 = %b ∪ %a ∪ %k
-keys %k           # 91 keywords (if, sub, my, our, …)
-keys %pc          # 195 Perl 5 core names (subset of %b)
-keys %e           # 10,311 stryke extensions (subset of %b)
-keys %d           # 4,421 names with LSP hover documentation
-keys %c           # 319 categories
-keys %p           # 8,982 primaries (after alias dedup)
-keys %o           # 72 operators
-keys %v           # 100 special variables ($_, $!, $/, ...)
+keys %b           # primary builtin names → category
+keys %a           # aliases (name → primary)
+keys %all         # %b ∪ %a ∪ %k
+keys %k           # keywords (if, sub, my, our, …)
+keys %pc          # Perl 5 core names (subset of %b)
+keys %e           # stryke extensions (subset of %b)
+keys %d           # names with LSP hover documentation
+keys %c           # categories
+keys %p           # primaries (after alias dedup)
+keys %o           # operators
+keys %v           # special variables ($_, $!, $/, ...)
 %parameters       # live binding view of every named pad slot
 
 # Per-package stashes:
@@ -1190,16 +1267,16 @@ the LSP hover (
 .SS "15.1  String"
 .B length len substr index rindex uc lc ucfirst lcfirst chomp chop
 .B chop quotemeta reverse_str sprintf printf format lpad rpad center
-.B truncate_str trim trim_left trim_right pad title_case snake_case
+.B trim trim_left trim_right pad title_case snake_case
 .B camel_case kebab_case starts_with ends_with contains words letters
-.B punct sentences paragraphs graphemes chars chars_at codepoints
+.B punct sentences paragraphs graphemes chars codepoints
 .B template deburr
 .SS "15.2  Numeric"
 .B abs int float ceil floor round sign sqrt exp log log2 log10 pow
 .B sin cos tan asin acos atan atan2 sinh cosh tanh
 .B isnan isfinite isinf max min sum sum0 prod product mean median
 .B mode stddev variance percentile quantile clamp scale normalize
-.B random rand_range rand_int gcd lcm fact comb perm
+.B random gcd lcm fact comb perm
 .SS "15.3  Array / Hash"
 .B push pop shift unshift splice
 .B grep map sort reverse_list
@@ -1209,21 +1286,20 @@ the LSP hover (
 .B chunk windowed take drop head tail rotate
 .B partition group_by chunk_by tally
 .B reduce inject scan zipmap
-.B intersect difference symmetric_diff_arr
+.B intersect difference
 .SS "15.4  Regex"
-.B regex_match regex_replace regex_split regex_split_limit
-.B captures named_captures match_all
-.B quotemeta_regex
+.B regex_replace regex_split
+.B captures match_all
 .SS "15.5  File / Path"
 .B slurp spurt cat read_lines append_file write_json read_json
 .B open close read write seek tell truncate
-.B file_exists is_file is_dir is_link is_readable is_writable
-.B stat lstat fstat mkdir rmdir touch unlink rename copy symlink
+.B is_file is_dir is_readable is_writable
+.B stat lstat mkdir rmdir touch unlink rename copy symlink
 .B realpath canonpath basename dirname tempfile tempdir mktemp
 .B mktempdir chmod chown
 .B files filesf dirs sym_links char_devices executables
 .SS "15.6  Process / System"
-.B system exec backtick `cmd` fork waitpid wait sleep nanosleep
+.B system exec backtick `cmd` fork waitpid wait sleep
 .B shell_quote shell_split shellwords
 .B getpid getppid getuid geteuid getgid getegid umask
 .B kill signal_name nice renice setpriority getpriority
@@ -1233,33 +1309,31 @@ the LSP hover (
 .SS "15.7  Network"
 .B fetch_async fetch_val fetch_json fetch_url_tool
 .B http_headers http_method_get http_method_post http_method_put
-.B http_method_delete http_method_patch http_status_line
+.B http_method_delete http_method_patch
 .B curl_get curl_post http_fetch http_post
-.B web_serve web_route web_render web_redirect web_static
+.B web_route web_render web_redirect
 .B ip_parse ip_is_valid ip_to_int int_to_ip
 .B cidr_parse cidr_contains ip_in_cidr cidr_difference
 .B net_interfaces ifconfig
 .SS "15.8  Crypto"
 .B md5 sha1 sha256 sha384 sha512 sha3_256 sha3_512 blake2b blake3
 .B hmac_sha1 hmac_sha256 hmac_sha512 hkdf_sha256 hkdf_sha512
-.B pbkdf2_sha256 pbkdf2_sha512 argon2 bcrypt scrypt
+.B argon2 bcrypt scrypt
 .B aes_encrypt aes_decrypt chacha_encrypt chacha_decrypt
 .B ed25519_keygen ed25519_sign ed25519_verify
 .B rsa_keygen rsa_sign rsa_verify rsa_encrypt rsa_decrypt
 .B base64_encode base64_decode hex_encode hex_decode
-.B totp_at totp_now totp_uri uuid_v4 uuid_v7 ulid nanoid
+.B uuid_v4 uuid_v7 ulid nanoid
 .SS "15.9  Codec / Serialization"
 .B to_json from_json to_yaml from_yaml to_toml from_toml
 .B to_xml from_xml to_csv from_csv to_html to_markdown
 .B to_jsonl from_jsonl to_ini from_ini
 .B base64url_encode base64url_decode
-.B msgpack_pack msgpack_unpack
-.B native_codec_dumps native_codec_loads
 .B encode decode iconv strftime
 .SS "15.10 Compression"
-.B gzip gzip_compress gzip_decompress
-.B brotli_encode brotli_decode
-.B zstd zstd_compress zstd_decompress
+.B gzip
+.B brotli_decode
+.B zstd zstd_compress
 .B xz xz_compress xz_decompress
 .B lz4_compress lz4_decompress
 .B tar tar_create tar_extract tar_list
@@ -1269,12 +1343,12 @@ the LSP hover (
 .B date_dayofyear date_days_in_month date_diff_days date_diff_hours
 .B date_diff_minutes date_diff_seconds date_add_days date_add_months
 .B date_add_years date_business_days_between iso_week
-.B strftime strptime time_ago from_now date_now_ms date_now_us date_now_ns
-.B human_duration format_duration sleep_ms sleep_us
+.B strftime strptime time_ago from_now
+.B human_duration format_duration
 .SS "15.12 Reflection / Introspection"
 .B keys values exists defined ref blessed isa can DOES
 .B caller wantarray __FILE__ __LINE__ __PACKAGE__ __SUB__
-.B perfview docs help h man lsp_completion_words methods_for which
+.B perfview docs help h man lsp_completion_words which
 .B which_all type_name fields to_hash builtins_hash_map
 .SS "15.13 Probabilistic Sketches (RFC-1)"
 .B bloom_filter bloom_add bloom_contains bloom_len bloom_clear
@@ -1323,11 +1397,11 @@ for my $row (kv_scan($db, "users:")) {
 .EE
 .RE
 .PP
-Phase 2 ships
+Phase 2 (not implemented) plans a
 .B stryke kvd
 server + remote
 .B kv_connect
-client \(em the same rkyv archive bytes travel over TCP.
+client over the same rkyv archive format.
 .SS "15.16 Shell-Like REPL (Tier S + A)"
 .B clear cls whoami groups pushd popd dir_stack
 .B history repl_alias repl_unalias set_alias unset_alias
@@ -1337,29 +1411,29 @@ client \(em the same rkyv archive bytes travel over TCP.
 .B iconv strftime tac rev_lines tty_raw tty_cooked
 .B man manpage run exec_script source src
 .SS "15.17 AI / ML / Vectors"
-.B ai prompt stream_prompt embed embed_batch ai_cost ai_routing
+.B ai prompt stream_prompt embed ai_cost
 .B ai_filter ai_map ai_classify ai_sort ai_match ai_dedupe
 .B vec_cosine vec_dot vec_normalize vec_add vec_scale vec_search
 .B vec_topk cosine_similarity euclidean_distance
 .B tool fn ... # declarative AI tool with build-time JSON schema
 .B mcp_connect mcp_server mcp_server_start mcp_serve_registered_tools
 .SS "15.18 Web Framework"
-.B web_serve web_route web_get web_post web_put web_delete web_patch
-.B web_static web_render web_redirect web_json web_text web_html
-.B web_session web_flash web_cookie web_csrf web_csrf_meta_tag
-.B web_security_headers web_form web_multipart web_uuid
+.B web_route
+.B web_render web_redirect web_json web_text
+.B web_session web_flash web_csrf_meta_tag
+.B web_security_headers web_uuid
 .B web_create_table web_add_column web_migrate
 .B web_jobs_init web_job_enqueue web_job_dequeue
-.B web_sse web_jobs_stats web_rate_limit
-.B s_web   # CLI subcommand: scaffold + build a web app
+.B web_jobs_stats web_rate_limit
+.B web_resources web_root web_application_config
 .SS "15.19 Package Manager"
-.B s_install s_add s_remove s_update s_outdated s_audit s_vendor
-.B s_clean s_tree s_info s_init s_new
+.B install add remove update upgrade outdated audit vendor clean tree info init new
+These are \fBs\fR subcommands (see 1.8), not builtins.
 .SS "15.20 Cluster / Distributed"
-.B cluster pmap_on remote_wire stryke_agent stryke_controller
-.B ppool barrier remote_eval remote_spawn
+.B cluster pmap_on
+.B ppool barrier
 .SS "15.21 Bench / Stress"
-.B bench bench_compare bench_section
+.B bench
 .B stress_metrics_prometheus stress_metrics_csv stress_metrics_json
 .B stress_metrics_export stress_metrics_watch stress_throttled
 .B audit_log heat fire
@@ -1388,7 +1462,7 @@ stryke❯ exit              # Ctrl-D also works
 .PP
 Tab completion is backed by
 .IR strykelang/lsp_completion_words.txt
-(22,071 names: every primary, alias, keyword, special variable, file
+(every primary, alias, keyword, special variable, file
 test op, glob qualifier). History is reedline-backed and persists
 across sessions.
 .PP
@@ -1453,7 +1527,6 @@ my $hit   = ai_match  "find the user-mentioning $name", @rows
 .PP
 .RS 4
 .EX
-my @vecs = embed_batch \@texts             # auto-batched
 my $hit  = vec_search $query_vec, \@vecs   # SQLite-vec backed
 my @top  = vec_topk 5, $query_vec, \@vecs
 .EE
@@ -1491,10 +1564,12 @@ s_web new myapp \\
 .PP
 .RS 4
 .EX
-web_route "GET",  "/users",       \\&list_users
-web_route "POST", "/users",       \\&create_user
-web_route "GET",  "/users/:id",   \\&show_user
-web_serve port => 8080
+web_route "GET /users",     "users#index"
+web_route "POST /users",    "users#create"
+web_route "GET /users/:id", "users#show"
+web_resources "posts"
+web_root "home#index"
+# dev server: s_web server [-p PORT]
 .EE
 .RE
 .SS "18.3  ORM"
@@ -1537,7 +1612,7 @@ name = "myproj"
 version = "0.1.0"
 edition = "2026"
 
-[dependencies]
+[deps]
 stryke-utils = "1.2"
 stryke-http  = { version = "0.5", features = ["tls"] }
 local-shared = { path = "../shared" }
@@ -1552,10 +1627,11 @@ s add httprs        # add dep
 s remove httprs     # remove dep
 s tree              # print resolved graph
 s info httprs       # store path + version
-s update            # bump pinned versions
-s outdated          # diff against latest
-s audit             # security scan
-s vendor            # copy deps into ./vendor
+s update            # re-resolve within manifest constraints
+s upgrade           # bump pins to latest upstream
+s outdated          # diff against lockfile pins
+s audit             # check lockfile against advisory feed
+s vendor            # snapshot store deps into ./vendor
 .EE
 .RE
 .SH "20. CLUSTER & DISTRIBUTED"
@@ -1663,13 +1739,6 @@ Disable all stryke extensions (CLI flag).
 Enforce idiomatic stryke (CLI flag).
 .SH "23. ENVIRONMENT VARIABLES"
 .TP
-.B PERL5LIB
-Colon-separated dirs prepended to
-.BR @INC .
-.TP
-.B PERL5OPT
-Default CLI options.
-.TP
 .B STRYKE_RECORD
 \fB1\fR records runs to \fI~/.stryke/perf.sqlite\fR.
 .TP
@@ -1679,11 +1748,11 @@ Default CLI options.
 .B STRYKE_AUDIT_LOG
 Path for structured audit JSONL log; default \fI~/.stryke/audit.log\fR.
 .TP
-.B RAYON_NUM_THREADS
-Override the rayon pool size (see also CLI \fB-j N\fR).
-.TP
 .B NO_COLOR
-Disable colored output / banner.
+Non-empty \fB$ENV{NO_COLOR}\fR disables ANSI in \fBlog_*\fR output.
+.TP
+.B STRYKE_HOME
+Override the \fI~/.stryke\fR state root for the store, perf log and FFI cache.
 .TP
 .B HOME
 Used by \fBcd\fR / \fI~\fR expansion / \fI~/.stryke\fR resolution.
@@ -1701,11 +1770,11 @@ Per-run wall-clock log (when \fBSTRYKE_RECORD=1\fR or \fB--record\fR).
 .I ~/.stryke/audit.log
 Structured JSONL audit log.
 .TP
-.I ~/.stryke/scripts.db
-Bytecode cache (rkyv-backed).
+.I ~/.stryke/scripts.rkyv
+Bytecode cache (rkyv-backed; \fIscripts.compat.rkyv\fR for \fB--compat\fR).
 .TP
-.I ~/.cache/stryke/
-Other transient caches.
+.I ~/.stryke/config.toml
+Runtime config, seeded on first launch.
 .TP
 .I ./stryke.toml
 Per-project manifest.
@@ -1999,7 +2068,7 @@ inheritance interaction) may diverge; full list:
 .UR https://github.com/MenkeTechnologies/strykelang
 .UE
 .br
-.B Full reference (10,322 topics):
+.B Full reference:
 .UR https://stryke.menketech.com/reference.html
 .UE
 .br
