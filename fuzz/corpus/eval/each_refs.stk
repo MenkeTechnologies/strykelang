@@ -1,0 +1,10 @@
+my $h = { a => 1, b => 2, c => 3 };
+my @a = (10, 20, 30);
+my $r = \@a;
+while (my ($k, $v) = each %$h) { delete $h->{$k} if $v == 2 }
+while (my ($i, $v) = each @a) { push @a, 0 if $i == 0 && @a < 5 }
+while (defined(my $i = each @$r)) { last if $i > 10 }
+my @e = each %{ {} };
+keys %$h;
+my ($k) = each %$h;
+my $n = () = each @a;

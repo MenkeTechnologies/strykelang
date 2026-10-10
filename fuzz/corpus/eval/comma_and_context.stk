@@ -1,0 +1,16 @@
+sub ctx { wantarray ? "list" : defined(wantarray) ? "scalar" : "void" }
+sub fwd { return ctx() }
+sub tail { ctx() }
+my @l = fwd();
+my $s = fwd();
+fwd();
+my ($t) = tail();
+my $c = (1, 2, 3);
+my $d = (ctx(), ctx());
+my ($i, $j) = (0, 10);
+for (my $k = 0; $k < 3; $k++, $j--) { $i += $k }
+my @e = (undef);
+my $count = () = (1, 2, undef);
+my $u = - -1;
+my $str = -"foo" . -"-bar";
+my $rep = ("ab") x3;

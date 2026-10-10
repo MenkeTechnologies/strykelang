@@ -134,3 +134,30 @@ fn pack_corpus_does_not_panic() {
         }
     }
 }
+
+#[test]
+fn sprintf_corpus_does_not_panic() {
+    // Mirrors the sprintf.rs harness: the corpus entry is a raw format string
+    // embedded as hex through `pack("H*", ...)`.
+    for (path, bytes) in read_corpus("sprintf") {
+        let _ = path;
+        if bytes.len() > 256 {
+            continue;
+        }
+        if bytes.split(|b| !b.is_ascii_digit()).any(|run| (7..=10).contains(&run.len())) {
+            continue;
+        }
+        let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+        let src = format!(
+            "my $f = pack(\"H*\", \"{hex}\"); \
+             my $r = sprintf($f, 42, \"str\", -2.5, undef, 1e20, \"0x1f\"); \
+             my @l = sprintf($f, 1, 2, 3);"
+        );
+        let Ok(program) = stryke::parse(&src) else {
+            continue;
+        };
+        let mut interp = VMHelper::new();
+        interp.suppress_stdout = true;
+        let _ = stryke::try_vm_execute(&program, &mut interp);
+    }
+}

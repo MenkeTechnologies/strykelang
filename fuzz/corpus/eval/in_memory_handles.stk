@@ -1,0 +1,17 @@
+my $text = "alpha\nbeta\n\n\ngamma\n";
+for my $sep ("\n", "", "a", undef) {
+    local $/ = $sep;
+    open(my $in, '<', \$text) or die;
+    my @r = <$in>;
+    close $in;
+}
+my $out;
+open(my $w, '>', \$out) or die;
+print $w "x" for 1 .. 3;
+printf $w "%s-%d", "y", 7;
+close $w;
+open($w, '>>', \$out);
+print $w "tail";
+close $w;
+open(my $u, '<', \undef);
+my $line = <$u>;
