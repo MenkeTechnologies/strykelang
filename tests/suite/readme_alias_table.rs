@@ -29,9 +29,7 @@ fn alias_table_rows() -> Vec<Vec<String>> {
         if !trimmed.starts_with('|') {
             break; // table ended
         }
-        let inner = trimmed
-            .trim_start_matches('|')
-            .trim_end_matches('|');
+        let inner = trimmed.trim_start_matches('|').trim_end_matches('|');
         rows.push(inner.split('|').map(|c| c.trim().to_string()).collect());
     }
     assert!(
@@ -75,7 +73,10 @@ fn every_alias_documented_in_the_readme_resolves() {
             ) else {
                 continue; // section label, empty cell, or `~>` operator row
             };
-            if alias.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_') {
+            if alias
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+            {
                 documented.push(alias.to_string());
             }
         }

@@ -133,7 +133,10 @@ fn non_compat_mode_rejects_redefining_an_alias_spelling() {
     let exe = env!("CARGO_BIN_EXE_st");
     for spelling in ["sl", "uq", "slurp"] {
         let out = Command::new(exe)
-            .args(["-e", &format!("sub {spelling} {{ 42 }} print {spelling}();")])
+            .args([
+                "-e",
+                &format!("sub {spelling} {{ 42 }} print {spelling}();"),
+            ])
             .output()
             .expect("spawn stryke");
         assert!(

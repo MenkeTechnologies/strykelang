@@ -5751,7 +5751,10 @@ fn short_aliases_resolve_as_barewords_and_as_thread_stages() {
     // so the alias must land on the same arm to inherit that precedence.
     assert_eq!(ri(r#"my $x = 1; (def $x) ? 1 : 0;"#), 1);
     assert_eq!(ri(r#"my $x; (def $x) ? 1 : 0;"#), 0);
-    assert_eq!(ri(r#"my %h = (k => 0); (def $h{k} && $h{k} > 0) ? 1 : 0;"#), 0);
+    assert_eq!(
+        ri(r#"my %h = (k => 0); (def $h{k} && $h{k} > 0) ? 1 : 0;"#),
+        0
+    );
 
     // `ufc` / `lfc` — the stage table already spelled them this way.
     assert_eq!(rs(r#"ufc("abc");"#), "Abc");
@@ -5801,12 +5804,11 @@ fn unary_barewords_are_all_available_as_bare_thread_stages() {
 // loop: a future alias added to a dispatch arm but not here fails immediately.
 #[test]
 fn every_keyword_builtin_alias_is_registered_and_known() {
-    let snapshot: std::collections::HashSet<&str> =
-        include_str!("lsp_completion_words.txt")
-            .lines()
-            .map(str::trim)
-            .filter(|l| !l.is_empty() && !l.starts_with('#'))
-            .collect();
+    let snapshot: std::collections::HashSet<&str> = include_str!("lsp_completion_words.txt")
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .collect();
 
     let table = crate::parser::Parser::KEYWORD_BUILTIN_ALIASES;
     assert!(
@@ -5853,8 +5855,7 @@ fn keyword_builtin_alias_table_is_unambiguous() {
         );
     }
 
-    let primaries: std::collections::HashSet<&str> =
-        table.iter().map(|(_, p)| *p).collect();
+    let primaries: std::collections::HashSet<&str> = table.iter().map(|(_, p)| *p).collect();
     for (alias, _) in table {
         assert!(
             !primaries.contains(alias),
@@ -5985,14 +5986,13 @@ fn every_pipe_forward_spelling_is_known_to_the_toolchain() {
         .filter(|l| !l.is_empty() && !l.starts_with('#'))
         .collect();
 
-    let missing: Vec<String> =
-        parser_fn_arm_names(
-            "fn pipe_forward_apply(&self, lhs: Expr, rhs: Expr, line: usize)",
-            20,
-        )
-            .into_iter()
-            .filter(|n| !snapshot.contains(n.as_str()))
-            .collect();
+    let missing: Vec<String> = parser_fn_arm_names(
+        "fn pipe_forward_apply(&self, lhs: Expr, rhs: Expr, line: usize)",
+        20,
+    )
+    .into_iter()
+    .filter(|n| !snapshot.contains(n.as_str()))
+    .collect();
 
     assert!(
         missing.is_empty(),
@@ -6236,7 +6236,10 @@ fn vector_angle_returns_degrees_under_both_spellings() {
     assert_eq!(ri(r#"vector_angle([1, 0], [-1, 0])"#), 180);
 
     // `vang` is the registered alias and must agree with the primary.
-    assert_eq!(rs(r#"vang([1, 0], [0, 1])"#), rs(r#"vector_angle([1, 0], [0, 1])"#));
+    assert_eq!(
+        rs(r#"vang([1, 0], [0, 1])"#),
+        rs(r#"vector_angle([1, 0], [0, 1])"#)
+    );
     assert_eq!(rs(r#"$a{vang}"#), "vector_angle");
 }
 
@@ -6401,9 +6404,8 @@ fn documented_aliases_behave_identically_to_their_primaries() {
         ("drp", "drop"),
         ("l", "len"),
     ] {
-        let two_arrays = |name: &str| {
-            format!(r#"my @a = (1, 2); my @b = (3, 4); scalar({name}(@a, @b))"#)
-        };
+        let two_arrays =
+            |name: &str| format!(r#"my @a = (1, 2); my @b = (3, 4); scalar({name}(@a, @b))"#);
         assert_eq!(
             rs(&two_arrays(alias)),
             rs(&two_arrays(primary)),
@@ -6414,6 +6416,12 @@ fn documented_aliases_behave_identically_to_their_primaries() {
 
     // The concrete regression: two arrays zip into two pairs under both
     // spellings. Flattening would collapse them to one.
-    assert_eq!(ri(r#"my @a = (1, 2); my @b = (3, 4); scalar(zip(@a, @b))"#), 2);
-    assert_eq!(ri(r#"my @a = (1, 2); my @b = (3, 4); scalar(zp(@a, @b))"#), 2);
+    assert_eq!(
+        ri(r#"my @a = (1, 2); my @b = (3, 4); scalar(zip(@a, @b))"#),
+        2
+    );
+    assert_eq!(
+        ri(r#"my @a = (1, 2); my @b = (3, 4); scalar(zp(@a, @b))"#),
+        2
+    );
 }

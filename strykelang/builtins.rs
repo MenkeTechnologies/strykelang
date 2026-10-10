@@ -287,10 +287,7 @@ pub fn primaries_hash_map() -> indexmap::IndexMap<String, StrykeValue> {
     // `primaries_hash_is_the_inverse_of_aliases_hash`.
     for (alias, primary) in SYNTACTIC_ALIASES {
         let entry = buckets.entry((*primary).to_string()).or_default();
-        if entry
-            .iter()
-            .any(|existing| existing.to_string() == **alias)
-        {
+        if entry.iter().any(|existing| existing.to_string() == **alias) {
             continue;
         }
         entry.push(StrykeValue::string((*alias).to_string()));

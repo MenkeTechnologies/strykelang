@@ -200,9 +200,18 @@ fn exit_with_postfix_modifier() {
             String::from_utf8_lossy(&out.stderr).into_owned(),
         )
     };
-    assert_eq!(run(r#"print "a"; exit if 1; print "b""#), (Some(0), "a".into(), String::new()));
-    assert_eq!(run(r#"print "a"; exit if 0; print "b""#), (Some(0), "ab".into(), String::new()));
-    assert_eq!(run(r#"print "a"; exit unless 0; print "b""#), (Some(0), "a".into(), String::new()));
+    assert_eq!(
+        run(r#"print "a"; exit if 1; print "b""#),
+        (Some(0), "a".into(), String::new())
+    );
+    assert_eq!(
+        run(r#"print "a"; exit if 0; print "b""#),
+        (Some(0), "ab".into(), String::new())
+    );
+    assert_eq!(
+        run(r#"print "a"; exit unless 0; print "b""#),
+        (Some(0), "a".into(), String::new())
+    );
     assert_eq!(run(r#"exit 3 if 1"#).0, Some(3));
 }
 

@@ -186,9 +186,12 @@ fn lint_accepts_alias_spellings_the_parser_resolves() {
     ] {
         let p = parse(src).unwrap_or_else(|e| panic!("parse `{src}`: {e}"));
         let mut interp = VMHelper::new();
-        lint_program(&p, &mut interp)
-            .unwrap_or_else(|e| panic!("lint rejected `{src}`: {e} — regenerate \
-                 lsp_completion_words.txt (see builtins.rs::builtin_lsp_completion_words)"));
+        lint_program(&p, &mut interp).unwrap_or_else(|e| {
+            panic!(
+                "lint rejected `{src}`: {e} — regenerate \
+                 lsp_completion_words.txt (see builtins.rs::builtin_lsp_completion_words)"
+            )
+        });
     }
 
     // Negative control: a name in no table must still be reported.
