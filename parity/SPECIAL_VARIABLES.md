@@ -1,6 +1,6 @@
 # Perl special variables vs stryke
 
-This document audits **Perl 5’s “special” globals** against **stryke** as implemented in the tree-walker / VM (`strykelang/vm_helper.rs`, `strykelang/lexer.rs`, `strykelang/vm.rs`, `strykelang/scope.rs`). Full stock **perlvar** parity is not claimed; this file tracks what is wired, stubbed, or absent. **Any** scalar whose name starts with `^` (including `${^NAME}` from the lexer) is routed through [`get_special_var`](strykelang/vm_helper.rs); unknown names read from `VMHelper.special_caret_scalars` (default `undef`) and can be assigned for compatibility. Documented `${^NAME}` scalars from Perl 5 are pre-seeded (see [`special_vars::PERL5_DOCUMENTED_CARET_NAMES`](strykelang/special_vars.rs)) so `defined ${^NAME}` works without a prior assignment; a few have dedicated semantics (e.g. `${^UNICODE}`, `${^TAINT}`). **`${^OPEN}`** is **`1`** after **`use open`** with `:utf8` / `:std` / `:encoding(UTF-8)` (stryke enables UTF-8 lossy readline decoding); **`0`** otherwise — not Perl’s full I/O layer bitmask.
+This document audits **Perl 5’s “special” globals** against **stryke** as implemented in the VM (`strykelang/vm_helper.rs`, `strykelang/lexer.rs`, `strykelang/vm.rs`, `strykelang/scope.rs`). Full stock **perlvar** parity is not claimed; this file tracks what is wired, stubbed, or absent. **Any** scalar whose name starts with `^` (including `${^NAME}` from the lexer) is routed through [`get_special_var`](strykelang/vm_helper.rs); unknown names read from `VMHelper.special_caret_scalars` (default `undef`) and can be assigned for compatibility. Documented `${^NAME}` scalars from Perl 5 are pre-seeded (see [`special_vars::PERL5_DOCUMENTED_CARET_NAMES`](strykelang/special_vars.rs)) so `defined ${^NAME}` works without a prior assignment; a few have dedicated semantics (e.g. `${^UNICODE}`, `${^TAINT}`). **`${^OPEN}`** is **`1`** after **`use open`** with `:utf8` / `:std` / `:encoding(UTF-8)` (stryke enables UTF-8 lossy readline decoding); **`0`** otherwise — not Perl’s full I/O layer bitmask.
 
 Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists but semantics differ; **No** = not implemented or wrong tokenization.
 
@@ -43,7 +43,7 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 | `$^I` | In-place edit extension | `inplace_edit` string; lexer reads `$^` + letter as variable name `^I`. The **`stryke`/`stryke` driver** sets this from **`-i`** / **`-i.ext`** (backup suffix) and applies in-place rewrites for **`-n`/`-p`** over **`@ARGV`** files. |
 | `$^D` | Debug flags | `debug_flags` (`i64`). |
 | `$^P` | Debugger flags | `perl_debug_flags` (`i64`). |
-| `$^S` | Exception state (in eval) | `eval_nesting > 0` while `eval` runs (tree-walker and VM `eval` / `evalblock`). |
+| `$^S` | Exception state (in eval) | `eval_nesting > 0` while `eval` runs (VM `eval` / `evalblock`). |
 | `$^W` | Warnings | `warnings` boolean (`true` → `1`). |
 | `$^O` | OS name | `perl_osname()` maps `std::env::consts::OS` toward Perl names (`linux`, `darwin`, `MSWin32`, …). |
 | `$^T` | Script start time | `VMHelper.script_start_time` (seconds since Unix epoch, set in `VMHelper::new`). |
@@ -82,7 +82,7 @@ Legend: **Yes** = behavior matches intent for typical use; **Partial** = exists 
 | `$1`…`$n`, `%+`, `@-`, `@+` | Driven by the **Rust `regex` crate**; Perl’s regexp engine differs (lookbehind, backtracking, etc.). |
 | `@_` | Works as the **subroutine argument array** in user subs; not fully identical to Perl’s XS calling conventions. |
 | `pos $_` | Supported with `regex_pos` map; edge cases may differ from Perl. |
-| `%SIG` / `$^C` | Tree-walker: **between statements**. VM: **between opcodes** (not inside a single native/Rust op). `$^C` reads `1` once after `SIGINT` if the latch was set; see [`perl_signal`](strykelang/perl_signal.rs). |
+| `%SIG` / `$^C` | VM: **between opcodes** (not inside a single native/Rust op). `$^C` reads `1` once after `SIGINT` if the latch was set; see [`perl_signal`](strykelang/perl_signal.rs). |
 | `$^I` | The **`stryke`/`stryke` driver** applies **`-i`** / **`-i.bak`** for **`-n`/`-p`** over **`@ARGV`**; value is stored for compatibility with other code paths. |
 | `$^V` | String form only (`v…` from crate version); not a Perl `version` object. |
 | `$^E` | Uses `std::io::Error::last_os_error()`, not Perl’s per-platform extended error. |

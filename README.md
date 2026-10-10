@@ -893,7 +893,7 @@ val $report = bench heavy_work 1000
 # eval_timeout — runs block on a worker thread; recv_timeout on main
 eval_timeout 5 slow
 
-# retry / rate_limit / every (tree interpreter only)
+# retry / rate_limit / every
 retry http_call times => 3, backoff => exponential
 rate_limit(10, "1s") hit_api
 every "500ms" tick
@@ -2710,7 +2710,7 @@ stryke controller --bind 10.0.0.1    # specific interface
 **`eval` example session:**
 
 ```text
-stryke controller v0.17.58
+stryke controller v0.17.59
 > status
 node-01    16   64GB         idle      120s
 node-02    16   64GB         idle      118s
@@ -2954,7 +2954,7 @@ Demo: [`examples/provenance_basics.stk`](examples/provenance_basics.stk) walks t
 
 ### Builtins: `kick(...)` / `udp_send(...)` — TCP knock + UDP multi-shot
 
-Convenience builtins over standard socket calls. Both capabilities exist in every language's stdlib; stryke ships them as bare builtins so service probes / Wake-on-LAN scripts / NAT keepalives don't need a socket import. (`punch` — full NAT hole-punching with STUN discovery for peer-to-peer UDP between stryke instances behind NAT — lands in a follow-on commit.)
+Convenience builtins over standard socket calls. Both capabilities exist in every language's stdlib; stryke ships them as bare builtins so service probes / Wake-on-LAN scripts / NAT keepalives don't need a socket import. (`punch` — full NAT hole-punching with STUN discovery for peer-to-peer UDP between stryke instances behind NAT — is documented below.)
 
 ```perl
 # TCP service-health sweep — 250 ms per probe, returns 1 / 0.
@@ -2981,7 +2981,7 @@ Demo: [`examples/kick_probe.stk`](examples/kick_probe.stk).
 
 ### Builtins: `udp_open` / `stun` / `punch` / `udp_send_to` / `udp_recv` / `udp_close` — P2P over the open internet
 
-Stryke-to-stryke communication between two hosts behind arbitrary NATs, no infrastructure required. STUN client + UDP hole-punching state machine, both rolled in-tree (~500 lines of Rust, no third-party network crate dependency). Bytecode-VM-direct dispatch — same path as the rest of the builtins.
+Stryke-to-stryke communication between two hosts behind arbitrary NATs, no infrastructure required. STUN client + UDP hole-punching state machine, both rolled in-tree (in-tree Rust, no third-party network crate dependency). Bytecode-VM-direct dispatch — same path as the rest of the builtins.
 
 ```perl
 # Side A (any host, runs first):
@@ -3029,7 +3029,7 @@ Demo: [`examples/p2p_chat.stk`](examples/p2p_chat.stk) — runnable two-process 
 
 When `stun_classify` reports `symmetric` (~20-30% of real-world NAT scenarios — mobile carriers, some corporate firewalls), pure hole-punching cannot succeed. TURN routes every packet through a public relay server you trust, working regardless of NAT type at the cost of one network hop and the bandwidth budget of whoever runs the TURN server.
 
-RFC 8656 client implemented in-tree (~600 lines, no third-party network crate — reuses the existing `hmac` + `sha1` + `md-5` from RustCrypto for MESSAGE-INTEGRITY auth). Builds on the STUN binary protocol from `nat_punch.rs`; TURN messages are STUN-formatted frames with different message types and attributes.
+RFC 8656 client implemented in-tree (no third-party network crate — reuses the existing `hmac` + `sha1` + `md-5` from RustCrypto for MESSAGE-INTEGRITY auth). Builds on the STUN binary protocol from `nat_punch.rs`; TURN messages are STUN-formatted frames with different message types and attributes.
 
 ```perl
 # Side A (the listener):
@@ -3291,7 +3291,7 @@ What this ICE-lite does NOT cover (RFC 8445 proper):
 - TCP candidates (RFC 6544)
 - Trickle ICE (RFC 8838)
 
-These are useful in WebRTC where the orchestrator runs autonomously; for stryke's typical "two peers with manual signaling" case the three-rung ladder + first-success wins is enough and stays in ~200 lines of inspectable code.
+These are useful in WebRTC where the orchestrator runs autonomously; for stryke's typical "two peers with manual signaling" case the three-rung ladder + first-success wins is enough and stays in a small amount of inspectable code.
 
 ### Agent (Worker Daemon)
 

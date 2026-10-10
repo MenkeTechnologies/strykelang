@@ -79,7 +79,7 @@ This is real, working code. `cluster` opens persistent SSH connections to each h
 
 stryke ships with a complete distributed load testing system:
 
-### Controller (Master REPL)
+### Controller (REPL)
 
 ```sh
 stryke controller                    # listen on 0.0.0.0:9999
@@ -257,8 +257,8 @@ The following features are planned:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        MASTER REPL                               │
-│  fire / terminate / status / throttle                           │
+│                        CONTROLLER REPL                          │
+│  fire / terminate / status                                      │
 └─────────────────────────┬───────────────────────────────────────┘
                           │ TCP/Unix socket
         ┌─────────────────┼─────────────────┐
@@ -278,7 +278,7 @@ The following features are planned:
 ### Agent Lifecycle
 
 1. **Dormant** — agent starts with container, connects to master, waits
-2. **Armed** — master sends workload definition, agent compiles (or loads from SQLite cache)
+2. **Armed** — master sends workload definition, agent compiles (or loads from the script cache)
 3. **Firing** — agent executes workload, pins cores to 100% TDP
 4. **Reporting** — agent streams metrics back to master (CPU%, temp, memory)
 5. **Released** — master sends terminate, agent returns to dormant
@@ -358,7 +358,7 @@ spec:
       containers:
       - name: agent
         image: ghcr.io/REPLACE_WITH_YOUR_REGISTRY/stryke:latest
-        args: ["agent", "--master", "stryke-master.stryke-system:9999"]
+        args: ["agent", "--controller", "stryke-master.stryke-system:9999"]
         resources:
           requests:
             cpu: "10m"
@@ -382,31 +382,24 @@ spec:
     image: your-app:latest
   - name: stryke-agent
     image: ghcr.io/REPLACE_WITH_YOUR_REGISTRY/stryke:latest
-    args: ["agent", "--master", "stryke-master:9999"]
+    args: ["agent", "--controller", "stryke-master:9999"]
 ```
 
 ---
 
-## Master REPL Commands
+## Controller REPL Commands
 
 | Command | Description |
 |---------|-------------|
 | `status` | List connected agents with hostname, cores, state |
-| `fire` | Start workload on all agents |
-| `fire node1,node2` | Start workload on specific nodes |
-| `fire --cores=50%` | Limit to 50% of cores per agent |
+| `fire [SECS]` | Start workload on all agents (default: 10 seconds) |
 | `terminate` | Stop workload on all agents |
-| `terminate node1` | Stop workload on specific node |
-| `throttle 75%` | Adjust running workload intensity |
-| `metrics` | Show live metrics stream |
-| `history` | Show past stress test sessions |
-| `export FILE` | Export metrics to CSV/JSON |
 
 ### Example Session
 
 ```
-$ stryke master --bind 0.0.0.0:9999
-stryke master v0.17.16
+$ stryke controller --bind 0.0.0.0 --port 9999
+stryke controller v0.17.59
 listening on 0.0.0.0:9999
 agents: 0
 
@@ -415,13 +408,13 @@ agents: 0
 [agent connected: node3 (64 cores, 256GB)]
 agents: 3 (192 cores total)
 
-master> status
+controller> status
 NODE     CORES  MEM     STATE    CPU%  TEMP
 node1    64     256GB   dormant  2%    42°C
 node2    64     256GB   dormant  3%    41°C
 node3    64     256GB   dormant  2%    43°C
 
-master> fire
+controller> fire
 [arming 3 agents...]
 [firing...]
 
@@ -430,12 +423,9 @@ node1    64     256GB   firing   100%  78°C
 node2    64     256GB   firing   100%  76°C
 node3    64     256GB   firing   100%  79°C
 
-master> ^C
+controller> ^C
 [terminating...]
 [released]
-
-master> export stress_test_001.json
-[exported 3 agents, 847 data points]
 ```
 
 ---
@@ -501,21 +491,20 @@ Simulates real application workload at 100% intensity.
 
 ```
 # Terminal 1: Stress primary datacenter
-$ stryke master --cluster mahwah
-master> fire
+$ stryke controller
+controller> fire
 
 # Terminal 2: Monitor secondary
 $ watch kubectl --context=sandy-springs get pods
 
 # Terminal 1: Watch primary metrics, initiate failover
-master> metrics
 # ... observe degradation ...
 
 # Initiate DNS failover / traffic shift
 $ kubectl apply -f failover-to-secondary.yaml
 
 # Terminal 1: Release primary
-master> ^C
+controller> ^C
 
 # Validate secondary handled the load
 ```
@@ -523,25 +512,17 @@ master> ^C
 ### Generator Switchover
 
 ```
-master> fire --duration=10m   # sustained load
+controller> fire 600   # sustained load (seconds)
 # ... UPS battery drains ...
 # ... generator kicks in ...
 # ... ATS switches ...
-master> metrics              # watch for blips during switchover
 ```
 
 ### Thermal Monitoring
 
 ```
-master> fire
-master> metrics --watch=temp
-
-NODE     TEMP    STATUS
-node47   78°C    nominal
-node47   82°C    nominal
-node47   85°C    WARNING: approaching configured limit
-
-master> terminate   # graceful shutdown at configured threshold
+controller> fire
+controller> terminate   # graceful shutdown at configured threshold
 ```
 
 ---
@@ -550,7 +531,7 @@ master> terminate   # graceful shutdown at configured threshold
 
 ### Kill Switch
 
-Ctrl-C from master REPL immediately sends TERMINATE to all agents. Workloads stop within milliseconds.
+Ctrl-C from controller REPL immediately sends TERMINATE to all agents. Workloads stop within milliseconds.
 
 ### Automatic Limits
 
@@ -582,14 +563,7 @@ Every command logged with timestamp, user, affected nodes:
 
 ### Prometheus
 
-```yaml
-# stryke master exposes /metrics
-- job_name: 'stryke-master'
-  static_configs:
-  - targets: ['stryke-master:9999']
-```
-
-Metrics: `stryke_agents_total`, `stryke_cores_firing`, `stryke_cpu_percent`, `stryke_temp_celsius`
+`stress_metrics_prometheus()` returns the recorded metrics in Prometheus text-exposition format, one gauge per metric name, for a script to serve from its own `/metrics` handler.
 
 ### Grafana Dashboard
 
@@ -604,8 +578,8 @@ Import dashboard ID `XXXXX` for pre-built stress test visualization:
 ### CSV/JSON Export
 
 ```
-master> export --format=csv stress_001.csv
-master> export --format=json stress_001.json
+stress_metrics_export("stress_001.csv", format => "csv")
+stress_metrics_export("stress_001.json", format => "json")
 ```
 
 ---

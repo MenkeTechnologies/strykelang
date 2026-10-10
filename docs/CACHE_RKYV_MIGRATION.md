@@ -154,7 +154,7 @@ The migration didn't add a new world-first capability, but it removed an inconsi
 | File | Change |
 |---|---|
 | `Cargo.toml` | `+rkyv = "0.7"` (validation, archive_le, size_32). `rusqlite` retained for the user-facing `sqlite()` builtin. |
-| `strykelang/script_cache.rs` | Full rewrite. Was 486 LOC SQLite-backed; now 540 LOC rkyv-backed with the same public surface. |
+| `strykelang/script_cache.rs` | Full rewrite. Was SQLite-backed; now rkyv-backed with the same public surface. |
 | `strykelang/interpreter.rs` (since renamed to `strykelang/vm_helper.rs`) | Field rename `sqlite_cache_script_path` → `cache_script_path`. |
 | `strykelang/main.rs`, `lib.rs` | Comment updates; field-rename ripple. |
 | `strykelang/builtins.rs` | `cacheview` outer `Mutex<>` dropped (internal locking now). Disabled message: `STRYKE_CACHE=0`. |
