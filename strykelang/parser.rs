@@ -21953,6 +21953,7 @@ impl Parser {
                         ));
                     }
                     if i < chars.len()
+                        && crate::compat_mode()
                         && chars[i] == '{'
                         && !name.is_empty()
                         && !matches!(name.as_str(), "+" | "-")

@@ -5815,6 +5815,7 @@ impl<'a> VM<'a> {
                             }
                         } else if matches!(self.interp.wantarray_kind, WantarrayCtx::List)
                             && val.is_undef()
+                            && crate::compat_mode()
                         {
                             // `return undef` in list context is one element, not the empty list
                             // (a bare `return` takes `Op::Return`).
