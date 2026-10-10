@@ -8,9 +8,8 @@ use crate::common::*;
 
 #[test]
 fn my_in_inner_block_shadow_value_seen_inside_only() {
-    // BUG-233: outer `$x` is clobbered to undef after the bare `{...}`
-    // block declares `my $x = 20`. Perl preserves the outer value.
-    // Pin: the inner $x is 20, but outer is unset after block exit.
+    // BUG-233 (fixed): a bare `{...}` block that declares `my $x = 20` shadows
+    // the outer `$x` only inside the block; the outer value (10) survives.
     let code = r#"
         my $x = 10;
         my $r;
@@ -18,8 +17,7 @@ fn my_in_inner_block_shadow_value_seen_inside_only() {
             my $x = 20;
             $r = $x;
         }
-        # Inside, $r captured 20; outer $x is observed as undef/empty.
-        ($r == 20 && !defined($x)) ? 1 : 0
+        ($r == 20 && $x == 10) ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }

@@ -34,9 +34,8 @@ use crate::profiler::Profiler;
 use crate::scope::Scope;
 use crate::sort_fast::{detect_sort_block_fast, sort_magic_cmp};
 use crate::value::{
-    perl_list_range_expand, perl_shl_i64, perl_shr_i64, CaptureResult, PerlBarrier, PerlDataFrame,
-    PerlGenerator, PerlHeap, PerlPpool, PipelineInner, PipelineOp, RemoteCluster, StrykeAsyncTask,
-    StrykeSub, StrykeValue,
+    perl_list_range_expand, CaptureResult, PerlBarrier, PerlDataFrame, PerlGenerator, PerlHeap,
+    PerlPpool, PipelineInner, PipelineOp, RemoteCluster, StrykeAsyncTask, StrykeSub, StrykeValue,
 };
 
 /// Merge two counting-hash accumulators (parallel `preduce_init` partials).
@@ -585,13 +584,19 @@ fn pad_str(body: &str, width: usize, left: bool, fill: char) -> String {
 /// `""` is paragraph mode (runs of blank lines separate records and collapse to
 /// one `"\n\n"` terminator), `"\n"` is a plain line, and any other string
 /// terminates a record when the bytes read so far end with it. Returns the number
-/// of bytes appended, `0` at EOF.
+/// of bytes appended, `0` at EOF. A `record_len` (`$/ = \N`) reads up to that many
+/// bytes instead, whatever the separator.
 pub(crate) fn read_perl_record<R: BufRead>(
     r: &mut R,
     sep: Option<&str>,
+    record_len: Option<usize>,
     buf: &mut Vec<u8>,
 ) -> io::Result<usize> {
     let start = buf.len();
+    if let Some(n) = record_len {
+        r.take(n as u64).read_to_end(buf)?;
+        return Ok(buf.len() - start);
+    }
     match sep {
         None => {
             r.read_to_end(buf)?;
@@ -692,6 +697,8 @@ pub struct VMHelper {
     /// Input record separator (`$/`). `None` represents undef (slurp mode in `<>`).
     /// Default at startup: `Some("\n")`. `local $/` (no init) sets `None`.
     pub irs: Option<String>,
+    /// `$/ = \N` (fixed-size record reads): bytes per record. Takes precedence over `irs`.
+    pub irs_record_len: Option<usize>,
     /// $! — last OS error
     pub errno: String,
     /// Numeric errno for `$!` dualvar (`raw_os_error()`), `0` when unset.
@@ -1282,6 +1289,10 @@ pub(crate) fn normalize_replacement_backrefs(replacement: &str) -> String {
                 _ => out.push('\\'),
             }
         } else if c == '$' {
+            let named_capture = {
+                let mut ahead = it.clone();
+                ahead.next() == Some('+') && ahead.next() == Some('{')
+            };
             match it.peek() {
                 Some(&d) if d.is_ascii_digit() => {
                     it.next();
@@ -1298,6 +1309,11 @@ pub(crate) fn normalize_replacement_backrefs(replacement: &str) -> String {
                 }
                 Some(&'{') => {
                     // already braced — pass through as-is
+                    out.push('$');
+                }
+                Some(&'+') if named_capture => {
+                    // `$+{name}` — a named capture; `${name}` is the spelling every backend takes.
+                    it.next();
                     out.push('$');
                 }
                 Some(&'&') => {
@@ -1782,6 +1798,7 @@ impl VMHelper {
             ofs: String::new(),
             ors: String::new(),
             irs: Some("\n".to_string()),
+            irs_record_len: None,
             errno: String::new(),
             errno_code: 0,
             eval_error: String::new(),
@@ -2145,6 +2162,7 @@ impl VMHelper {
             ofs: self.ofs.clone(),
             ors: self.ors.clone(),
             irs: self.irs.clone(),
+            irs_record_len: self.irs_record_len,
             errno: self.errno.clone(),
             errno_code: self.errno_code,
             eval_error: self.eval_error.clone(),
@@ -6143,6 +6161,7 @@ impl VMHelper {
         handle: Option<&str>,
     ) -> StrykeResult<StrykeValue> {
         let irs = self.irs.clone();
+        let record_len = self.irs_record_len;
         // `<>` / `readline` with no handle: iterate `@ARGV` files, else stdin.
         if handle.is_none() {
             let argv = self.scope.get_array("ARGV");
@@ -6174,14 +6193,16 @@ impl VMHelper {
                         if let Some(reader) = self.diamond_reader.as_mut() {
                             if self.open_pragma_utf8 {
                                 let mut buf = Vec::new();
-                                read_perl_record(reader, irs.as_deref(), &mut buf).inspect(|n| {
-                                    if *n > 0 {
-                                        line_str = String::from_utf8_lossy(&buf).into_owned();
-                                    }
-                                })
+                                read_perl_record(reader, irs.as_deref(), record_len, &mut buf)
+                                    .inspect(|n| {
+                                        if *n > 0 {
+                                            line_str = String::from_utf8_lossy(&buf).into_owned();
+                                        }
+                                    })
                             } else {
                                 let mut buf = Vec::new();
-                                match read_perl_record(reader, irs.as_deref(), &mut buf) {
+                                match read_perl_record(reader, irs.as_deref(), record_len, &mut buf)
+                                {
                                     Ok(n) => {
                                         if n > 0 {
                                             line_str =
@@ -6232,7 +6253,13 @@ impl VMHelper {
             }
             let r: Result<usize, io::Error> = if self.open_pragma_utf8 {
                 let mut buf = Vec::new();
-                read_perl_record(&mut io::stdin().lock(), irs.as_deref(), &mut buf).inspect(|n| {
+                read_perl_record(
+                    &mut io::stdin().lock(),
+                    irs.as_deref(),
+                    record_len,
+                    &mut buf,
+                )
+                .inspect(|n| {
                     if *n > 0 {
                         line_str = String::from_utf8_lossy(&buf).into_owned();
                     }
@@ -6240,7 +6267,7 @@ impl VMHelper {
             } else {
                 let mut buf = Vec::new();
                 let mut lock = io::stdin().lock();
-                match read_perl_record(&mut lock, irs.as_deref(), &mut buf) {
+                match read_perl_record(&mut lock, irs.as_deref(), record_len, &mut buf) {
                     Ok(n) => {
                         if n > 0 {
                             line_str = crate::perl_decode::decode_utf8_or_latin1_read_until(&buf);
@@ -6268,7 +6295,7 @@ impl VMHelper {
             }
         } else if let Some(reader) = self.input_handles.get_mut(handle_name) {
             // Check $/ for slurp mode (None/undef = read entire file)
-            let slurp_mode = self.irs.is_none();
+            let slurp_mode = self.irs.is_none() && self.irs_record_len.is_none();
             let r: Result<usize, io::Error> = if slurp_mode {
                 // Slurp mode: read entire remaining content
                 let mut buf = Vec::new();
@@ -6287,14 +6314,14 @@ impl VMHelper {
                 }
             } else if self.open_pragma_utf8 {
                 let mut buf = Vec::new();
-                read_perl_record(reader, irs.as_deref(), &mut buf).inspect(|n| {
+                read_perl_record(reader, irs.as_deref(), record_len, &mut buf).inspect(|n| {
                     if *n > 0 {
                         line_str = String::from_utf8_lossy(&buf).into_owned();
                     }
                 })
             } else {
                 let mut buf = Vec::new();
-                match read_perl_record(reader, irs.as_deref(), &mut buf) {
+                match read_perl_record(reader, irs.as_deref(), record_len, &mut buf) {
                     Ok(n) => {
                         if n > 0 {
                             line_str = crate::perl_decode::decode_utf8_or_latin1_read_until(&buf);
@@ -7032,12 +7059,11 @@ impl VMHelper {
                 }
                 return Ok(StrykeValue::perl_bool(false));
             }
-            let sub = s.get(start..).unwrap_or("");
-            if let Some(caps) = re.captures(sub) {
+            if let Some((caps, base)) = re.captures_at(&s, start) {
                 let overall = caps.get(0).expect("capture 0");
-                let abs_end = start + overall.end;
+                let abs_end = base + overall.end;
                 self.regex_pos.insert(key, Some(abs_end));
-                self.apply_regex_captures(&s, start, &re, &caps, CaptureAllMode::Append)?;
+                self.apply_regex_captures(&s, base, &re, &caps, CaptureAllMode::Append)?;
                 Ok(StrykeValue::integer(1))
             } else {
                 if !keep_pos_on_failure {
@@ -10296,7 +10322,7 @@ impl VMHelper {
                 {
                     s
                 } else {
-                    StrykeValue::integer(old.to_int() & rhs.to_int())
+                    crate::value::perl_bit_int_op(&old, &rhs, crate::value::BitIntOp::And)
                 }
             }
             BinOp::BitOr => {
@@ -10307,12 +10333,12 @@ impl VMHelper {
                 {
                     s
                 } else {
-                    StrykeValue::integer(old.to_int() | rhs.to_int())
+                    crate::value::perl_bit_int_op(&old, &rhs, crate::value::BitIntOp::Or)
                 }
             }
-            BinOp::BitXor => StrykeValue::integer(old.to_int() ^ rhs.to_int()),
-            BinOp::ShiftLeft => StrykeValue::integer(perl_shl_i64(old.to_int(), rhs.to_int())),
-            BinOp::ShiftRight => StrykeValue::integer(perl_shr_i64(old.to_int(), rhs.to_int())),
+            BinOp::BitXor => crate::value::perl_bit_int_op(&old, &rhs, crate::value::BitIntOp::Xor),
+            BinOp::ShiftLeft => crate::value::perl_shift(&old, &rhs, true),
+            BinOp::ShiftRight => crate::value::perl_shift(&old, &rhs, false),
             BinOp::Div => StrykeValue::float(old.to_number() / rhs.to_number()),
             BinOp::Mod => {
                 // Return 0 on b==0 silently — this helper is the
@@ -10725,6 +10751,7 @@ impl VMHelper {
         let line = expr.line;
         match &expr.kind {
             ExprKind::Integer(n) => Ok(StrykeValue::integer(*n)),
+            ExprKind::UnsignedInteger(n) => Ok(StrykeValue::unsigned(*n)),
             ExprKind::Float(f) => Ok(StrykeValue::float(*f)),
             ExprKind::String(s) => {
                 let processed = Self::process_case_escapes(s);
@@ -11445,7 +11472,7 @@ impl VMHelper {
                         let n = self.resolved_scalar_storage_name(name);
                         return Ok(self
                             .scope
-                            .atomic_mutate(&n, |v| perl_dec(v))
+                            .atomic_mutate(&n, perl_dec)
                             .map_err(|e| e.at_line(line))?);
                     }
                     if let ExprKind::Deref { kind, .. } = &expr.kind {
@@ -11516,7 +11543,7 @@ impl VMHelper {
                             }
                             Ok(StrykeValue::perl_bool(!val.is_true()))
                         }
-                        UnaryOp::BitNot => Ok(StrykeValue::integer(!val.to_int())),
+                        UnaryOp::BitNot => Ok(crate::value::perl_bit_not(&val)),
                         UnaryOp::LogNotWord => {
                             if let Some(r) = self.try_overload_unary_dispatch("bool", &val, line) {
                                 let pv = r?;
@@ -11735,15 +11762,23 @@ impl VMHelper {
                                 StrykeValue::string(s)
                             }
                             BinOp::Pow => StrykeValue::float(old.to_number().powf(rhs.to_number())),
-                            BinOp::BitAnd => StrykeValue::integer(old.to_int() & rhs.to_int()),
-                            BinOp::BitOr => StrykeValue::integer(old.to_int() | rhs.to_int()),
-                            BinOp::BitXor => StrykeValue::integer(old.to_int() ^ rhs.to_int()),
-                            BinOp::ShiftLeft => {
-                                StrykeValue::integer(perl_shl_i64(old.to_int(), rhs.to_int()))
-                            }
-                            BinOp::ShiftRight => {
-                                StrykeValue::integer(perl_shr_i64(old.to_int(), rhs.to_int()))
-                            }
+                            BinOp::BitAnd => crate::value::perl_bit_int_op(
+                                &old,
+                                &rhs,
+                                crate::value::BitIntOp::And,
+                            ),
+                            BinOp::BitOr => crate::value::perl_bit_int_op(
+                                &old,
+                                &rhs,
+                                crate::value::BitIntOp::Or,
+                            ),
+                            BinOp::BitXor => crate::value::perl_bit_int_op(
+                                &old,
+                                &rhs,
+                                crate::value::BitIntOp::Xor,
+                            ),
+                            BinOp::ShiftLeft => crate::value::perl_shift(&old, &rhs, true),
+                            BinOp::ShiftRight => crate::value::perl_shift(&old, &rhs, false),
                             _ => StrykeValue::float(old.to_number() + rhs.to_number()),
                         })?);
                 }
@@ -14226,6 +14261,7 @@ impl VMHelper {
                 line,
             ),
             ExprKind::Delete(expr) => self.eval_delete_operand(expr.as_ref(), line),
+            ExprKind::DeleteLocal(expr) => self.eval_delete_local_operand(expr.as_ref(), line),
             ExprKind::Exists(expr) => self.eval_exists_operand(expr.as_ref(), line),
             ExprKind::Keys(expr) => {
                 let val = self.eval_expr_ctx(expr, WantarrayCtx::List)?;
@@ -14502,11 +14538,9 @@ impl VMHelper {
             ExprKind::Sqrt(expr) => {
                 let val = self.eval_expr(expr)?;
                 if crate::compat_mode() && val.to_number() < 0.0 {
-                    return Err(StrykeError::runtime(
-                        format!("Can't take sqrt of {}", val.to_string()),
-                        line,
-                    )
-                    .into());
+                    return Err(
+                        StrykeError::runtime(format!("Can't take sqrt of {}", val), line).into(),
+                    );
                 }
                 Ok(StrykeValue::float(val.to_number().sqrt()))
             }
@@ -14530,11 +14564,9 @@ impl VMHelper {
             ExprKind::Log(expr) => {
                 let val = self.eval_expr(expr)?;
                 if crate::compat_mode() && val.to_number() <= 0.0 {
-                    return Err(StrykeError::runtime(
-                        format!("Can't take log of {}", val.to_string()),
-                        line,
-                    )
-                    .into());
+                    return Err(
+                        StrykeError::runtime(format!("Can't take log of {}", val), line).into(),
+                    );
                 }
                 Ok(StrykeValue::float(val.to_number().ln()))
             }
@@ -14556,12 +14588,8 @@ impl VMHelper {
             ExprKind::Oct(expr) => Ok(StrykeValue::integer(self.eval_expr(expr)?.oct_value())),
 
             // Case
-            ExprKind::Lc(expr) => Ok(StrykeValue::string(
-                self.eval_expr(expr)?.to_string().to_lowercase(),
-            )),
-            ExprKind::Uc(expr) => Ok(StrykeValue::string(
-                self.eval_expr(expr)?.to_string().to_uppercase(),
-            )),
+            ExprKind::Lc(expr) => Ok(StrykeValue::string(self.eval_expr(expr)?.lc_value())),
+            ExprKind::Uc(expr) => Ok(StrykeValue::string(self.eval_expr(expr)?.uc_value())),
             ExprKind::Lcfirst(expr) => {
                 let s = self.eval_expr(expr)?.to_string();
                 let mut chars = s.chars();
@@ -15732,7 +15760,9 @@ impl VMHelper {
                 }
             }
             BinOp::Div => {
-                if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
+                if let Some(v) = crate::value::perl_div_uv(lv, rv) {
+                    v
+                } else if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
                     if b == 0 {
                         return Err(StrykeError::division_by_zero(
                             "Illegal division by zero",
@@ -15758,6 +15788,9 @@ impl VMHelper {
                 }
             }
             BinOp::Mod => {
+                if let Some(v) = crate::value::perl_mod_uv(lv, rv) {
+                    return Ok(v);
+                }
                 let d = rv.to_int();
                 if d == 0 {
                     return Err(StrykeError::division_by_zero("Illegal modulus zero", _line).into());
@@ -15890,7 +15923,7 @@ impl VMHelper {
                 {
                     s
                 } else {
-                    StrykeValue::integer(lv.to_int() & rv.to_int())
+                    crate::value::perl_bit_int_op(lv, rv, crate::value::BitIntOp::And)
                 }
             }
             BinOp::BitOr => {
@@ -15901,15 +15934,17 @@ impl VMHelper {
                 {
                     s
                 } else {
-                    StrykeValue::integer(lv.to_int() | rv.to_int())
+                    crate::value::perl_bit_int_op(lv, rv, crate::value::BitIntOp::Or)
                 }
             }
             BinOp::BitXor => {
                 crate::value::perl_string_bitop(lv, rv, crate::value::StringBitOp::Xor)
-                    .unwrap_or_else(|| StrykeValue::integer(lv.to_int() ^ rv.to_int()))
+                    .unwrap_or_else(|| {
+                        crate::value::perl_bit_int_op(lv, rv, crate::value::BitIntOp::Xor)
+                    })
             }
-            BinOp::ShiftLeft => StrykeValue::integer(perl_shl_i64(lv.to_int(), rv.to_int())),
-            BinOp::ShiftRight => StrykeValue::integer(perl_shr_i64(lv.to_int(), rv.to_int())),
+            BinOp::ShiftLeft => crate::value::perl_shift(lv, rv, true),
+            BinOp::ShiftRight => crate::value::perl_shift(lv, rv, false),
             // These should have been handled by short-circuit above
             BinOp::LogAnd
             | BinOp::LogOr
@@ -17512,6 +17547,10 @@ impl VMHelper {
                     StrykeValue::errno_dual(self.eval_error_code, self.eval_error.clone())
                 }
             }
+            "/" if self.irs_record_len.is_some() => {
+                let n = self.irs_record_len.unwrap_or_default();
+                StrykeValue::scalar_ref(Arc::new(RwLock::new(StrykeValue::integer(n as i64))))
+            }
             "/" => match &self.irs {
                 Some(s) => StrykeValue::string(s.clone()),
                 None => StrykeValue::UNDEF,
@@ -17637,7 +17676,14 @@ impl VMHelper {
             }
             "0" => self.program_name = val.to_string(),
             "/" => {
-                self.irs = if val.is_undef() {
+                self.irs_record_len = val
+                    .as_scalar_ref()
+                    .map(|r| r.read().to_int())
+                    .filter(|n| *n > 0)
+                    .map(|n| n as usize);
+                self.irs = if self.irs_record_len.is_some() {
+                    Some("\n".to_string())
+                } else if val.is_undef() {
                     None
                 } else {
                     Some(val.to_string())
@@ -22519,6 +22565,44 @@ impl VMHelper {
         Self::values_from_value(val, line)
     }
 
+    /// `delete local $h{k}` / `delete local $a[i]` for the tree-walking evaluator.
+    pub(crate) fn eval_delete_local_operand(
+        &mut self,
+        expr: &Expr,
+        line: usize,
+    ) -> Result<StrykeValue, FlowOrError> {
+        match &expr.kind {
+            ExprKind::HashElement { hash, key } => {
+                let k = self.eval_expr(key)?.to_string();
+                self.touch_env_hash(hash);
+                let hname = self.tree_hash_storage_name(hash);
+                let old = self.scope.get_hash_element(&hname, &k);
+                self.scope
+                    .local_set_hash_element(&hname, &k, StrykeValue::UNDEF)
+                    .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
+                self.scope
+                    .delete_hash_element(&hname, &k)
+                    .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
+                Ok(old)
+            }
+            ExprKind::ArrayElement { array, index } => {
+                self.check_strict_array_var(array, line)?;
+                let i = self.eval_expr(index)?.to_int();
+                let old = self.scope.get_array_element(array, i);
+                self.scope
+                    .local_set_array_element(array, i, StrykeValue::UNDEF)
+                    .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
+                self.scope
+                    .delete_array_element(array, i)
+                    .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
+                Ok(old)
+            }
+            _ => Err(
+                StrykeError::runtime("delete local on this lvalue is not supported", line).into(),
+            ),
+        }
+    }
+
     pub(crate) fn eval_delete_operand(
         &mut self,
         expr: &Expr,
@@ -23973,10 +24057,10 @@ where
                 let pad = w.saturating_sub(1);
                 if left_align {
                     result.push('%');
-                    result.extend(std::iter::repeat(' ').take(pad));
+                    result.extend(std::iter::repeat_n(' ', pad));
                 } else {
                     let fill = if flags.contains('0') { '0' } else { ' ' };
-                    result.extend(std::iter::repeat(fill).take(pad));
+                    result.extend(std::iter::repeat_n(fill, pad));
                     result.push('%');
                 }
                 continue;
@@ -24110,7 +24194,7 @@ where
 
             let formatted = match spec {
                 'd' | 'i' => {
-                    let v = arg.to_int();
+                    let v = crate::value::perl_iv_arg(&arg);
                     let body = if plus && v >= 0 {
                         format!("+{}", v)
                     } else if space && v >= 0 {
@@ -24121,7 +24205,7 @@ where
                     pad_align(&body, w, left_align, zero_pad)
                 }
                 'u' => {
-                    let v = arg.to_int() as u64;
+                    let v = crate::value::perl_uv_arg(&arg);
                     pad_align(&format!("{}", v), w, left_align, zero_pad)
                 }
                 'f' => {
@@ -24202,22 +24286,22 @@ where
                     }
                 }
                 'x' => {
-                    let v = arg.to_int();
+                    let v = crate::value::perl_uv_arg(&arg);
                     let prefix = if hash && v != 0 { "0x" } else { "" };
                     pad_align_radix(prefix, &format!("{:x}", v), w, left_align, zero_pad)
                 }
                 'X' => {
-                    let v = arg.to_int();
+                    let v = crate::value::perl_uv_arg(&arg);
                     let prefix = if hash && v != 0 { "0X" } else { "" };
                     pad_align_radix(prefix, &format!("{:X}", v), w, left_align, zero_pad)
                 }
                 'o' => {
-                    let v = arg.to_int();
+                    let v = crate::value::perl_uv_arg(&arg);
                     let prefix = if hash && v != 0 { "0" } else { "" };
                     pad_align_radix(prefix, &format!("{:o}", v), w, left_align, zero_pad)
                 }
                 'b' => {
-                    let v = arg.to_int();
+                    let v = crate::value::perl_uv_arg(&arg);
                     let prefix = if hash && v != 0 { "0b" } else { "" };
                     pad_align_radix(prefix, &format!("{:b}", v), w, left_align, zero_pad)
                 }
@@ -24225,7 +24309,7 @@ where
                     let code = arg.to_int();
                     if code < 0 && crate::compat_mode() {
                         return Err(StrykeError::runtime(
-                            format!("Cannot printf {} with 'c'", arg.to_string()),
+                            format!("Cannot printf {} with 'c'", arg),
                             0,
                         )
                         .into());
@@ -24421,10 +24505,9 @@ pub(crate) fn exec_builtin(
             let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
             if crate::compat_mode() && val.to_number() < 0.0 {
                 return Err(StrykeError::runtime(
-                    format!("Can't take sqrt of {}", val.to_string()),
+                    format!("Can't take sqrt of {}", val),
                     line,
-                )
-                .into());
+                ));
             }
             Ok(StrykeValue::float(val.to_number().sqrt()))
         }
@@ -24450,10 +24533,9 @@ pub(crate) fn exec_builtin(
             let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
             if crate::compat_mode() && val.to_number() <= 0.0 {
                 return Err(StrykeError::runtime(
-                    format!("Can't take log of {}", val.to_string()),
+                    format!("Can't take log of {}", val),
                     line,
-                )
-                .into());
+                ));
             }
             Ok(StrykeValue::float(val.to_number().ln()))
         }

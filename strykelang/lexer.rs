@@ -287,6 +287,14 @@ impl Lexer {
         }
     }
 
+    /// An integer literal token: an IV when it fits, otherwise a UV.
+    fn integer_token(val: u64) -> Token {
+        match i64::try_from(val) {
+            Ok(n) => Token::Integer(n),
+            Err(_) => Token::UnsignedInteger(val),
+        }
+    }
+
     fn read_while(&mut self, pred: impl Fn(char) -> bool) -> String {
         let mut s = String::new();
         while let Some(ch) = self.peek() {
@@ -568,9 +576,9 @@ impl Lexer {
                     self.advance();
                     let digits = self.read_while(|c| c.is_ascii_digit() || c == '_');
                     let clean: String = digits.chars().filter(|&c| c != '_').collect();
-                    let val = i64::from_str_radix(&clean, 8)
+                    let val = u64::from_str_radix(&clean, 8)
                         .map_err(|_| self.syntax_err("Invalid octal literal", self.line))?;
-                    return Ok(Token::Integer(val));
+                    return Ok(Self::integer_token(val));
                 }
                 Some(c) if c.is_ascii_digit() => {
                     is_oct = true;
@@ -582,7 +590,7 @@ impl Lexer {
         if is_hex {
             let digits = self.read_while(|c| c.is_ascii_hexdigit() || c == '_');
             let clean: String = digits.chars().filter(|&c| c != '_').collect();
-            let val = i64::from_str_radix(&clean, 16)
+            let val = u64::from_str_radix(&clean, 16)
                 .map_err(|_| self.syntax_err("Invalid hex literal", self.line))?;
             // Range-context lookahead: `0x00:0xFF:1` should iterate as hex
             // strings (`0x00`, `0x01`, …, `0xFF`), preserving the leading
@@ -595,14 +603,14 @@ impl Lexer {
                 let raw: String = self.input[start..self.pos].iter().collect();
                 return Ok(Token::DoubleString(raw));
             }
-            return Ok(Token::Integer(val));
+            return Ok(Self::integer_token(val));
         }
         if is_bin {
             let digits = self.read_while(|c| c == '0' || c == '1' || c == '_');
             let clean: String = digits.chars().filter(|&c| c != '_').collect();
-            let val = i64::from_str_radix(&clean, 2)
+            let val = u64::from_str_radix(&clean, 2)
                 .map_err(|_| self.syntax_err("Invalid binary literal", self.line))?;
-            return Ok(Token::Integer(val));
+            return Ok(Self::integer_token(val));
         }
 
         // Decimal or octal
@@ -663,20 +671,17 @@ impl Lexer {
                 .map_err(|_| self.syntax_err("Invalid float literal", self.line))?;
             Ok(Token::Float(val))
         } else if is_oct && clean.starts_with('0') && clean.len() > 1 {
-            let val = i64::from_str_radix(&clean[1..], 8)
+            let val = u64::from_str_radix(&clean[1..], 8)
                 .map_err(|_| self.syntax_err("Invalid octal literal", self.line))?;
-            Ok(Token::Integer(val))
-        } else if let Ok(val) = clean.parse::<i64>() {
-            Ok(Token::Integer(val))
-        } else if clean.parse::<u64>().is_err() {
-            // Beyond UV_MAX perl falls back to an NV literal. The IV_MAX+1..=UV_MAX
-            // band needs an unsigned scalar, which stryke lacks, so it stays an error.
+            Ok(Self::integer_token(val))
+        } else if let Ok(val) = clean.parse::<u64>() {
+            Ok(Self::integer_token(val))
+        } else {
+            // Beyond UV_MAX perl falls back to an NV literal.
             let val: f64 = clean
                 .parse()
                 .map_err(|_| self.syntax_err("Invalid integer literal", self.line))?;
             Ok(Token::Float(val))
-        } else {
-            Err(self.syntax_err("Invalid integer literal", self.line))
         }
     }
 

@@ -4,6 +4,8 @@ pub enum Token {
     // Literals
     /// `Integer` variant.
     Integer(i64),
+    /// Integer literal in `IV_MAX+1 ..= UV_MAX` (perl stores it as a UV).
+    UnsignedInteger(u64),
     /// `Float` variant.
     Float(f64),
     /// `SingleString` variant.
@@ -271,6 +273,7 @@ impl Token {
         matches!(
             self,
             Token::Integer(_)
+                | Token::UnsignedInteger(_)
                 | Token::Float(_)
                 | Token::SingleString(_)
                 | Token::DoubleString(_)

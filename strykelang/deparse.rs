@@ -733,6 +733,9 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
         ExprKind::Integer(n) => {
             let _ = write!(buf, "{}", n);
         }
+        ExprKind::UnsignedInteger(n) => {
+            let _ = write!(buf, "{}", n);
+        }
         ExprKind::Float(f) => {
             let _ = write!(buf, "{}", f);
         }

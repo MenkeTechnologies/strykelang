@@ -85,6 +85,70 @@ pub fn expr_tail_is_list_sensitive(expr: &Expr) -> bool {
 /// otherwise evaluated its arms in scalar context, and the comma operator
 /// collapsed the pair list to its last element. `Carp::caller_info` returns
 /// exactly that shape.
+/// The read-back form of a list-assignment target: `my $p` becomes `$p`, `my ($a, @b)` becomes
+/// `($a, @b)`; plain lvalues are their own rvalue.
+fn lvalue_list_as_rvalue(target: &Expr) -> Expr {
+    let line = target.line;
+    let kind = match &target.kind {
+        ExprKind::List(items) => ExprKind::List(items.iter().map(lvalue_list_as_rvalue).collect()),
+        ExprKind::MyExpr { decls, .. } => ExprKind::List(
+            decls
+                .iter()
+                .map(|d| Expr {
+                    kind: match d.sigil {
+                        Sigil::Array => ExprKind::ArrayVar(d.name.clone()),
+                        Sigil::Hash => ExprKind::HashVar(d.name.clone()),
+                        _ => ExprKind::ScalarVar(d.name.clone()),
+                    },
+                    line,
+                })
+                .collect(),
+        ),
+        other => other.clone(),
+    };
+    Expr { kind, line }
+}
+
+/// True when `e` is a single scalar by construction, so in list context it is a one-element
+/// list even when its value is `undef` (`my @a = (undef)` has one element).
+fn is_single_scalar_expr(e: &Expr) -> bool {
+    match &e.kind {
+        ExprKind::Undef
+        | ExprKind::ScalarVar(_)
+        | ExprKind::Integer(_)
+        | ExprKind::UnsignedInteger(_)
+        | ExprKind::Float(_)
+        | ExprKind::String(_)
+        | ExprKind::InterpolatedString(_)
+        | ExprKind::ArrayElement { .. }
+        | ExprKind::HashElement { .. } => true,
+        ExprKind::List(items) => items.len() == 1 && is_single_scalar_expr(&items[0]),
+        _ => false,
+    }
+}
+
+/// True when evaluating `e` in scalar context gives something other than the last element of
+/// its list-context value: an array yields its length, a hash its key count.
+pub(crate) fn scalar_context_differs_from_list_tail(e: &Expr) -> bool {
+    match &e.kind {
+        ExprKind::ArrayVar(_) | ExprKind::HashVar(_) => true,
+        ExprKind::Deref {
+            kind: Sigil::Array | Sigil::Hash,
+            ..
+        } => true,
+        ExprKind::List(items) => items.iter().any(scalar_context_differs_from_list_tail),
+        ExprKind::Ternary {
+            then_expr,
+            else_expr,
+            ..
+        } => {
+            scalar_context_differs_from_list_tail(then_expr)
+                || scalar_context_differs_from_list_tail(else_expr)
+        }
+        _ => false,
+    }
+}
+
 pub(crate) fn return_operand_is_list_shaped(e: &Expr) -> bool {
     match &e.kind {
         ExprKind::Range { .. }
@@ -100,6 +164,24 @@ pub(crate) fn return_operand_is_list_shaped(e: &Expr) -> bool {
             else_expr,
             ..
         } => return_operand_is_list_shaped(then_expr) || return_operand_is_list_shaped(else_expr),
+        _ => false,
+    }
+}
+
+/// A hash-slice subscript whose key count is known at compile time: scalars, `qw`, and lists
+/// of scalars. Anything else (`@a`, a call, `(LIST)[..]`, `sort ...`) is flattened at run time.
+fn hash_slice_key_is_static(k: &Expr) -> bool {
+    match &k.kind {
+        ExprKind::ScalarVar(_)
+        | ExprKind::Integer(_)
+        | ExprKind::UnsignedInteger(_)
+        | ExprKind::Float(_)
+        | ExprKind::String(_)
+        | ExprKind::InterpolatedString(_)
+        | ExprKind::ArrayElement { .. }
+        | ExprKind::HashElement { .. }
+        | ExprKind::QW(_) => true,
+        ExprKind::List(items) => items.iter().all(hash_slice_key_is_static),
         _ => false,
     }
 }
@@ -406,22 +488,22 @@ impl Compiler {
     /// array slice) is compiled in list context so the VM's hash-slice
     /// helpers see all the elements instead of a scalarized count.
     fn compile_hash_slice_key_expr(&mut self, key_expr: &Expr) -> Result<(), CompileError> {
+        // The subscript of a slice is evaluated in list context; only expressions that are
+        // scalars by construction skip it.
         if matches!(
             &key_expr.kind,
-            ExprKind::Range { .. }
-                | ExprKind::SliceRange { .. }
-                | ExprKind::ArrayVar(_)
-                | ExprKind::Deref {
-                    kind: Sigil::Array,
-                    ..
-                }
-                | ExprKind::ArraySlice { .. }
-                | ExprKind::QW(_)
-                | ExprKind::List(_)
+            ExprKind::ScalarVar(_)
+                | ExprKind::Integer(_)
+                | ExprKind::UnsignedInteger(_)
+                | ExprKind::Float(_)
+                | ExprKind::String(_)
+                | ExprKind::InterpolatedString(_)
+                | ExprKind::ArrayElement { .. }
+                | ExprKind::HashElement { .. }
         ) {
-            self.compile_expr_ctx(key_expr, WantarrayCtx::List)
-        } else {
             self.compile_expr(key_expr)
+        } else {
+            self.compile_expr_ctx(key_expr, WantarrayCtx::List)
         }
     }
 
@@ -1591,7 +1673,15 @@ impl Compiler {
         }
         if matches!(
             name,
-            "_" | "ARGV" | "INC" | "ENV" | "ISA" | "EXPORT" | "EXPORT_OK" | "EXPORT_FAIL"
+            "_" | "ARGV"
+                | "INC"
+                | "ENV"
+                | "ISA"
+                | "EXPORT"
+                | "EXPORT_OK"
+                | "EXPORT_FAIL"
+                | "-"
+                | "+"
         ) {
             return true;
         }
@@ -2810,6 +2900,9 @@ impl Compiler {
                         let name_idx = self.chunk.intern_name(&stash);
                         if let Some(init) = &decl.initializer {
                             self.compile_expr_ctx(init, WantarrayCtx::List)?;
+                            if is_single_scalar_expr(init) {
+                                self.chunk.emit(Op::MakeArray(1), line);
+                            }
                         } else {
                             self.chunk.emit(Op::LoadUndef, line);
                         }
@@ -2837,6 +2930,9 @@ impl Compiler {
                         let name_idx = self.chunk.intern_name(&stash);
                         if let Some(init) = &decl.initializer {
                             self.compile_expr_ctx(init, WantarrayCtx::List)?;
+                            if is_single_scalar_expr(init) {
+                                self.chunk.emit(Op::MakeArray(1), line);
+                            }
                         } else {
                             self.chunk.emit(Op::LoadUndef, line);
                         }
@@ -3129,6 +3225,21 @@ impl Compiler {
         Ok(())
     }
 
+    /// RHS of `local @x[..] = LIST` (list context), or `undef` placeholder when absent.
+    fn compile_local_slice_values(
+        &mut self,
+        initializer: Option<&Expr>,
+        line: usize,
+    ) -> Result<(), CompileError> {
+        match initializer {
+            Some(init) => self.compile_expr_ctx(init, WantarrayCtx::List),
+            None => {
+                self.chunk.emit(Op::LoadUndef, line);
+                Ok(())
+            }
+        }
+    }
+
     /// `local $h{k} = …` / `local $SIG{__WARN__}` — not plain [`StmtKind::Local`] declarations.
     fn compile_local_expr(
         &mut self,
@@ -3162,6 +3273,33 @@ impl Compiler {
                 }
                 self.compile_expr(index)?;
                 self.chunk.emit(Op::LocalDeclareArrayElement(arr_idx), line);
+                Ok(())
+            }
+            ExprKind::HashSlice { hash, keys } => {
+                self.check_strict_hash_access(hash, line)?;
+                self.check_hash_mutable(hash, line)?;
+                let hash_idx = self.chunk.intern_name(hash);
+                self.compile_local_slice_values(initializer, line)?;
+                for key_expr in keys {
+                    self.compile_hash_slice_key_expr(key_expr)?;
+                }
+                self.chunk
+                    .emit(Op::LocalDeclareHashSlice(hash_idx, keys.len() as u16), line);
+                Ok(())
+            }
+            ExprKind::ArraySlice { array, indices } => {
+                self.check_strict_array_access(array, line)?;
+                let q = self.qualify_stash_array_name(array);
+                self.check_array_mutable(&q, line)?;
+                let arr_idx = self.chunk.intern_name(&q);
+                self.compile_local_slice_values(initializer, line)?;
+                for ix in indices {
+                    self.compile_array_slice_index_expr(ix)?;
+                }
+                self.chunk.emit(
+                    Op::LocalDeclareArraySlice(arr_idx, indices.len() as u16),
+                    line,
+                );
                 Ok(())
             }
             ExprKind::Typeglob(name) => {
@@ -3256,7 +3394,46 @@ impl Compiler {
         }
     }
 
+    /// Compile `expr` as a sub's return value: in list context when the sub was called in list
+    /// context, otherwise in scalar context (`return @a` is the length, not the last element).
+    fn compile_value_for_call_context(
+        &mut self,
+        expr: &Expr,
+        line: usize,
+    ) -> Result<(), CompileError> {
+        self.emit_op(Op::CallBuiltin(BuiltinId::Wantarray as u16, 0), line, None);
+        let to_scalar = self.emit_op(Op::JumpIfFalse(0), line, None);
+        self.compile_expr_ctx(expr, WantarrayCtx::List)?;
+        let to_end = self.emit_op(Op::Jump(0), line, None);
+        self.chunk.patch_jump_here(to_scalar);
+        self.compile_expr_ctx(expr, WantarrayCtx::Scalar)?;
+        self.chunk.patch_jump_here(to_end);
+        Ok(())
+    }
+
+    /// Run `f`, then forget the lexical names it declared in the current scope layer. Blocks that
+    /// emit no runtime frame (slot mode) would otherwise leave an inner `my $x` shadowing the
+    /// outer `$x` after the block ends.
+    fn scoped_lexicals<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
+        let saved = self.scope_stack.last().cloned();
+        let out = f(self);
+        if let (Some(mut saved), Some(layer)) = (saved, self.scope_stack.last_mut()) {
+            saved.next_scalar_slot = layer.next_scalar_slot;
+            *layer = saved;
+        }
+        out
+    }
+
     fn compile_statement(&mut self, stmt: &Statement) -> Result<(), CompileError> {
+        match stmt.kind {
+            StmtKind::For { .. } | StmtKind::Foreach { .. } => {
+                self.scoped_lexicals(|c| c.compile_statement_unscoped(stmt))
+            }
+            _ => self.compile_statement_unscoped(stmt),
+        }
+    }
+
+    fn compile_statement_unscoped(&mut self, stmt: &Statement) -> Result<(), CompileError> {
         // A `LABEL:` on a statement binds the label to the IP of the first op emitted for that
         // statement, so that `goto LABEL` can jump to the effective start of execution.
         if let Some(lbl) = &stmt.label {
@@ -3731,7 +3908,9 @@ impl Compiler {
                     // side scalar coercion (Op::CallSub in scalar slot) takes the
                     // last element from the returned list — matching Perl's
                     // `return (1, 2, 3)` semantics. (BUG-010)
-                    if return_operand_is_list_shaped(expr) {
+                    if scalar_context_differs_from_list_tail(expr) {
+                        self.compile_value_for_call_context(expr, line)?;
+                    } else if return_operand_is_list_shaped(expr) {
                         self.compile_expr_ctx(expr, WantarrayCtx::List)?;
                     } else if matches!(
                         expr.kind,
@@ -3871,7 +4050,7 @@ impl Compiler {
                 });
                 // A `package NAME;` statement lasts to the end of the enclosing block.
                 let outer_package = self.current_package.clone();
-                let res = self.compile_block_inner(block);
+                let res = self.scoped_lexicals(|c| c.compile_block_inner(block));
                 let ctx = self.loop_stack.pop().expect("bare block loop ctx");
                 res?;
                 self.emit_pop_frame(line);
@@ -4175,7 +4354,13 @@ impl Compiler {
             // When scalar slots are active, skip PushFrame/PopFrame so slot indices keep
             // addressing the same runtime frame. New `my` / `val` / `var` decls still get
             // fresh slot indices via `assign_scalar_slot` in `emit_declare_scalar`.
-            self.compile_block_inner(block)?;
+            if block.len() == 1 {
+                // A lone statement may be the body of a postfix `if` (`my $x = 1 if $c;`),
+                // whose declaration belongs to the enclosing scope.
+                self.compile_block_inner(block)?;
+            } else {
+                self.scoped_lexicals(|c| c.compile_block_inner(block))?;
+            }
         } else {
             self.push_scope_layer();
             self.chunk.emit(Op::PushFrame, 0);
@@ -4215,7 +4400,7 @@ impl Compiler {
             break_jumps: vec![],
             continue_jumps: vec![],
         });
-        let res = self.emit_block_value(block, stmt.line);
+        let res = self.scoped_lexicals(|c| c.emit_block_value(block, stmt.line));
         let ctx = self.loop_stack.pop().expect("bare block loop ctx");
         res?;
         self.emit_pop_frame(stmt.line);
@@ -4315,8 +4500,7 @@ impl Compiler {
     /// statement unless it already executed `return`.
     fn emit_subroutine_body_return(&mut self, body: &Block) -> Result<(), CompileError> {
         if body.is_empty() {
-            self.chunk.emit(Op::LoadUndef, 0);
-            self.chunk.emit(Op::ReturnValue, 0);
+            self.chunk.emit(Op::Return, 0);
             return Ok(());
         }
         let last_idx = body.len() - 1;
@@ -4334,7 +4518,11 @@ impl Compiler {
                 // Compile tail expression in List context so @array returns
                 // the array contents, not the count. The caller's ReturnValue
                 // handler will adapt to the actual wantarray context.
-                self.compile_expr_ctx(expr, WantarrayCtx::List)?;
+                if scalar_context_differs_from_list_tail(expr) {
+                    self.compile_value_for_call_context(expr, last.line)?;
+                } else {
+                    self.compile_expr_ctx(expr, WantarrayCtx::List)?;
+                }
                 self.chunk.emit(Op::ReturnValue, last.line);
             }
             StmtKind::If {
@@ -4393,8 +4581,8 @@ impl Compiler {
                 for stmt in body {
                     self.compile_statement(stmt)?;
                 }
-                self.chunk.emit(Op::LoadUndef, 0);
-                self.chunk.emit(Op::ReturnValue, 0);
+                // No value: a bare return, the empty list in list context.
+                self.chunk.emit(Op::Return, 0);
             }
         }
         Ok(())
@@ -4404,10 +4592,10 @@ impl Compiler {
     /// inside `if`/`unless`/block statements) are handled by `compile_statement` via the
     /// [`Compiler::loop_stack`] — the innermost loop frame owns their break/continue patches.
     fn compile_block_no_frame(&mut self, block: &Block) -> Result<(), CompileError> {
-        for stmt in block {
-            self.compile_statement(stmt)?;
+        if block.len() == 1 {
+            return self.compile_block_inner(block);
         }
-        Ok(())
+        self.scoped_lexicals(|c| c.compile_block_inner(block))
     }
 
     fn compile_expr(&mut self, expr: &Expr) -> Result<(), CompileError> {
@@ -4419,6 +4607,10 @@ impl Compiler {
         match &root.kind {
             ExprKind::Integer(n) => {
                 self.emit_op(Op::LoadInt(*n), line, Some(root));
+            }
+            ExprKind::UnsignedInteger(n) => {
+                let idx = self.chunk.add_constant(StrykeValue::unsigned(*n));
+                self.emit_op(Op::LoadConst(idx), line, Some(root));
             }
             ExprKind::Float(f) => {
                 self.emit_op(Op::LoadFloat(*f), line, Some(root));
@@ -4613,18 +4805,7 @@ impl Compiler {
                 // we need runtime flattening via `GetHashSlice` — the per-key
                 // `GetHashElem` path treats each operand as a single key and
                 // would scalarize `@arr` to its count (BUG-028).
-                let has_dynamic_keys = keys.iter().any(|k| {
-                    matches!(
-                        &k.kind,
-                        ExprKind::Range { .. }
-                            | ExprKind::ArrayVar(_)
-                            | ExprKind::Deref {
-                                kind: Sigil::Array,
-                                ..
-                            }
-                            | ExprKind::ArraySlice { .. }
-                    )
-                });
+                let has_dynamic_keys = !keys.iter().all(hash_slice_key_is_static);
                 if has_dynamic_keys {
                     for key_expr in keys {
                         self.compile_hash_slice_key_expr(key_expr)?;
@@ -5667,7 +5848,20 @@ impl Compiler {
                 }
                 let rhs_ctx = assign_rhs_wantarray(target);
                 self.compile_expr_ctx(value, rhs_ctx)?;
-                self.compile_assign(target, line, true, Some(root))?;
+                if rhs_ctx == WantarrayCtx::List && is_single_scalar_expr(value) {
+                    self.emit_op(Op::MakeArray(1), line, Some(root));
+                }
+                // A list assignment in list context yields its left-hand side (the lvalues,
+                // after assignment), not the right-hand list: `@c = ($p, $q) = (5, 6, 7)`
+                // gives `@c` two elements.
+                let lhs_result =
+                    ctx == WantarrayCtx::List && matches!(target.kind, ExprKind::List(_));
+                self.compile_assign(target, line, !lhs_result, Some(root))?;
+                if lhs_result {
+                    let lhs = lvalue_list_as_rvalue(target);
+                    self.compile_expr_ctx(&lhs, WantarrayCtx::List)?;
+                    return Ok(());
+                }
                 // A *list* assignment evaluated in scalar context yields the
                 // number of RHS elements — the countof idiom `my $n = () = f()`.
                 // The count is of the right side, so a short left side doesn't
@@ -7674,6 +7868,27 @@ impl Compiler {
                     self.emit_op(Op::DeleteExpr(pool), line, Some(root));
                 }
             }
+            ExprKind::DeleteLocal(inner) => match &inner.kind {
+                ExprKind::HashElement { hash, key } => {
+                    self.check_hash_mutable(hash, line)?;
+                    let idx = self.chunk.intern_name(hash);
+                    self.compile_expr(key)?;
+                    self.emit_op(Op::DeleteLocalHashElem(idx), line, Some(root));
+                }
+                ExprKind::ArrayElement { array, index } => {
+                    self.check_strict_array_access(array, line)?;
+                    let q = self.qualify_stash_array_name(array);
+                    self.check_array_mutable(&q, line)?;
+                    let arr_idx = self.chunk.intern_name(&q);
+                    self.compile_expr(index)?;
+                    self.emit_op(Op::DeleteLocalArrayElem(arr_idx), line, Some(root));
+                }
+                _ => {
+                    return Err(CompileError::Unsupported(
+                        "delete local on this lvalue".into(),
+                    ))
+                }
+            },
             ExprKind::Exists(inner) => {
                 if let ExprKind::HashElement { hash, key } = &inner.kind {
                     let idx = self.chunk.intern_name(hash);
@@ -9702,7 +9917,13 @@ impl Compiler {
                     let tmp = self
                         .compile_var_declarations(decls, line, is_my)?
                         .expect("multi-decl list assignment reports its temp array");
-                    self.emit_op(Op::ArrayLen(tmp), line, Some(root));
+                    if ctx == WantarrayCtx::List {
+                        // In list context the assignment yields the declared variables.
+                        let lhs = lvalue_list_as_rvalue(root);
+                        self.compile_expr_ctx(&lhs, WantarrayCtx::List)?;
+                    } else {
+                        self.emit_op(Op::ArrayLen(tmp), line, Some(root));
+                    }
                 } else if decls.len() == 1
                     && decls[0].initializer.is_some()
                     && matches!(keyword.as_str(), "my" | "our")
@@ -10117,6 +10338,20 @@ impl Compiler {
                     }
                 }
                 self.emit_op(Op::SetRegexPos, line, ast);
+            }
+            // `(my $p, my $q) = LIST` — each `my` element is declared from the value on the
+            // stack, exactly as a bare `my $p = VALUE` would be.
+            ExprKind::MyExpr { keyword, decls }
+                if keyword == "my"
+                    && decls.len() == 1
+                    && decls[0].sigil == Sigil::Scalar
+                    && decls[0].initializer.is_none() =>
+            {
+                if keep {
+                    self.emit_op(Op::Dup, line, ast);
+                }
+                let name_idx = self.chunk.intern_name(&decls[0].name);
+                self.emit_declare_scalar(name_idx, line, false);
             }
             // List assignment: `($a, $b) = (val1, val2)` — RHS is on stack as array,
             // store into temp, then distribute elements to each target.

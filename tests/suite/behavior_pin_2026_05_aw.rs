@@ -20,14 +20,9 @@ fn pairmap_with_hash_variable_parses_as_modulus() {
 }
 
 #[test]
-fn unpack_b_format_unsupported() {
-    let err = eval_err_kind(r#"unpack("B8", "a")"#);
-    let msg = format!("{:?}", err);
-    assert!(
-        msg.contains("Runtime") || msg.contains("Unsupported"),
-        "expected runtime error for unsupported pack type, got {:?}",
-        err
-    );
+fn unpack_b_format_returns_bit_string() {
+    assert_eq!(eval_string(r#"unpack("B8", "a")"#), "01100001");
+    assert_eq!(eval_string(r#"unpack("b8", "a")"#), "10000110");
 }
 
 #[test]

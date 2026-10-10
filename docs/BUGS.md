@@ -4079,33 +4079,61 @@ empty string; `substr` with an offset past the end returned `""` instead of
 (`"ab"x3`, `)x2`) lexed as an identifier; a `package NAME;` inside a bare block
 leaked past the block. `parity/cases/349_*`, `350_*`, `355_*`, `359_*`.
 
-## BUG-336 — no unsigned (UV) scalar — **`parity`**
+## BUG-336 — unsigned (UV) scalars — **`parity`** [FIXED]
 
-`~0`, `-1 & 0xFFFFFFFFFFFFFFFF`, `1 << 63`, `-8 >> 1` and integer literals in
-`IV_MAX+1 ..= UV_MAX` (`18446744073709551615`, `0xFFFFFFFFFFFFFFFF`) need an
-unsigned integer representation. The scalar model has `i64` plus a `BigInt`
-approximation that the bit operators narrow back to `i64`, so these give signed
-results and the literals are rejected. Needs an unsigned arm in the value
-representation and the matching bit-operator semantics (including the fusevm
-`BitNot` / `Shl` / `Shr` ops).
+Integers in `IV_MAX+1 ..= UV_MAX` are held as exact unsigned values. Under
+`--compat` the bit operators (`& | ^ ~ << >>`, including the assignment forms)
+work on the unsigned 64-bit view of their operands, so `~0` is
+`18446744073709551615`, `1 << 63` is `9223372036854775808` and `-8 >> 1` is
+`9223372036854775804`; a negative or out-of-range shift count shifts the other
+way or yields `0`. Decimal, hex, octal and binary literals up to `UV_MAX` lex
+as unsigned. `/` and `%` stay exact for unsigned operands, numeric strings above
+`IV_MAX` act as unsigned in `+ - *`, and `sprintf` `%d` wraps an unsigned value
+like perl while `%u %x %o %b` print the full 64 bits. `parity/cases/362_*`,
+`363_*`.
 
-## BUG-337 — undef scalar assigned to an array vanishes — **`parity`**
+## BUG-337 — undef scalar assigned to an array vanishes — **`parity`** [FIXED]
 
-`my @a = (undef)`, `my @a = $undef_scalar`, `my @a = $h{missing}` and
-`my @a = f()` where `f` returns `undef` produce an empty array; perl produces a
-one-element array. A scalar `undef` and the empty list are the same value on the
-stack, so list assignment cannot tell them apart. Needs a distinct empty-list
-representation (or context-aware `return`) in the call protocol.
+`my @a = (undef)`, `my @a = $undef_scalar`, `@a = $h{missing}` and `my @a = f()`
+with `return undef` give a one-element array. A statically scalar right-hand
+side is wrapped as a one-element list, `return undef` in list context returns a
+one-element list, and a bare `return` (or a body with no value) returns the empty
+list in list context. `parity/cases/366_*`.
 
 ## BUG-338 — unsupported forms — **`parity`**
 
-- `local @a[0,1] = ...`, `local @h{qw(a b)} = ...` and `delete local $h{k}`
-  (compile error: `local on this lvalue`).
-- `my @c = (my $p, my $q) = (5, 6, 7)`: a list assignment used as the right-hand
-  side of another list assignment (`Assign to complex lvalue`).
+Fixed: `local @a[0,1] = ...`, `local @h{qw(a b)} = ...`, `delete local $h{k}` /
+`$a[i]` (`parity/cases/364_*`); `my @c = (my $p, my $q) = (5, 6, 7)` — a list
+assignment in list context yields its left-hand side (`367_*`); `local $/ = \N`
+fixed-size record reads (`365_*`); `lc` / `uc` leave bytes above `0x7F` alone
+under `--compat` without `use utf8`.
+
+Open:
+
 - `my $ref = \substr($s, 0, 2); $$ref = "XX"` (magic `substr` lvalue reference).
-- `local $/ = \N` (fixed-size record reads).
 - `Class->new` on a package that defines no `new` constructs an object under
   `--compat` instead of dying with `Can't locate object method`.
-- `lc` / `uc` of non-ASCII bytes without `use utf8` fold as Unicode; perl leaves
-  the bytes alone.
+- `unpack` of a buffer shorter than the template dies; perl returns the values
+  that fit.
+- `pack "H5", "ab"` / non-hex characters in `H` input die or are skipped; perl
+  pads with zero nibbles and maps non-hex characters to nibbles.
+
+## BUG-339 — `my` shadowing leaked out of a block — **`bug`** [FIXED]
+
+`my $x = 7; { my $x = 5 } print $x` printed an empty string: a block compiled
+without its own runtime frame left the inner `my $x` mapped to the outer name at
+compile time. Names declared in a bare block, a loop body, `foreach` / C-style
+`for` header, or a multi-statement `if` body are forgotten at the block end.
+
+## BUG-340 — statement-level parity fixes — **`parity`** [FIXED]
+
+Found by `tests/suite/diff_perl_gen_stmt.rs`: `return @a` and a trailing `@a` /
+`%h` give the element count in scalar context; interpolating here-docs process
+`\n`, `\$`, `\@` and the rest of the double-quote escapes; `"$-[0]"` / `"$+[0]"`
+interpolate `@-` / `@+`; `"@h{@k}"` interpolates a hash slice; `$+{name}` works
+in an `s///` replacement; a slice subscript such as `@h{(LIST)[0,1]}` is
+evaluated in list context; `$r->%{...}` / `$r->%[...]` key/value slices; `length`
+counts characters of a string holding a wide character; `pack` / `unpack` gained
+`b B h`, `c W j J F`, `u`, `X @ . x!`, `< > !` modifiers, `( ... )N` groups, `/`
+length prefixes, `[N]` counts and `%N` checksums, and `a*` / `A*` / `Z*` in
+`pack`; `unpack "a"` of non-UTF-8 bytes returns the byte string.

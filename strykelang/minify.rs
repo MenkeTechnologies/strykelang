@@ -116,14 +116,21 @@ fn needs_space(prev: &Token, next: &Token) -> bool {
     // `2 / 3` must not become `2/3` because `/` would be the start of a
     // regex after a non-term token. Conservatively keep a space after any
     // numeric literal.
-    if matches!(prev, Token::Integer(_) | Token::Float(_)) && matches!(next, Token::Slash) {
+    if matches!(
+        prev,
+        Token::Integer(_) | Token::UnsignedInteger(_) | Token::Float(_)
+    ) && matches!(next, Token::Slash)
+    {
         return true;
     }
     false
 }
 
 fn is_identifier_like(t: &Token) -> bool {
-    matches!(t, Token::Ident(_) | Token::Integer(_) | Token::Float(_))
+    matches!(
+        t,
+        Token::Ident(_) | Token::Integer(_) | Token::UnsignedInteger(_) | Token::Float(_)
+    )
 }
 
 fn is_sigil_var(t: &Token) -> bool {
@@ -184,6 +191,7 @@ fn token_source(t: &Token) -> String {
         HashPercent => "%".into(),
         PackageSep => "::".into(),
         Integer(n) => n.to_string(),
+        UnsignedInteger(n) => n.to_string(),
         Float(f) => {
             if f.fract() == 0.0 && f.is_finite() {
                 format!("{f}.0")

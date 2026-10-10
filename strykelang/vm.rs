@@ -11,10 +11,7 @@ use crate::compiler::scalar_compound_op_from_byte;
 use crate::error::{ErrorKind, StrykeError, StrykeResult};
 use crate::pmap_progress::{FanProgress, PmapProgress};
 use crate::sort_fast::{sort_magic_cmp, SortBlockFast};
-use crate::value::{
-    perl_list_range_expand, perl_shl_i64, perl_shr_i64, PipelineOp, StrykeAsyncTask, StrykeSub,
-    StrykeValue,
-};
+use crate::value::{perl_list_range_expand, PipelineOp, StrykeAsyncTask, StrykeSub, StrykeValue};
 use crate::vm_helper::{
     fold_preduce_init_step, merge_preduce_init_partials, preduce_init_fold_identity, Flow,
     FlowOrError, VMHelper, WantarrayCtx,
@@ -4725,6 +4722,83 @@ impl<'a> VM<'a> {
                         self.push(val);
                         Ok(())
                     }
+                    Op::DeleteLocalHashElem(idx) => {
+                        let key = self.pop().to_string();
+                        let n = names[*idx as usize].as_str();
+                        self.require_hash_mutable(n)?;
+                        self.interp.touch_env_hash(n);
+                        let old = self.interp.scope.get_hash_element(n, &key);
+                        let line = self.line();
+                        self.interp
+                            .scope
+                            .local_set_hash_element(n, &key, StrykeValue::UNDEF)
+                            .map_err(|e| e.at_line(line))?;
+                        self.interp
+                            .scope
+                            .delete_hash_element(n, &key)
+                            .map_err(|e| e.at_line(line))?;
+                        self.push(old);
+                        Ok(())
+                    }
+                    Op::DeleteLocalArrayElem(idx) => {
+                        let index = self.pop().to_int();
+                        let n = names[*idx as usize].as_str();
+                        self.require_array_mutable(n)?;
+                        let old = self.interp.scope.get_array_element(n, index);
+                        let line = self.line();
+                        self.interp
+                            .scope
+                            .local_set_array_element(n, index, StrykeValue::UNDEF)
+                            .map_err(|e| e.at_line(line))?;
+                        self.interp
+                            .scope
+                            .delete_array_element(n, index)
+                            .map_err(|e| e.at_line(line))?;
+                        self.push(old);
+                        Ok(())
+                    }
+                    Op::LocalDeclareHashSlice(idx, n) => {
+                        let n = *n as usize;
+                        let mut specs = Vec::with_capacity(n);
+                        for _ in 0..n {
+                            specs.push(self.pop());
+                        }
+                        specs.reverse();
+                        let val = self.pop();
+                        let name = names[*idx as usize].as_str();
+                        self.interp.touch_env_hash(name);
+                        let keys: Vec<String> = specs
+                            .iter()
+                            .flat_map(|s| match s.as_array_vec() {
+                                Some(vv) => vv.iter().map(|v| v.to_string()).collect(),
+                                None => vec![s.to_string()],
+                            })
+                            .collect();
+                        let vals = val.to_list();
+                        for (i, k) in keys.iter().enumerate() {
+                            let v = vals.get(i).cloned().unwrap_or(StrykeValue::UNDEF);
+                            self.interp
+                                .scope
+                                .local_set_hash_element(name, k, v)
+                                .map_err(|e| e.at_line(self.line()))?;
+                        }
+                        Ok(())
+                    }
+                    Op::LocalDeclareArraySlice(idx, n) => {
+                        let idxs = self.pop_flattened_array_slice_specs(*n as usize);
+                        let val = self.pop();
+                        let name = names[*idx as usize].as_str();
+                        self.require_array_mutable(name)?;
+                        let vals = val.to_list();
+                        for (i, ix) in idxs.iter().enumerate() {
+                            let v = vals.get(i).cloned().unwrap_or(StrykeValue::UNDEF);
+                            self.interp
+                                .scope
+                                .local_set_array_element(name, *ix, v)
+                                .map_err(|e| e.at_line(self.line()))?;
+                        }
+                        Ok(())
+                    }
                     Op::LocalDeclareTypeglob(lhs_i, rhs_opt) => {
                         let lhs = names[*lhs_i as usize].as_str();
                         let rhs = rhs_opt.map(|i| names[i as usize].as_str());
@@ -5022,7 +5096,9 @@ impl<'a> VM<'a> {
                         let a = self.pop();
                         let line = self.line();
                         self.push_binop_with_overload(BinOp::Div, a, b, |a, b| {
-                            if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
+                            if let Some(v) = crate::value::perl_div_uv(a, b) {
+                                Ok(v)
+                            } else if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
                                 if y == 0 {
                                     return Err(StrykeError::division_by_zero(
                                         "Illegal division by zero",
@@ -5051,6 +5127,9 @@ impl<'a> VM<'a> {
                         let a = self.pop();
                         let line = self.line();
                         self.push_binop_with_overload(BinOp::Mod, a, b, |a, b| {
+                            if let Some(v) = crate::value::perl_mod_uv(a, b) {
+                                return Ok(v);
+                            }
                             let b = b.to_int();
                             let a = a.to_int();
                             if b == 0 {
@@ -5362,7 +5441,11 @@ impl<'a> VM<'a> {
                         ) {
                             self.push(s);
                         } else {
-                            self.push(StrykeValue::integer(lv.to_int() & rv.to_int()));
+                            self.push(crate::value::perl_bit_int_op(
+                                &lv,
+                                &rv,
+                                crate::value::BitIntOp::And,
+                            ));
                         }
                         Ok(())
                     }
@@ -5382,7 +5465,11 @@ impl<'a> VM<'a> {
                         ) {
                             self.push(s);
                         } else {
-                            self.push(StrykeValue::integer(lv.to_int() | rv.to_int()));
+                            self.push(crate::value::perl_bit_int_op(
+                                &lv,
+                                &rv,
+                                crate::value::BitIntOp::Or,
+                            ));
                         }
                         Ok(())
                     }
@@ -5402,25 +5489,29 @@ impl<'a> VM<'a> {
                         ) {
                             self.push(s);
                         } else {
-                            self.push(StrykeValue::integer(lv.to_int() ^ rv.to_int()));
+                            self.push(crate::value::perl_bit_int_op(
+                                &lv,
+                                &rv,
+                                crate::value::BitIntOp::Xor,
+                            ));
                         }
                         Ok(())
                     }
                     Op::BitNot => {
-                        let a = self.pop().to_int();
-                        self.push(StrykeValue::integer(!a));
+                        let a = self.pop();
+                        self.push(crate::value::perl_bit_not(&a));
                         Ok(())
                     }
                     Op::Shl => {
-                        let b = self.pop().to_int();
-                        let a = self.pop().to_int();
-                        self.push(StrykeValue::integer(perl_shl_i64(a, b)));
+                        let b = self.pop();
+                        let a = self.pop();
+                        self.push(crate::value::perl_shift(&a, &b, true));
                         Ok(())
                     }
                     Op::Shr => {
-                        let b = self.pop().to_int();
-                        let a = self.pop().to_int();
-                        self.push(StrykeValue::integer(perl_shr_i64(a, b)));
+                        let b = self.pop();
+                        let a = self.pop();
+                        self.push(crate::value::perl_shift(&a, &b, false));
                         Ok(())
                     }
 
@@ -5659,6 +5750,7 @@ impl<'a> VM<'a> {
                         Ok(())
                     }
                     Op::Return => {
+                        let empty_list = matches!(self.interp.wantarray_kind, WantarrayCtx::List);
                         if let Some(frame) = self.call_stack.pop() {
                             self.interp.leave_caller_frame(frame.caller_depth);
                             if frame.block_region {
@@ -5685,10 +5777,15 @@ impl<'a> VM<'a> {
                                     )
                                 })?;
                             }
-                            if frame.jit_trampoline_return {
-                                self.jit_trampoline_out = Some(StrykeValue::UNDEF);
+                            let ret = if empty_list {
+                                StrykeValue::array(Vec::new())
                             } else {
-                                self.push(StrykeValue::UNDEF);
+                                StrykeValue::UNDEF
+                            };
+                            if frame.jit_trampoline_return {
+                                self.jit_trampoline_out = Some(ret);
+                            } else {
+                                self.push(ret);
                                 self.ip = frame.return_ip;
                             }
                         } else {
@@ -5716,6 +5813,12 @@ impl<'a> VM<'a> {
                             } else {
                                 val
                             }
+                        } else if matches!(self.interp.wantarray_kind, WantarrayCtx::List)
+                            && val.is_undef()
+                        {
+                            // `return undef` in list context is one element, not the empty list
+                            // (a bare `return` takes `Op::Return`).
+                            StrykeValue::array(vec![StrykeValue::UNDEF])
                         } else {
                             val
                         };

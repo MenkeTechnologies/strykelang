@@ -97,11 +97,6 @@ can grep through `src/lsp.rs` and fix multiple in one pass.
 - **`[datetime_parse_local]`** — `my $epoch = datetime_parse_local("2026-04-15 14:30:00");`
   - `unknown timezone "" at -e line 0`
 
-### pack/unpack 'B' (binary string) format not implemented (1)
-
-- **`[vec]`** — `my $bits = "";`
-  - `unpack: unsupported pack type 'B' at -e line 6`
-
 ### Internal panic: investigate stack trace (1)
 
 - **`[rand]`** — `p rand();                # e.g. 0.7342...`

@@ -158,6 +158,30 @@ impl PerlCompiledRegex {
         }
     }
 
+    /// First match at or after byte `start`, searching the *whole* haystack so `\b`, `^`,
+    /// look-behind and `\G`-style context see the text before `start` (scalar-context `//g`).
+    /// Returns the captures and the offset their positions are relative to: `0` for engines
+    /// that search in place, `start` for the PCRE2 backend, which matches a suffix slice.
+    pub fn captures_at<'t>(
+        &self,
+        text: &'t str,
+        start: usize,
+    ) -> Option<(PerlCaptures<'t>, usize)> {
+        match self {
+            Self::Rust(r) => r
+                .captures_at(text, start)
+                .map(|c| (PerlCaptures::Rust(c), 0)),
+            Self::Fancy(r) => match r.captures_from_pos(text, start) {
+                Ok(Some(c)) => Some((PerlCaptures::Fancy(c), 0)),
+                _ => None,
+            },
+            Self::Pcre2(_) => {
+                let sub = text.get(start..)?;
+                self.captures(sub).map(|c| (c, start))
+            }
+        }
+    }
+
     /// Iterator over all non-overlapping capture sets (for `/g` in list context).
     pub fn captures_iter<'r, 't>(&'r self, text: &'t str) -> CaptureIter<'r, 't> {
         match self {

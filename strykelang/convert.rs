@@ -1125,6 +1125,7 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
     match &e.kind {
         // ── Leaf / simple (delegate to fmt) ──────────────────────────────
         ExprKind::Integer(_)
+        | ExprKind::UnsignedInteger(_)
         | ExprKind::Float(_)
         | ExprKind::String(_)
         | ExprKind::Bareword(_)

@@ -175,6 +175,14 @@ pub enum Op {
     LocalDeclareHashElement(u16),
     /// `local $a[i] = val` — stack: `[value, index]` (index on top), same as [`Op::SetArrayElem`].
     LocalDeclareArrayElement(u16),
+    /// `local @h{k1,k2} = LIST` — stack: `[LIST, key-spec1, …, key-specN]`; operand is `(hash, N)`.
+    /// `delete local $h{k}` — stack: `[key]`; pushes the deleted value.
+    DeleteLocalHashElem(u16),
+    /// `delete local $a[i]` — stack: `[index]`; pushes the deleted value.
+    DeleteLocalArrayElem(u16),
+    LocalDeclareHashSlice(u16, u16),
+    /// `local @a[i1,i2] = LIST` — stack: `[LIST, index-spec1, …, index-specN]`; operand is `(array, N)`.
+    LocalDeclareArraySlice(u16, u16),
     /// `local *name` or `local *name = *other` — second pool index is `Some(rhs)` when aliasing.
     LocalDeclareTypeglob(u16, Option<u16>),
     /// `local *{EXPR}` / `local *$x` — LHS glob name string on stack (TOS); optional static `*rhs` pool index.
@@ -778,7 +786,10 @@ pub enum Op {
     /// pflat_maps { BLOCK } LIST — streaming parallel flat map; stack: \[list\] → \[iterator\]
     PFlatMapsWithBlock(u16),
     /// `pmap_on` / `pflat_map_on` over SSH — stack: \[progress_flag, list, cluster\] → \[mapped\]; `flat` = 1 for flatten
-    PMapRemote { block_idx: u16, flat: u8 },
+    PMapRemote {
+        block_idx: u16,
+        flat: u8,
+    },
     /// puniq LIST — hash-partition parallel distinct (first occurrence order); stack: \[progress_flag, list\] → \[array\]
     Puniq,
     /// pfirst { BLOCK } LIST — short-circuit parallel; stack: \[progress_flag, list\] → value or undef
@@ -808,7 +819,10 @@ pub enum Op {
     /// `pcache { BLOCK } @list` — block_idx; stack: \[progress_flag, list\] → \[array\]
     PcacheWithBlock(u16),
     /// `pselect($rx1, ... [, timeout => SECS])` — stack: \[rx0, …, rx_{n-1}\] with optional timeout on top
-    Pselect { n_rx: u8, has_timeout: bool },
+    Pselect {
+        n_rx: u8,
+        has_timeout: bool,
+    },
     /// `par_lines PATH, fn { } [, progress => EXPR]` — index into [`Chunk::par_lines_entries`]; stack: \[\] → `undef`
     ParLines(u16),
     /// `par_walk PATH, fn { } [, progress => EXPR]` — index into [`Chunk::par_walk_entries`]; stack: \[\] → `undef`
@@ -1011,7 +1025,10 @@ pub enum Op {
     UseOverload(u16),
     /// Scalar `$x OP= $rhs` — uses [`Scope::atomic_mutate`] so `mysync` scalars are RMW-safe.
     /// Stack: `[rhs]` → `[result]`. `op` byte is from [`crate::compiler::scalar_compound_op_to_byte`].
-    ScalarCompoundAssign { name_idx: u16, op: u8 },
+    ScalarCompoundAssign {
+        name_idx: u16,
+        op: u8,
+    },
 
     // ── Special ──
     /// Set `${^GLOBAL_PHASE}` on the interpreter. See [`GP_START`] … [`GP_END`].

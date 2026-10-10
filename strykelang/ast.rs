@@ -972,6 +972,8 @@ pub enum ExprKind {
     // Literals
     /// `Integer` variant.
     Integer(i64),
+    /// Integer literal in `IV_MAX+1 ..= UV_MAX`; evaluates to a UV scalar.
+    UnsignedInteger(u64),
     /// `Float` variant.
     Float(f64),
     /// `String` variant.
@@ -1562,6 +1564,8 @@ pub enum ExprKind {
     },
     /// `Delete` variant.
     Delete(Box<Expr>),
+    /// `delete local $h{k}` / `delete local $a[i]` — delete the element, restoring it at scope exit.
+    DeleteLocal(Box<Expr>),
     /// `Exists` variant.
     Exists(Box<Expr>),
     /// `Keys` variant.

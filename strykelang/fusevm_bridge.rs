@@ -414,6 +414,12 @@ pub(crate) fn set_utf8_pragma(on: bool) {
     STRYKE_UTF8_PRAGMA.with(|p| p.set(on));
 }
 
+/// The live `utf8` pragma as last published by the interpreter.
+#[inline]
+pub(crate) fn utf8_pragma_live() -> bool {
+    STRYKE_UTF8_PRAGMA.with(std::cell::Cell::get)
+}
+
 /// Stable helper-symbol name for `STK_STR_LEN`, hashed into a JIT helper id and
 /// registered with arity 1 (unary) — distinct from the binary string helpers.
 const STRYKE_STR_LEN_SYM: &str = "stryke_str_len";

@@ -1243,6 +1243,15 @@ impl StrykeValue {
         Self::from_heap(Arc::new(HeapObject::BigInt(Arc::new(n))))
     }
 
+    /// An unsigned 64-bit integer. Values above `i64::MAX` are held as a boxed
+    /// `BigInt` (a perl UV); smaller values are ordinary integers.
+    pub fn unsigned(n: u64) -> Self {
+        match i64::try_from(n) {
+            Ok(i) => Self::integer(i),
+            Err(_) => Self::from_heap(Arc::new(HeapObject::BigInt(Arc::new(BigInt::from(n))))),
+        }
+    }
+
     /// Returns the inner `BigInt` as `Arc` (zero-copy) when this value is a
     /// boxed `BigInt`; `None` otherwise. Use [`Self::to_bigint`] to coerce
     /// from `i64`/`f64`/strings.
@@ -1537,7 +1546,8 @@ impl StrykeValue {
     /// (`BuiltinId::Length`) and the fusevm JIT host helper
     /// (`fusevm_bridge::stryke_str_len_op`) compute an identical result: array
     /// element count, hash key count, raw-byte length, otherwise the stringified
-    /// value's character count (when the `utf8` pragma is active) or byte length.
+    /// value's character count (when the `utf8` pragma is active or it holds a wide character) or
+    /// byte length.
     pub fn length_value(&self, utf8: bool) -> i64 {
         if let Some(a) = self.as_array_vec() {
             a.len() as i64
@@ -1547,7 +1557,9 @@ impl StrykeValue {
             b.len() as i64
         } else {
             let s = self.to_string();
-            if utf8 {
+            // A character above 0xFF can only be a wide character, which perl counts as one
+            // character whatever the pragma; otherwise the byte length stands for the source bytes.
+            if utf8 || (crate::compat_mode() && s.chars().any(|c| u32::from(c) > 0xFF)) {
                 s.chars().count() as i64
             } else {
                 s.len() as i64
@@ -1604,13 +1616,13 @@ impl StrykeValue {
     /// `uc` builtin: the stringified value upper-cased. Shared by the interpreter
     /// (`BuiltinId::Uc`) and the fusevm JIT host helper so both agree exactly.
     pub fn uc_value(&self) -> String {
-        self.to_string().to_uppercase()
+        perl_case_map(&self.to_string(), true)
     }
 
     /// `lc` builtin: the stringified value lower-cased. Shared by the interpreter
     /// (`BuiltinId::Lc`) and the fusevm JIT host helper.
     pub fn lc_value(&self) -> String {
-        self.to_string().to_lowercase()
+        perl_case_map(&self.to_string(), false)
     }
 
     /// `ucfirst` builtin: the stringified value with only its first character
@@ -1619,7 +1631,7 @@ impl StrykeValue {
         let s = self.to_string();
         let mut chars = s.chars();
         match chars.next() {
-            Some(c) => c.to_uppercase().to_string() + chars.as_str(),
+            Some(c) => perl_case_map(&c.to_string(), true) + chars.as_str(),
             None => String::new(),
         }
     }
@@ -1630,7 +1642,7 @@ impl StrykeValue {
         let s = self.to_string();
         let mut chars = s.chars();
         match chars.next() {
-            Some(c) => c.to_lowercase().to_string() + chars.as_str(),
+            Some(c) => perl_case_map(&c.to_string(), false) + chars.as_str(),
             None => String::new(),
         }
     }
@@ -3487,6 +3499,232 @@ pub fn perl_shr_i64(a: i64, b: i64) -> i64 {
     }
 }
 
+/// `uc` / `lc` case mapping. Under `--compat` without the `utf8` pragma a string is a byte
+/// string: only ASCII letters change, bytes above 0x7F are left alone (perl does not fold
+/// them without `use utf8`). A wide character forces Unicode semantics.
+pub fn perl_case_map(s: &str, upper: bool) -> String {
+    let byte_semantics = crate::compat_mode()
+        && !crate::fusevm_bridge::utf8_pragma_live()
+        && !s.is_ascii()
+        && s.chars().all(|c| u32::from(c) <= 0xFF);
+    match (byte_semantics, upper) {
+        (true, true) => s.to_ascii_uppercase(),
+        (true, false) => s.to_ascii_lowercase(),
+        (false, true) => s.to_uppercase(),
+        (false, false) => s.to_lowercase(),
+    }
+}
+
+/// A numeric string holding an integer in `IV_MAX+1 ..= UV_MAX` is a UV for arithmetic
+/// (`"18446744073709551615" + 0` is exact). Returns the unsigned value for such a string.
+fn uv_from_numeric_string(v: &StrykeValue) -> Option<StrykeValue> {
+    let s = v.as_str()?;
+    let t = s.trim();
+    let digits = t.strip_prefix('+').unwrap_or(t);
+    if digits.is_empty() || !digits.bytes().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    let n = digits.parse::<u64>().ok()?;
+    (n > i64::MAX as u64).then(|| StrykeValue::unsigned(n))
+}
+
+/// Both operands with UV-valued numeric strings replaced by their unsigned value; `None`
+/// when nothing changes (not `--compat`, or no string operand holds a UV).
+fn with_uv_strings(a: &StrykeValue, b: &StrykeValue) -> Option<(StrykeValue, StrykeValue)> {
+    if !crate::compat_mode() || !(a.is_string_like() || b.is_string_like()) {
+        return None;
+    }
+    let (ua, ub) = (uv_from_numeric_string(a), uv_from_numeric_string(b));
+    if ua.is_none() && ub.is_none() {
+        return None;
+    }
+    Some((
+        ua.unwrap_or_else(|| a.clone()),
+        ub.unwrap_or_else(|| b.clone()),
+    ))
+}
+
+/// Exact integer view of an operand for `/` and `%`: an IV, or a UV held as `BigInt`.
+fn exact_integer(v: &StrykeValue) -> Option<i128> {
+    use num_traits::ToPrimitive;
+    match v.as_bigint() {
+        Some(b) => b.to_i128(),
+        None => v.as_integer().map(i128::from),
+    }
+}
+
+fn value_from_i128(n: i128) -> StrykeValue {
+    if let Ok(u) = u64::try_from(n) {
+        StrykeValue::unsigned(u)
+    } else if let Ok(i) = i64::try_from(n) {
+        StrykeValue::integer(i)
+    } else {
+        StrykeValue::float(n as f64)
+    }
+}
+
+/// `/` when an operand is a UV (or a numeric string holding one): an exact quotient stays an
+/// integer, as perl's `pp_divide` does for operands above 2**53, otherwise an NV.
+/// `None` when the plain path applies or the divisor is zero.
+pub fn perl_div_uv(a: &StrykeValue, b: &StrykeValue) -> Option<StrykeValue> {
+    if !crate::compat_mode() {
+        return None;
+    }
+    if let Some((x, y)) = with_uv_strings(a, b) {
+        return perl_div_uv(&x, &y);
+    }
+    if a.as_bigint().is_none() && b.as_bigint().is_none() {
+        return None;
+    }
+    let (x, y) = (exact_integer(a)?, exact_integer(b)?);
+    if y == 0 {
+        return None;
+    }
+    Some(if x % y == 0 {
+        value_from_i128(x / y)
+    } else {
+        StrykeValue::float(x as f64 / y as f64)
+    })
+}
+
+/// `%` when an operand is a UV: the result takes the sign of the right operand.
+/// `None` when the plain path applies or the divisor is zero.
+pub fn perl_mod_uv(a: &StrykeValue, b: &StrykeValue) -> Option<StrykeValue> {
+    if !crate::compat_mode() {
+        return None;
+    }
+    if let Some((x, y)) = with_uv_strings(a, b) {
+        return perl_mod_uv(&x, &y);
+    }
+    if a.as_bigint().is_none() && b.as_bigint().is_none() {
+        return None;
+    }
+    let (x, y) = (exact_integer(a)?, exact_integer(b)?);
+    if y == 0 {
+        return None;
+    }
+    let mut r = x % y;
+    if r != 0 && (r < 0) != (y < 0) {
+        r += y;
+    }
+    Some(value_from_i128(r))
+}
+
+/// perl's `SvUV` as the bitwise operators see an operand: a negative IV is
+/// reinterpreted as a UV, an NV is truncated (negative ones through IV), and a
+/// numeric string keeps full 64-bit integer precision.
+pub(crate) fn perl_uv_arg(v: &StrykeValue) -> u64 {
+    perl_bit_operand(v)
+}
+
+/// `%d` operand: a UV above `IV_MAX` wraps to its two's-complement IV (`printf "%d", ~0` is `-1`).
+pub(crate) fn perl_iv_arg(v: &StrykeValue) -> i64 {
+    match v.as_bigint().map(|b| u64::try_from(&*b)) {
+        Some(Ok(u)) => u as i64,
+        _ => v.to_int(),
+    }
+}
+
+fn perl_bit_operand(v: &StrykeValue) -> u64 {
+    if let Some(b) = v.as_bigint() {
+        return u64::try_from(&*b).unwrap_or_else(|_| v.to_int() as u64);
+    }
+    if let Some(i) = v.as_integer() {
+        return i as u64;
+    }
+    if let Some(s) = v.as_str() {
+        let t = s.trim_start();
+        let (neg, digits) = match t.as_bytes().first() {
+            Some(b'-') => (true, &t[1..]),
+            Some(b'+') => (false, &t[1..]),
+            _ => (false, t),
+        };
+        let end = digits
+            .bytes()
+            .position(|c| !c.is_ascii_digit())
+            .unwrap_or(digits.len());
+        let integral = end > 0 && !matches!(digits.as_bytes().get(end), Some(b'.' | b'e' | b'E'));
+        if integral {
+            let n = digits[..end].parse::<u64>().unwrap_or(u64::MAX);
+            return if neg {
+                (n as i64).wrapping_neg() as u64
+            } else {
+                n
+            };
+        }
+    }
+    let f = v.to_number();
+    if f < 0.0 {
+        f as i64 as u64
+    } else {
+        f as u64
+    }
+}
+
+/// Which bitwise operator [`perl_bit_int_op`] applies.
+#[derive(Clone, Copy)]
+pub enum BitIntOp {
+    And,
+    Or,
+    Xor,
+}
+
+/// Integer `&` `|` `^`. Under `--compat` both operands are taken as UVs and the
+/// result is a UV (`-1 & 0xFF` is 255, `-1 | 0` is `18446744073709551615`),
+/// as `pp_bit_and` / `pp_bit_or` do outside `use integer`. Native mode keeps
+/// the signed 64-bit result.
+pub fn perl_bit_int_op(l: &StrykeValue, r: &StrykeValue, op: BitIntOp) -> StrykeValue {
+    if !crate::compat_mode() {
+        let (a, b) = (l.to_int(), r.to_int());
+        return StrykeValue::integer(match op {
+            BitIntOp::And => a & b,
+            BitIntOp::Or => a | b,
+            BitIntOp::Xor => a ^ b,
+        });
+    }
+    let (a, b) = (perl_bit_operand(l), perl_bit_operand(r));
+    StrykeValue::unsigned(match op {
+        BitIntOp::And => a & b,
+        BitIntOp::Or => a | b,
+        BitIntOp::Xor => a ^ b,
+    })
+}
+
+/// Integer `~`: a UV complement under `--compat` (`~0` is `18446744073709551615`).
+pub fn perl_bit_not(v: &StrykeValue) -> StrykeValue {
+    if crate::compat_mode() {
+        StrykeValue::unsigned(!perl_bit_operand(v))
+    } else {
+        StrykeValue::integer(!v.to_int())
+    }
+}
+
+/// `<<` / `>>`. Under `--compat` the left operand is a UV and the shift is
+/// logical; a negative count shifts the other way and a count of 64 or more
+/// yields 0 (`pp_left_shift` / `pp_right_shift`, perl 5.24+).
+pub fn perl_shift(l: &StrykeValue, r: &StrykeValue, left: bool) -> StrykeValue {
+    if !crate::compat_mode() {
+        let (a, b) = (l.to_int(), r.to_int());
+        return StrykeValue::integer(if left {
+            perl_shl_i64(a, b)
+        } else {
+            perl_shr_i64(a, b)
+        });
+    }
+    let a = perl_bit_operand(l);
+    let n = r.to_int();
+    let shift_left = left == (n >= 0);
+    let count = n.unsigned_abs();
+    let out = if count >= 64 {
+        0
+    } else if shift_left {
+        a << count
+    } else {
+        a >> count
+    };
+    StrykeValue::unsigned(out)
+}
+
 /// Perl's `SvIV_please_nomg`: an NV whose value is a whole number with magnitude
 /// below 2**53 (`NV_PRESERVES_UV_BITS`; beyond it only `pIOK` is set, so the NV
 /// path still runs) is treated as an IV by `pp_add` / `pp_subtract` / `pp_multiply`, so
@@ -3628,6 +3866,9 @@ fn widen_or_nv(exact: BigInt, nv: f64) -> StrykeValue {
 /// already being a `BigInt` forces the BigInt path.
 #[inline]
 pub fn compat_mul(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
+    if let Some((x, y)) = with_uv_strings(a, b) {
+        return compat_mul(&x, &y);
+    }
     if a.as_bigint().is_some() || b.as_bigint().is_some() {
         return widen_or_nv(a.to_bigint() * b.to_bigint(), a.to_number() * b.to_number());
     }
@@ -3646,6 +3887,9 @@ pub fn compat_mul(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
 /// `compat_add` — see implementation.
 #[inline]
 pub fn compat_add(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
+    if let Some((x, y)) = with_uv_strings(a, b) {
+        return compat_add(&x, &y);
+    }
     if a.as_bigint().is_some() || b.as_bigint().is_some() {
         return widen_or_nv(a.to_bigint() + b.to_bigint(), a.to_number() + b.to_number());
     }
@@ -3664,6 +3908,9 @@ pub fn compat_add(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
 /// `compat_sub` — see implementation.
 #[inline]
 pub fn compat_sub(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
+    if let Some((x, y)) = with_uv_strings(a, b) {
+        return compat_sub(&x, &y);
+    }
     if a.as_bigint().is_some() || b.as_bigint().is_some() {
         return widen_or_nv(a.to_bigint() - b.to_bigint(), a.to_number() - b.to_number());
     }

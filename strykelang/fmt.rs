@@ -744,6 +744,7 @@ pub(crate) fn format_string_literal(s: &str) -> String {
 pub fn format_expr(e: &Expr) -> String {
     match &e.kind {
         ExprKind::Integer(n) => n.to_string(),
+        ExprKind::UnsignedInteger(n) => n.to_string(),
         ExprKind::Float(f) => format!("{}", f),
         ExprKind::String(s) => format_string_literal(s),
         ExprKind::Bareword(s) => s.clone(),
@@ -1434,6 +1435,7 @@ pub fn format_expr(e: &Expr) -> String {
             format!("splice({})", parts.join(", "))
         }
         ExprKind::Delete(e) => format!("delete {}", format_expr(e)),
+        ExprKind::DeleteLocal(e) => format!("delete local {}", format_expr(e)),
         ExprKind::Exists(e) => format!("exists {}", format_expr(e)),
         ExprKind::Keys(e) => format!("keys {}", format_expr(e)),
         ExprKind::Values(e) => format!("values {}", format_expr(e)),

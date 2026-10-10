@@ -596,6 +596,7 @@ impl Parser {
             | Token::SingleString(_)
             | Token::DoubleString(_)
             | Token::ScalarVar(_)
+            | Token::UnsignedInteger(_)
             | Token::Integer(_) => matches!(tok2, Token::FatArrow),
             Token::HashVar(_) => matches!(tok2, Token::RBrace | Token::Comma),
             _ => false,
@@ -9625,6 +9626,49 @@ impl Parser {
                                         line,
                                     };
                                 }
+                                // `$r->%{k1,k2}` / `$r->%[i,j]` — key/value (index/value) slices,
+                                // lowered to `map { ($_, $r->{$_}) } LIST`.
+                                tok @ (Token::LBrace | Token::LBracket) => {
+                                    self.advance();
+                                    let is_hash = tok == Token::LBrace;
+                                    let keys = self.parse_slice_arg_list(is_hash)?;
+                                    self.expect(if is_hash {
+                                        &Token::RBrace
+                                    } else {
+                                        &Token::RBracket
+                                    })?;
+                                    let topic = Expr {
+                                        kind: ExprKind::ScalarVar("_".to_string()),
+                                        line,
+                                    };
+                                    let element = Expr {
+                                        kind: ExprKind::ArrowDeref {
+                                            expr: Box::new(expr),
+                                            index: Box::new(topic.clone()),
+                                            kind: if is_hash {
+                                                DerefKind::Hash
+                                            } else {
+                                                DerefKind::Array
+                                            },
+                                        },
+                                        line,
+                                    };
+                                    expr = Expr {
+                                        kind: ExprKind::MapExprComma {
+                                            expr: Box::new(Expr {
+                                                kind: ExprKind::List(vec![topic, element]),
+                                                line,
+                                            }),
+                                            list: Box::new(Expr {
+                                                kind: ExprKind::List(keys),
+                                                line,
+                                            }),
+                                            flatten_array_refs: false,
+                                            stream: false,
+                                        },
+                                        line,
+                                    };
+                                }
                                 tok => {
                                     return Err(self.syntax_err(
                                         format!("Expected `*` after `->%`, got {:?}", tok),
@@ -9954,6 +9998,13 @@ impl Parser {
                     line,
                 })
             }
+            Token::UnsignedInteger(n) => {
+                self.advance();
+                Ok(Expr {
+                    kind: ExprKind::UnsignedInteger(n),
+                    line,
+                })
+            }
             Token::Float(f) => {
                 self.advance();
                 Ok(Expr {
@@ -10130,6 +10181,7 @@ impl Parser {
             Token::HereDoc(_, body, interpolate) => {
                 self.advance();
                 if interpolate {
+                    let body = Self::heredoc_dq_escapes(&body);
                     self.parse_interpolated_string(&body, line)
                 } else {
                     Ok(Expr {
@@ -11602,6 +11654,14 @@ impl Parser {
             "delete" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
+                }
+                if matches!(self.peek(), Token::Ident(s) if s == "local") {
+                    self.advance();
+                    let a = self.parse_postfix()?;
+                    return Ok(Expr {
+                        kind: ExprKind::DeleteLocal(Box::new(a)),
+                        line,
+                    });
                 }
                 let a = self.parse_postfix()?;
                 Ok(Expr {
@@ -14411,7 +14471,10 @@ impl Parser {
                         && self.suppress_tilde_range == 0
                         && matches!(
                             self.peek_at(1),
-                            Token::Ident(_) | Token::Integer(_) | Token::Float(_)
+                            Token::Ident(_)
+                                | Token::Integer(_)
+                                | Token::UnsignedInteger(_)
+                                | Token::Float(_)
                         ))
                 {
                     // Perl allows func arg without parens
@@ -14583,7 +14646,10 @@ impl Parser {
                     && self.suppress_tilde_range == 0
                     && matches!(
                         self.peek_at(1),
-                        Token::Ident(_) | Token::Integer(_) | Token::Float(_)
+                        Token::Ident(_)
+                            | Token::Integer(_)
+                            | Token::UnsignedInteger(_)
+                            | Token::Float(_)
                     );
                 if !is_tilde_range_after
                     && (self.peek().is_term_start()
@@ -21153,6 +21219,35 @@ impl Parser {
         None
     }
 
+    /// An interpolating here-doc body follows double-quote rules: `\n`, `\t`, `\x{..}`, `\$`,
+    /// `\@` and friends are escapes. Run the body through the double-quoted string lexer so the
+    /// escape table is the one `"..."` uses.
+    fn heredoc_dq_escapes(body: &str) -> String {
+        let mut quoted = String::with_capacity(body.len() + 2);
+        quoted.push('"');
+        let mut it = body.chars();
+        while let Some(c) = it.next() {
+            match c {
+                '\\' => {
+                    quoted.push('\\');
+                    if let Some(next) = it.next() {
+                        quoted.push(next);
+                    }
+                }
+                '"' => quoted.push_str("\\\""),
+                c => quoted.push(c),
+            }
+        }
+        quoted.push('"');
+        match Lexer::new(&quoted).tokenize() {
+            Ok(tokens) => match tokens.into_iter().next() {
+                Some((Token::DoubleString(s), _)) => s,
+                _ => body.to_string(),
+            },
+            Err(_) => body.to_string(),
+        }
+    }
+
     fn parse_interpolated_string(&self, s: &str, line: usize) -> StrykeResult<Expr> {
         // Parse $var and @var inside double-quoted strings
         let mut parts = Vec::new();
@@ -21640,6 +21735,29 @@ impl Parser {
                             };
                             base = self.interp_chain_subscripts(&chars, &mut i, base, line);
                             parts.push(StringPart::Expr(base));
+                        } else if matches!(c, '-' | '+') && chars.get(i) == Some(&'[') {
+                            // `$-[N]` / `$+[N]` — element of `@-` / `@+` (match offsets).
+                            let close = chars[i..].iter().position(|&ch| ch == ']').map(|p| i + p);
+                            match close {
+                                Some(close) => {
+                                    let inner: String = chars[i + 1..close].iter().collect();
+                                    i = close + 1;
+                                    let index = parse_expression_from_str(inner.trim(), "-e")?;
+                                    let mut base = Expr {
+                                        kind: ExprKind::ArrayElement {
+                                            array: probe,
+                                            index: Box::new(index),
+                                        },
+                                        line,
+                                    };
+                                    base = self.interp_chain_subscripts(&chars, &mut i, base, line);
+                                    parts.push(StringPart::Expr(base));
+                                }
+                                None => {
+                                    literal.push('$');
+                                    literal.push(c);
+                                }
+                            }
                         } else {
                             // Check for arrow deref chain: `$@->{key}`, etc.
                             let mut base = Expr {
@@ -21833,6 +21951,33 @@ impl Parser {
                             "Unterminated [ in array slice inside quoted string",
                             line,
                         ));
+                    }
+                    if i < chars.len()
+                        && chars[i] == '{'
+                        && !name.is_empty()
+                        && !matches!(name.as_str(), "+" | "-")
+                    {
+                        // `@h{k1,k2}` — hash slice interpolation.
+                        let mut depth = 1usize;
+                        let mut j = i + 1;
+                        while j < chars.len() && depth > 0 {
+                            match chars[j] {
+                                '{' => depth += 1,
+                                '}' => depth -= 1,
+                                _ => {}
+                            }
+                            j += 1;
+                        }
+                        if depth == 0 {
+                            let inner: String = chars[i + 1..j - 1].iter().collect();
+                            let keys = parse_slice_indices_from_str(inner.trim(), "-e")?;
+                            i = j;
+                            parts.push(StringPart::Expr(Expr {
+                                kind: ExprKind::HashSlice { hash: name, keys },
+                                line,
+                            }));
+                            continue 'istr;
+                        }
                     }
                     parts.push(StringPart::ArrayVar(name));
                 }

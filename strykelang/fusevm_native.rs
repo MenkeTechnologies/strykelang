@@ -645,7 +645,9 @@ pub(crate) fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
         nops::DIV => {
             let b = pop_stryke(vm);
             let a = pop_stryke(vm);
-            let result = if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
+            let result = if let Some(v) = crate::value::perl_div_uv(&a, &b) {
+                stryke_to_fusevm(&v)
+            } else if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
                 if y == 0 {
                     set_native_err(StrykeError::division_by_zero("Illegal division by zero", 0));
                     fusevm::Value::Undef
@@ -669,7 +671,9 @@ pub(crate) fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
             let b = pop_stryke(vm);
             let a = pop_stryke(vm);
             let bi = b.to_int();
-            if bi == 0 {
+            if let Some(v) = crate::value::perl_mod_uv(&a, &b) {
+                vm.push(stryke_to_fusevm(&v));
+            } else if bi == 0 {
                 set_native_err(StrykeError::division_by_zero("Illegal modulus zero", 0));
                 vm.push(fusevm::Value::Undef);
             } else {
@@ -1184,7 +1188,7 @@ pub(crate) fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
             {
                 s
             } else {
-                StrykeValue::integer(lv.to_int() & rv.to_int())
+                crate::value::perl_bit_int_op(&lv, &rv, crate::value::BitIntOp::And)
             };
             vm.push(stryke_to_fusevm(&res));
         }
@@ -1202,7 +1206,7 @@ pub(crate) fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
             {
                 s
             } else {
-                StrykeValue::integer(lv.to_int() | rv.to_int())
+                crate::value::perl_bit_int_op(&lv, &rv, crate::value::BitIntOp::Or)
             };
             vm.push(stryke_to_fusevm(&res));
         }
@@ -1218,23 +1222,23 @@ pub(crate) fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
             {
                 s
             } else {
-                StrykeValue::integer(lv.to_int() ^ rv.to_int())
+                crate::value::perl_bit_int_op(&lv, &rv, crate::value::BitIntOp::Xor)
             };
             vm.push(stryke_to_fusevm(&res));
         }
         nops::BIT_NOT => {
-            let a = pop_stryke(vm).to_int();
-            vm.push(fusevm::Value::Int(!a));
+            let a = pop_stryke(vm);
+            vm.push(stryke_to_fusevm(&crate::value::perl_bit_not(&a)));
         }
         nops::SHL => {
-            let b = pop_stryke(vm).to_int();
-            let a = pop_stryke(vm).to_int();
-            vm.push(fusevm::Value::Int(crate::value::perl_shl_i64(a, b)));
+            let b = pop_stryke(vm);
+            let a = pop_stryke(vm);
+            vm.push(stryke_to_fusevm(&crate::value::perl_shift(&a, &b, true)));
         }
         nops::SHR => {
-            let b = pop_stryke(vm).to_int();
-            let a = pop_stryke(vm).to_int();
-            vm.push(fusevm::Value::Int(crate::value::perl_shr_i64(a, b)));
+            let b = pop_stryke(vm);
+            let a = pop_stryke(vm);
+            vm.push(stryke_to_fusevm(&crate::value::perl_shift(&a, &b, false)));
         }
         nops::SORT_WITH_BLOCK_FAST => {
             let tag = vm.pop().to_int();
