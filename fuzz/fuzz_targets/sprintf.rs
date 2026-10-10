@@ -22,7 +22,10 @@ fuzz_target!(|data: &[u8]| {
     }
     // A width or precision of 7-10 digits is legal (up to INT_MAX) and only
     // allocates; skip those. Longer runs exceed INT_MAX and die immediately.
-    if data.split(|b| !b.is_ascii_digit()).any(|run| (7..=10).contains(&run.len())) {
+    if data
+        .split(|b| !b.is_ascii_digit())
+        .any(|run| (7..=10).contains(&run.len()))
+    {
         return;
     }
     let hex: String = data.iter().map(|b| format!("{b:02x}")).collect();

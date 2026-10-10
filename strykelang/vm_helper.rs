@@ -3574,9 +3574,7 @@ impl VMHelper {
     /// "forgot to load" hint is appended when no sub is defined in `class` at all.
     pub(crate) fn no_method_message(&self, class: &str, method: &str) -> String {
         if class.is_empty() {
-            return format!(
-                "Can't call method \"{method}\" without a package or object reference"
-            );
+            return format!("Can't call method \"{method}\" without a package or object reference");
         }
         let prefix = format!("{class}::");
         let known = self.subs.keys().any(|k| k.starts_with(&prefix));
@@ -12500,9 +12498,11 @@ impl VMHelper {
                 } else if let Some(s) = obj.as_str() {
                     s // Class->method()
                 } else {
-                    return Err(
-                        StrykeError::runtime(non_object_method_message(&obj, method), line).into(),
-                    );
+                    return Err(StrykeError::runtime(
+                        non_object_method_message(&obj, method),
+                        line,
+                    )
+                    .into());
                 };
                 if method == "VERSION" && !*super_call {
                     if let Some(ver) = self.package_version_scalar(class.as_str())? {
@@ -12551,10 +12551,7 @@ impl VMHelper {
                 let full_name = self
                     .resolve_method_full_name(&class, method, *super_call)
                     .ok_or_else(|| {
-                        StrykeError::runtime(
-                            self.no_method_message(&class, method),
-                            line,
-                        )
+                        StrykeError::runtime(self.no_method_message(&class, method), line)
                     })?;
                 if let Some(sub) = self.subs.get(&full_name).cloned() {
                     // `$_[0]` is the invocant, so argument N is `$_[N + 1]`.
@@ -12569,11 +12566,7 @@ impl VMHelper {
                 {
                     r
                 } else {
-                    Err(StrykeError::runtime(
-                        self.no_method_message(&class, method),
-                        line,
-                    )
-                    .into())
+                    Err(StrykeError::runtime(self.no_method_message(&class, method), line).into())
                 }
             }
 
@@ -14695,9 +14688,9 @@ impl VMHelper {
                     Some(f) => Some(self.eval_expr(f)?),
                     None => None,
                 };
-                let in_memory = file_val
-                    .as_ref()
-                    .filter(|v| v.as_scalar_ref().is_some() || v.as_scalar_binding_name().is_some());
+                let in_memory = file_val.as_ref().filter(|v| {
+                    v.as_scalar_ref().is_some() || v.as_scalar_binding_name().is_some()
+                });
                 if let Some(target) = in_memory {
                     return self
                         .open_scalar_ref_execute(handle_name, &mode_s, target, line)
@@ -15911,8 +15904,10 @@ impl VMHelper {
                     StrykeValue::integer(lv.to_int() | rv.to_int())
                 }
             }
-            BinOp::BitXor => crate::value::perl_string_bitop(lv, rv, crate::value::StringBitOp::Xor)
-                .unwrap_or_else(|| StrykeValue::integer(lv.to_int() ^ rv.to_int())),
+            BinOp::BitXor => {
+                crate::value::perl_string_bitop(lv, rv, crate::value::StringBitOp::Xor)
+                    .unwrap_or_else(|| StrykeValue::integer(lv.to_int() ^ rv.to_int()))
+            }
             BinOp::ShiftLeft => StrykeValue::integer(perl_shl_i64(lv.to_int(), rv.to_int())),
             BinOp::ShiftRight => StrykeValue::integer(perl_shr_i64(lv.to_int(), rv.to_int())),
             // These should have been handled by short-circuit above
@@ -24037,18 +24032,18 @@ where
             // ahead of the zero padding: %#010b is 0b00000101, not 000000b101.
             // Kept separate from pad_align because %s has no prefix concept —
             // perl renders %08s of "0xAB" as 00000xAB, padding straight through.
-            let pad_align_radix = |prefix: &str,
-                                   digits: &str,
-                                   width: usize,
-                                   left: bool,
-                                   zero: bool|
-             -> String {
-                let body = format!("{}{}", prefix, digits);
-                if zero && !left && width > body.len() {
-                    return format!("{}{}", prefix, pad_str(digits, width - prefix.len(), false, '0'));
-                }
-                pad_align(&body, width, left, false)
-            };
+            let pad_align_radix =
+                |prefix: &str, digits: &str, width: usize, left: bool, zero: bool| -> String {
+                    let body = format!("{}{}", prefix, digits);
+                    if zero && !left && width > body.len() {
+                        return format!(
+                            "{}{}",
+                            prefix,
+                            pad_str(digits, width - prefix.len(), false, '0')
+                        );
+                    }
+                    pad_align(&body, width, left, false)
+                };
 
             // Format a single integer with the inner spec for `%v...`. No
             // width/precision is applied here — those are deferred to the
@@ -25038,9 +25033,10 @@ pub(crate) fn exec_builtin(
                 }
                 return this.open_pipe_list_execute(handle_name, &mode_s, argv, line);
             }
-            if let Some(target) = args.get(2).filter(|v| {
-                v.as_scalar_ref().is_some() || v.as_scalar_binding_name().is_some()
-            }) {
+            if let Some(target) = args
+                .get(2)
+                .filter(|v| v.as_scalar_ref().is_some() || v.as_scalar_binding_name().is_some())
+            {
                 return this.open_scalar_ref_execute(handle_name, &mode_s, target, line);
             }
             let file_opt = args.get(2).map(|v| v.to_string());

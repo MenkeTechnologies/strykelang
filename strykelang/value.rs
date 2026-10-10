@@ -1588,16 +1588,16 @@ impl StrykeValue {
         let s = self.to_string();
         let s = s.trim_start();
         let lower = s.to_ascii_lowercase();
-        let (radix, digits) = if let Some(rest) = lower.strip_prefix("0x").or(lower.strip_prefix('x'))
-        {
-            (16, rest)
-        } else if let Some(rest) = lower.strip_prefix("0b").or(lower.strip_prefix('b')) {
-            (2, rest)
-        } else if let Some(rest) = lower.strip_prefix("0o").or(lower.strip_prefix('o')) {
-            (8, rest)
-        } else {
-            (8, lower.as_str())
-        };
+        let (radix, digits) =
+            if let Some(rest) = lower.strip_prefix("0x").or(lower.strip_prefix('x')) {
+                (16, rest)
+            } else if let Some(rest) = lower.strip_prefix("0b").or(lower.strip_prefix('b')) {
+                (2, rest)
+            } else if let Some(rest) = lower.strip_prefix("0o").or(lower.strip_prefix('o')) {
+                (8, rest)
+            } else {
+                (8, lower.as_str())
+            };
         perl_radix_prefix(digits, radix)
     }
 
@@ -3579,7 +3579,10 @@ pub fn perl_string_bitop(l: &StrykeValue, r: &StrykeValue, op: StringBitOp) -> O
     };
     let out: String = (0..len)
         .map(|i| {
-            let (a, b) = (lb.get(i).copied().unwrap_or(0), rb.get(i).copied().unwrap_or(0));
+            let (a, b) = (
+                lb.get(i).copied().unwrap_or(0),
+                rb.get(i).copied().unwrap_or(0),
+            );
             char::from(match op {
                 StringBitOp::And => a & b,
                 StringBitOp::Or => a | b,

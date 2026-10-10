@@ -144,7 +144,10 @@ fn sprintf_corpus_does_not_panic() {
         if bytes.len() > 256 {
             continue;
         }
-        if bytes.split(|b| !b.is_ascii_digit()).any(|run| (7..=10).contains(&run.len())) {
+        if bytes
+            .split(|b| !b.is_ascii_digit())
+            .any(|run| (7..=10).contains(&run.len()))
+        {
             continue;
         }
         let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();

@@ -3741,11 +3741,7 @@ impl Compiler {
                     ) {
                         // `return f(...)` calls `f` in the context this sub was called
                         // in, which is only known at run time: branch on `wantarray`.
-                        self.emit_op(
-                            Op::CallBuiltin(BuiltinId::Wantarray as u16, 0),
-                            line,
-                            None,
-                        );
+                        self.emit_op(Op::CallBuiltin(BuiltinId::Wantarray as u16, 0), line, None);
                         let to_scalar = self.emit_op(Op::JumpIfFalse(0), line, None);
                         self.compile_expr_ctx(expr, WantarrayCtx::List)?;
                         let to_end = self.emit_op(Op::Jump(0), line, None);

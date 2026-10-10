@@ -5371,11 +5371,9 @@ impl<'a> VM<'a> {
                         let lv = self.pop();
                         if let Some(s) = crate::value::set_union(&lv, &rv) {
                             self.push(s);
-                        } else if let Some(s) = crate::value::perl_string_bitop(
-                            &lv,
-                            &rv,
-                            crate::value::StringBitOp::Or,
-                        ) {
+                        } else if let Some(s) =
+                            crate::value::perl_string_bitop(&lv, &rv, crate::value::StringBitOp::Or)
+                        {
                             self.push(s);
                         } else if let Some(s) = crate::sketches::try_sketch_binop(
                             crate::sketches::SketchOp::Or,
@@ -5549,7 +5547,8 @@ impl<'a> VM<'a> {
                         Ok(())
                     }
                     Op::PreDecSlot(slot) => {
-                        let new_val = crate::vm_helper::perl_dec(&self.interp.scope.get_scalar_slot(*slot));
+                        let new_val =
+                            crate::vm_helper::perl_dec(&self.interp.scope.get_scalar_slot(*slot));
                         self.interp.scope.set_scalar_slot(*slot, new_val.clone());
                         self.push(new_val);
                         Ok(())
@@ -5571,7 +5570,9 @@ impl<'a> VM<'a> {
                     }
                     Op::PostDecSlot(slot) => {
                         if self.ip < len && matches!(ops[self.ip], Op::Pop) {
-                            let new_val = crate::vm_helper::perl_dec(&self.interp.scope.get_scalar_slot(*slot));
+                            let new_val = crate::vm_helper::perl_dec(
+                                &self.interp.scope.get_scalar_slot(*slot),
+                            );
                             self.interp.scope.set_scalar_slot(*slot, new_val);
                             self.ip += 1;
                         } else {
