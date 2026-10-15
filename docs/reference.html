@@ -9918,7 +9918,7 @@ p $h-&gt;{name}, &quot; using &quot;, $h-&gt;{memory_bytes}, &quot; bytes&quot;
         <p>Value-lineage tracking as a first-class scripting-language builtin is <strong>new ground</strong> — no major scripting language (Perl, Python, Ruby, JavaScript, Lua, PHP) ships this. Closest analogs are research dataflow languages (LIO, Adapton) which surface it as a type-system feature, never as a <code>mark</code>/<code>provenance</code> call pair.</p>
         <p>Cost model is zero when unused: a process-global <code>LEDGER_ACTIVE</code> flag flips to <code>true</code> on the first <code>mark(...)</code> call. Until then, the post-dispatch hook in every builtin call elides via a single inlined <code>AtomicBool::load(Relaxed)</code> branch.</p>
         <p>Marks only apply to <strong>heap values</strong> — hashes, arrays, byte buffers, atomics, generators, pipelines. Immediates (integers, floats, undef) have no stable <code>Arc</code> to key on and return <code>$val</code> unchanged from <code>mark</code> (silently no-op). Wrap a number in a one-element array if you need to track it.</p>
-        <pre><code class="lang-perl">val $payload = mark({ user =&gt; &quot;jamenk&quot;, roles =&gt; [&quot;admin&quot;] })
+        <pre><code class="lang-perl">val $payload = mark({ user =&gt; &quot;user&quot;, roles =&gt; [&quot;admin&quot;] })
 var $jwt     = jwt_encode($payload, $secret)          # tracked op
 var $cookie  = base64_encode($jwt)                    # tracked op
 p provenance($cookie)

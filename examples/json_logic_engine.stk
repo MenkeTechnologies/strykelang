@@ -89,7 +89,7 @@ p "── JSON-Logic Engine Demo ──"
 
 val $data = {
     temp => 25,
-    user => "wizard",
+    user => "user",
     role => "admin"
 }
 

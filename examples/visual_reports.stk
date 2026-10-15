@@ -24,7 +24,7 @@ print bar_chart($resources)
 p "\nTop Processes:"
 val @procs = (
     +{ pid => 1234, user => "root",   cpu => "0.5%", mem => "1.2%", command => "stryke" },
-    +{ pid => 5678, user => "wizard", cpu => "12.4%", mem => "4.5%", command => "rustc" },
+    +{ pid => 5678, user => "user", cpu => "12.4%", mem => "4.5%", command => "rustc" },
     +{ pid => 9012, user => "daemon", cpu => "0.1%", mem => "0.2%", command => "sshd" },
 )
 print to_table(\@procs)

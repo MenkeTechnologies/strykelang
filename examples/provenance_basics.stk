@@ -63,7 +63,7 @@ p "── 6. v1 limit: string results don't auto-propagate ───"
 # identity in the VM's scalar-return path, so the post-dispatch hook
 # stores under a stale pointer. The v1 idiom: wrap the string in a
 # container so the container's stable Arc carries the lineage.
-val $orig = mark({ user => "jamenk", roles => ["admin"] })
+val $orig = mark({ user => "user", roles => ["admin"] })
 val $j_unwrapped = to_json($orig)
 p "  bare-string return : ", (defined provenance($j_unwrapped) ? "tracked" : "lost (expected)")
 

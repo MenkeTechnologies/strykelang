@@ -28,7 +28,7 @@ fn dump_stage($val, $label) {
 
 # ── stage 1: origin ────────────────────────────────────────────────
 val $config = mark({
-    user    => "jamenk",
+    user    => "user",
     project => "strykelang",
     started => time(),
 })

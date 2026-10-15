@@ -4085,8 +4085,8 @@ mod tests {
     fn split_version_suffix_keeps_non_version_at() {
         // `@scope/pkg` style — not a version, do not split.
         assert_eq!(
-            split_version_suffix("/Users/wizard/projects/team@alpha/pkg"),
-            ("/Users/wizard/projects/team@alpha/pkg", None)
+            split_version_suffix("/Users/user/projects/team@alpha/pkg"),
+            ("/Users/user/projects/team@alpha/pkg", None)
         );
     }
 
