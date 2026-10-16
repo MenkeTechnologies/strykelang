@@ -257,8 +257,8 @@ stryke disasm script.stk                     # disassemble bytecode (learning/de
 stryke profile script.stk                    # run with profiling, structured output
 stryke profile --flame script.stk -o out.svg # flamegraph to file
 stryke bench                                 # run all benchmarks in bench/ or benches/
-stryke init myapp                            # scaffold a new project (stryke.toml, lib/, t/, benches/)
-stryke new myapp                             # alias for `init` that creates ./myapp/
+stryke init myapp                            # scaffold a new project (stryke.toml, main.stk, lib/, t/, benches/, bin/, examples/)
+stryke new myapp                             # like `init`, but creates ./myapp/
 stryke install                               # populate stryke.lock from stryke.toml (path deps; registry deps soon)
 stryke add mylib --path=../mylib             # add a local path dep (registry deps land in RFC phase 7-8)
 stryke remove mylib                          # drop a dep, regenerate stryke.lock
@@ -998,7 +998,7 @@ stryke-specific long flags:
 | `disasm FILE` | Disassemble bytecode to stderr (learning the VM, debugging perf) |
 | `profile [--flame] [--json] FILE` | Run with profiling; `--flame` generates SVG, `-o FILE` writes to file |
 | `bench [FILE\|DIR]` | Discover and run benchmarks from `bench/` or `benches/` (`bench_*.stk`, `b_*.stk`) |
-| `init [NAME]` | Scaffold a new project: `main.stk`, `lib/`, `bench/`, `t/`, `.gitignore` |
+| `init [NAME]` | Scaffold the current directory as a project: `stryke.toml`, `main.stk`, `lib/`, `t/`, `benches/`, `bin/`, `examples/`, `.gitignore` |
 | `repl [--load FILE]` | Start interactive REPL explicitly, with optional pre-loaded file |
 | `lsp` | Start Language Server Protocol over stdio (equivalent to `--lsp`) |
 | `completions [SHELL]` | Emit shell completions to stdout (`stryke completions zsh > _stryke`) |
@@ -2710,7 +2710,7 @@ stryke controller --bind 10.0.0.1    # specific interface
 **`eval` example session:**
 
 ```text
-stryke controller v0.17.59
+stryke controller v<version>
 > status
 node-01    16   64GB         idle      120s
 node-02    16   64GB         idle      118s

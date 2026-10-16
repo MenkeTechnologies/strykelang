@@ -399,7 +399,7 @@ spec:
 
 ```
 $ stryke controller --bind 0.0.0.0 --port 9999
-stryke controller v0.17.59
+stryke controller v<version>
 listening on 0.0.0.0:9999
 agents: 0
 
