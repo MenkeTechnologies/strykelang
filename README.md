@@ -953,9 +953,9 @@ Builtins from inside advice bodies:
 
 ### Embedded in zshrs — the `@`-prefix dispatch
 
-stryke is designed to embed **inside** [zshrs](https://github.com/MenkeTechnologies/zshrs): the shell is the host, stryke is its scripting layer. The contract is a single handler slot — `STRYKE_HANDLER` (`zshrs/src/lib.rs:353`), a `OnceLock<Box<dyn Fn(&str) -> i32 + Send + Sync>>`. The **fat binary** (shell + stryke linked together) registers `stryke::run` into that slot through `set_stryke_handler` (`zshrs/src/lib.rs:356`); the **thin binary** leaves it `None`, in which case `@` is an ordinary character. `try_stryke_dispatch` (`zshrs/src/lib.rs:365`) returns `Some(exit_code)` when a handler is registered and `None` otherwise, so any line the shell routes through it runs as stryke source.
+stryke is designed to embed **inside** [zshrs](https://github.com/MenkeTechnologies/zshrs): the shell is the host, stryke is its scripting layer. The contract is a single handler slot — `STRYKE_HANDLER` (`src/lib.rs` in zshrs), a `OnceLock<Box<dyn Fn(&str) -> i32 + Send + Sync>>`. The **fat binary** (shell + stryke linked together) registers `stryke::run` into that slot through `set_stryke_handler`; the **thin binary** leaves it `None`, in which case `@` is an ordinary character. `try_stryke_dispatch` returns `Some(exit_code)` when a handler is registered and `None` otherwise, so any line the shell routes through it runs as stryke source.
 
-The wired consumer today is AOP advice bodies: a zshrs `intercept` whose body starts with `@` strips the sigil and runs the remainder as stryke (`zshrs/src/extensions/intercepts.rs:167-169`), so a shell-level pointcut can carry stryke logic instead of shell script. This is the same interception model stryke exposes as `before`/`after`/`around` above — one model, split only by which language writes the advice.
+The wired consumer today is AOP advice bodies: a zshrs `intercept` whose body starts with `@` strips the sigil and runs the remainder as stryke (`src/extensions/intercepts.rs` in zshrs), so a shell-level pointcut can carry stryke logic instead of shell script. This is the same interception model stryke exposes as `before`/`after`/`around` above — one model, split only by which language writes the advice.
 
 ---
 
@@ -1469,7 +1469,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   # builtin that accepts a glob — `glob`, `glob_par`, `slurp`/`c`/`cat`,
   # `swallow`/`swa`, `ingest`/`ing`, `pwatch`, `par_find_files`,
   # `<*.txt>`, … — applies the qualifiers without a single line of
-  # stryke-side parsing. Source of truth is `zsh::glob` from `../zshrs`.
+  # stryke-side parsing. Source of truth is `zsh::glob` from the `zshrs` crate.
   val @dirs = glob "**(/)"          # directories only, recursive
   val @files = glob "**(.)"         # regular files only, recursive
   val @links = glob "**(@)"         # symlinks only
