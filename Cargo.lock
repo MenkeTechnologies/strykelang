@@ -143,6 +143,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ar_archive_writer"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73cd58deff2140a0a8eae87e417bd01db68a33e148aa93d1e8cd837e55e312b6"
+dependencies = [
+ "object 0.39.1",
+]
+
+[[package]]
 name = "arbitrary"
 version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -191,17 +200,6 @@ name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
-
-[[package]]
-name = "atty"
-version = "0.2.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9b39be18770d11421cdb1b9947a45dd3f37e93092cbf377614828a319d5fee8"
-dependencies = [
- "hermit-abi 0.1.19",
- "libc",
- "winapi",
-]
 
 [[package]]
 name = "autocfg"
@@ -991,7 +989,7 @@ dependencies = [
  "cranelift-control",
  "cranelift-module",
  "log",
- "object",
+ "object 0.38.1",
  "target-lexicon",
 ]
 
@@ -2122,15 +2120,6 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "hermit-abi"
-version = "0.1.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62b467343b94ba476dcb2500d242dadbb39557df889310ac77c5d99100aaac33"
-dependencies = [
- "libc",
-]
-
-[[package]]
-name = "hermit-abi"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc0fef456e4baa96da950455cd02c081ca953b141298e41db3fc7e36b1da849c"
@@ -2507,7 +2496,7 @@ version = "0.4.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
 dependencies = [
- "hermit-abi 0.5.2",
+ "hermit-abi",
  "libc",
  "windows-sys 0.61.2",
 ]
@@ -3410,6 +3399,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "object"
+version = "0.39.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e5a6c098c7a3b6547378093f5cc30bc54fd361ce711e05293a5cc589562739b"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3969,6 +3967,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fd00f0bb2e90d81d1044c2b32617f68fcb9fa3bb7640c23e9c748e53fb30934"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "psm"
+version = "0.1.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4dcd034599e63b970727f70d79e02d62390a4a84f7c6b827c27c46d5ac3fa622"
+dependencies = [
+ "ar_archive_writer",
+ "cc",
 ]
 
 [[package]]
@@ -4945,6 +4953,19 @@ name = "stable_deref_trait"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
+
+[[package]]
+name = "stacker"
+version = "0.1.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "707f49d46706bacf8a2b00d51dace3f9de527c13eec3778f570c411f89e69967"
+dependencies = [
+ "cc",
+ "cfg-if",
+ "libc",
+ "psm",
+ "windows-sys 0.61.2",
+]
 
 [[package]]
 name = "statrs"
@@ -6992,9 +7013,9 @@ checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
 
 [[package]]
 name = "znative"
-version = "0.13.1"
+version = "0.13.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0587545d2624657d77df26b6d5944354131fcc6673d1356a6a25d5f59b79749"
+checksum = "1e66f3448e50126953a8559792fc378ff1aaefeaac45e8eb1c678885d266eabe"
 
 [[package]]
 name = "zopfli"
@@ -7010,11 +7031,10 @@ dependencies = [
 
 [[package]]
 name = "zshrs"
-version = "0.13.1"
+version = "0.13.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8dcb4e8cbefcbe6334d972a56b7a1476e9bb38b25cf88f38ecd419678a60c9a"
+checksum = "d37c21f3128105fe016adc8770a018142a4dc72bfc90197fb7655eec808b388b"
 dependencies = [
- "atty",
  "bincode",
  "bitflags 2.13.0",
  "byteorder",
@@ -7048,6 +7068,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "stacker",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
@@ -7066,17 +7087,17 @@ dependencies = [
 
 [[package]]
 name = "zshrs-daemon"
-version = "0.13.1"
+version = "0.13.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec7ea037ae9be9ddbc437e75e53d553ffe28f9b9a3eec16839f7414fbb505828"
+checksum = "72e754fb1c7a9b2c3355bcad74c779b8fda80c53209b8806617b3e442c84e747"
 dependencies = [
- "atty",
  "axum",
  "base64",
  "byteorder",
  "chrono",
  "cron",
  "dirs 5.0.1",
+ "ed25519-dalek",
  "glob",
  "libc",
  "memmap2",
@@ -7100,6 +7121,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "ureq",
  "walkdir",
 ]
 
