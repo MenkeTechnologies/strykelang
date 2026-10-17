@@ -1003,6 +1003,7 @@ stryke-specific long flags:
 | `lsp` | Start Language Server Protocol over stdio (equivalent to `--lsp`) |
 | `completions [SHELL]` | Emit shell completions to stdout (`stryke completions zsh > _stryke`) |
 | `ast FILE` | Dump parsed AST as JSON to stdout |
+| `gen-docs [PATH] [--out DIR]` | Generate Markdown module docs for every `.stk`/`.pl`/`.pm` under PATH (default `.`) into DIR (default `docs/`), plus `index.md` |
 | `prun FILE...` | Run multiple script files in parallel using all cores |
 | `convert [-i] FILE...` | Convert Perl source to stryke syntax with `\|>` pipes |
 | `deconvert [-i] FILE...` | Convert stryke `.stk` files back to standard Perl syntax |

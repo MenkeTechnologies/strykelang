@@ -603,6 +603,9 @@ Run with profiling and structured output.
 .B ast \fIFILE\fR
 Dump the AST as JSON.
 .TP
+.B gen-docs \fR[\fIPATH\fR] [\fB--out \fIDIR\fR]
+Walk PATH (default current directory) for .stk, .pl and .pm sources and write one Markdown module doc per file under DIR (default docs/), mirroring the source layout, plus an index.md.
+.TP
 .B completions \fR[\fISHELL\fR]
 Emit shell completions.
 .TP
