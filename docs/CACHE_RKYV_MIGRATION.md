@@ -19,7 +19,7 @@ The dependency `rusqlite = "0.32"` (with bundled SQLite) is still needed for str
 
 ### 1. zshrs already moved past it
 
-`zshrs/src/daemon/shard.rs` (430 LOC) ships an rkyv-based shard pattern at `~/.cache/zshrs/images/{hash8}-{slug}.rkyv`. The pattern: file-per-shard, atomic-rename writes, advisory `flock`, mmap + `check_archived_root` reads, zero-copy `ArchivedHashMap` lookup. zshrs uses per-source-tree shards driven by a daemon; the SQLite cache stryke inherited was the older zshrs design from before the rkyv shard layer existed.
+`daemon/shard.rs` in zshrs (430 LOC) ships an rkyv-based shard pattern at `~/.zshrs/images/{hash8}-{slug}.rkyv`. The pattern: file-per-shard, atomic-rename writes, advisory `flock`, mmap + `check_archived_root` reads, zero-copy `ArchivedHashMap` lookup. zshrs uses per-source-tree shards driven by a daemon; the SQLite cache stryke inherited was the older zshrs design from before the rkyv shard layer existed.
 
 stryke embeds in zshrs as part of a shared CLI stack. Aligning their persistence layers — same crate, same pattern, same crash-safety story — reduces the surface area both projects need to maintain.
 
@@ -45,7 +45,7 @@ rkyv collapses this to: `File::open` → `Mmap::map` → `check_archived_root` (
 
 ### 4. Endgame implications
 
-Per the project framing: stryke is the second-priority project after zshrs, and zshrs is "endgame" — no further migrations planned, schemas must be versioned and migration-safe. rkyv has explicit format versioning via the `magic: u32` + `format_version: u32` header fields (`zshrs/src/daemon/shard.rs` pattern). Bumping the format version cleanly invalidates old shards on read. SQLite gave us schema versioning via a `stryke_version` column but couldn't catch *binary-level* changes (compiler.rs / parser.rs / vm.rs edits that don't touch `CARGO_PKG_VERSION`). The rkyv design keeps that invariant via the `binary_mtime_at_cache` field — same logic, different store.
+Per the project framing: stryke is the second-priority project after zshrs, and zshrs is "endgame" — no further migrations planned, schemas must be versioned and migration-safe. rkyv has explicit format versioning via the `magic: u32` + `format_version: u32` header fields (`daemon/shard.rs` in zshrs pattern). Bumping the format version cleanly invalidates old shards on read. SQLite gave us schema versioning via a `stryke_version` column but couldn't catch *binary-level* changes (compiler.rs / parser.rs / vm.rs edits that don't touch `CARGO_PKG_VERSION`). The rkyv design keeps that invariant via the `binary_mtime_at_cache` field — same logic, different store.
 
 ## What changed
 

@@ -907,7 +907,7 @@ val $next = $g->next  # [value, more]
 
 ## [0x06b] AOP — BEFORE / AFTER / AROUND ADVICE
 
-Aspect-oriented advice on user subs. Glob pointcuts, three advice kinds, `proceed()` for around. Same surface as zshrs's `intercept` builtin (`zshrs/src/exec.rs`), adapted to a real language: keyword statements instead of a CLI builtin.
+Aspect-oriented advice on user subs. Glob pointcuts, three advice kinds, `proceed()` for around. Same surface as zshrs's `intercept` builtin (`src/extensions/ext_builtins.rs` in zshrs), adapted to a real language: keyword statements instead of a CLI builtin.
 
 ```perl
 # Before — runs before the matched sub. Sees $INTERCEPT_NAME, @INTERCEPT_ARGS.
@@ -2413,7 +2413,7 @@ PATH                                                      PROG KB    BC KB
 
 **Format:** rkyv-archived `ScriptShard { header, entries: HashMap<path, ScriptEntry> }`. Entries hold per-script `(mtime_secs, mtime_nsecs, binary_mtime_at_cache, cached_at_secs, program_blob, chunk_blob)`. Inner blobs use bincode for now (`StrykeValue`'s `Arc`-shared graph isn't trivially zero-copy archivable yet — phase 2 will derive `Archive` directly on `Chunk` / `Program` for full zero-copy load). Writes go through `flock` on `scripts.rkyv.lock` and atomic rename of a tmp file.
 
-**Aligned with zshrs:** same rkyv shard pattern (`zshrs/src/daemon/shard.rs`) — `mmap` + `check_archived_root` + zero-copy `ArchivedHashMap` lookup. zshrs uses per-source-tree shards with a daemon; stryke uses a single global shard since scripts are individually invoked.
+**Aligned with zshrs:** same rkyv shard pattern (`daemon/shard.rs` in zshrs) — `mmap` + `check_archived_root` + zero-copy `ArchivedHashMap` lookup. zshrs uses per-source-tree shards with a daemon; stryke uses a single global shard since scripts are individually invoked.
 
 **Migration rationale:** see [`docs/CACHE_RKYV_MIGRATION.md`](docs/CACHE_RKYV_MIGRATION.md) for the full story — measured 11x speedup on the per-process workload (`s test t`), tradeoffs, and what's deferred to phase 2.
 
