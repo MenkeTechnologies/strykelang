@@ -259,6 +259,14 @@ mod nops {
     /// Perl unary minus under `--compat`: numeric negate, plus string negation
     /// (`-"foo"` is `"-foo"`) that fusevm's native `Negate` does not model.
     pub const NEGATE: u16 = BASE + 93;
+    /// Pops a value, pushes its flattened list length (`to_list().len()`).
+    pub const STACK_ARRAY_LEN: u16 = BASE + 94;
+    /// Pops key then container; pushes `exists $container->{key}` as Perl bool.
+    pub const EXISTS_ARROW_HASH_ELEM: u16 = BASE + 95;
+    /// `chomp` / `chop` on an assignable expr: pops lvalue idx (`chunk.lvalues`)
+    /// then the current value; pushes the removed count / char.
+    pub const CHOMP_IN_PLACE: u16 = BASE + 96;
+    pub const CHOP_IN_PLACE: u16 = BASE + 97;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -1025,6 +1033,50 @@ pub(crate) fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
                         "arrow hash: unexpected control flow",
                         0,
                     ));
+                    vm.push(fusevm::Value::Undef);
+                }
+            }
+        }
+        nops::STACK_ARRAY_LEN => {
+            let v = pop_stryke(vm);
+            vm.push(fusevm::Value::Int(v.to_list().len() as i64));
+        }
+        nops::EXISTS_ARROW_HASH_ELEM => {
+            let key = pop_stryke(vm).to_string();
+            let r = pop_stryke(vm);
+            match with_interp(|i| i.exists_arrow_hash_element(r, &key, 0)) {
+                Ok(b) => vm.push(stryke_to_fusevm(&StrykeValue::perl_bool(b))),
+                Err(e) => {
+                    set_native_err(e);
+                    vm.push(fusevm::Value::Undef);
+                }
+            }
+        }
+        nops::CHOMP_IN_PLACE | nops::CHOP_IN_PLACE => {
+            let chomp = id == nops::CHOMP_IN_PLACE;
+            let lv_idx = vm.pop().to_int() as usize;
+            let val = pop_stryke(vm);
+            let r = with_chunk(|c| c.lvalues.get(lv_idx).cloned());
+            let Some(target) = r else {
+                set_native_err(StrykeError::runtime("chomp/chop: bad lvalue index", 0));
+                vm.push(fusevm::Value::Undef);
+                return;
+            };
+            let res = with_interp(|i| {
+                if chomp {
+                    i.chomp_inplace_execute(val, &target)
+                } else {
+                    i.chop_inplace_execute(val, &target)
+                }
+            });
+            match res {
+                Ok(v) => vm.push(stryke_to_fusevm(&v)),
+                Err(crate::vm_helper::FlowOrError::Error(e)) => {
+                    set_native_err(e);
+                    vm.push(fusevm::Value::Undef);
+                }
+                Err(_) => {
+                    set_native_err(StrykeError::runtime("chomp/chop: unexpected control flow", 0));
                     vm.push(fusevm::Value::Undef);
                 }
             }
@@ -2136,6 +2188,20 @@ pub(crate) fn lower_to_fusevm(chunk: &Chunk) -> Option<fusevm::Chunk> {
             Op::ArrowHash => {
                 b.emit(fusevm::Op::Extended(nops::ARROW_HASH, 0), 0);
             }
+            Op::StackArrayLen => {
+                b.emit(fusevm::Op::Extended(nops::STACK_ARRAY_LEN, 0), 0);
+            }
+            Op::ExistsArrowHashElem => {
+                b.emit(fusevm::Op::Extended(nops::EXISTS_ARROW_HASH_ELEM, 0), 0);
+            }
+            Op::ChompInPlace(idx) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::CHOMP_IN_PLACE, 0), 0);
+            }
+            Op::ChopInPlace(idx) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::CHOP_IN_PLACE, 0), 0);
+            }
             Op::ArrayDerefLen => {
                 b.emit(fusevm::Op::Extended(nops::ARRAY_DEREF_LEN, 0), 0);
             }
@@ -2850,6 +2916,22 @@ mod tests {
         assert_parity_int("my $h = { a => 1, b => 2 }; $h->{b}", 2);
         assert_parity_str("my $h = { a => \"x\", b => \"y\" }; $h->{a}", "x");
         assert_parity_int("my $r = [1, 2, 3, 4]; scalar(@$r)", 4);
+    }
+
+    #[test]
+    fn native_stack_array_len_and_exists_arrow_match_vm() {
+        assert_parity_int("my $n = () = (1, 2, 3, 4); $n", 4);
+        assert_parity_int("my $h = { a => 1 }; exists $h->{a} ? 1 : 0", 1);
+        assert_parity_int("my $h = { a => 1 }; exists $h->{zz} ? 1 : 0", 0);
+    }
+
+    #[test]
+    fn native_chomp_chop_in_place_match_vm() {
+        assert_parity_str("my $s = \"abc\\n\"; chomp($s); $s", "abc");
+        assert_parity_int("my $s = \"abc\\n\"; chomp($s)", 1);
+        assert_parity_str("my $s = \"abc\"; chop($s); $s", "ab");
+        assert_parity_str("my $s = \"abc\"; chop($s)", "c");
+        assert_parity_int("my @a = (\"x\\n\", \"y\\n\"); chomp(@a)", 2);
     }
 
     #[test]
