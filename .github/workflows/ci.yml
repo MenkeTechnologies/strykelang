@@ -187,6 +187,31 @@ jobs:
           targets: ${{ matrix.target }}
       # No-op on macOS via runner.os guard in the composite action.
       - uses: Swatinem/rust-cache@v2
+      - name: Set Linux release profile (compile-time memory budget)
+        # The Linux leg died twice at the same point (runs 39070098832
+        # attempts 1 and 2, 2026-10-17 and 2026-10-22): the last line is
+        # `Compiling git2`, then 12.5 minutes of silence, then
+        # `The runner has received a shutdown signal` / exit 143 at ~20 min.
+        # The job passed at 69d73e9437 four commits earlier; in between the
+        # lock grew by 492 lines (zshrs 0.13.49, printpdf 0.12, pdf-extract
+        # 0.12). Under `lto = "fat"` + `codegen-units = 1` (Cargo.toml) every
+        # large dependency (zshrs, cranelift, wasmtime, git2) is compiled as
+        # one codegen unit with bitcode kept for the final whole-program
+        # LTO, and four of those in flight at once exhaust the 16 GB
+        # ubuntu-latest runner, which GitHub tears down without a rustc
+        # error. release.yml already applies this override to the
+        # aarch64-linux leg for the same reason; the CI leg only has to
+        # prove the tree builds and upload a smoke binary, so thin LTO with
+        # 16 units (bounded, parallel peak memory) is the right profile
+        # here. The shipped x86_64 Linux binary still comes from
+        # release.yml's fat-LTO build.
+        if: runner.os == 'Linux'
+        run: |
+          {
+            echo 'CARGO_PROFILE_RELEASE_DEBUG=0'
+            echo 'CARGO_PROFILE_RELEASE_LTO=thin'
+            echo 'CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16'
+          } >> "$GITHUB_ENV"
       - run: cargo build --release --locked --target ${{ matrix.target }}
       - uses: actions/upload-artifact@v4
         with:
