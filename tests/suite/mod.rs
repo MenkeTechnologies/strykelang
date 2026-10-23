@@ -257,6 +257,7 @@ mod lsp_stdio_completion;
 mod lsp_words_filter_and_specials;
 mod main_namespace_perl_parity;
 mod main_pkg_aliasing;
+mod map_grep_topic_alias_pin;
 mod math_builtins_pin;
 mod misc_extensions;
 mod modules_inc;

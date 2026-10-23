@@ -3753,7 +3753,15 @@ my @a = (1,2,3); $_ *= 2 for @a; print "@a\n";            # perl: 2 4 6  st: 1 2
 The `foreach` half is done for a bare-array source: both `for (@a) { ... }`
 and the statement-modifier form `EXPR for @a` write the loop variable back to
 the element after each iteration
-(`parity/cases/20070_postfix_for_aliases_and_localizes_topic.pl`).
+(`parity/cases/20070_postfix_for_aliases_and_localizes_topic.pl`). The same
+write-back covers a single scalar source (`for ($s) { s/^\s+// }`,
+`s/x/y/ for $s`, `for my $x ($s)`) and `map { BLOCK } @a` / `grep { BLOCK } @a`
+over a bare array, where `grep` also returns the edited elements; an edit
+made inside a nested bare block of the body (`for (@a) { { $_++ } }`) now
+reaches the element, because a write to `$_` lands in the frame that binds
+the topic instead of the innermost block frame
+(`parity/cases/372_map_grep_for_topic_alias.pl`,
+`tests/suite/map_grep_topic_alias_pin.rs`).
 
 The `@_` half is done under `--compat` for sub and method calls: a plain
 scalar variable (`$x`, `our $g`) or a caller's own `$_[N]` passed at a
@@ -3776,8 +3784,9 @@ Still open:
 - The write lands when the sub returns, not at the moment of the write: a sub
   that reads the caller's variable directly after writing `$_[0]`, or dies
   after writing it, does not see the new value there.
-- `foreach` aliasing through non-array sources (`for ($x, $y)`,
-  `for (@$ref)`).
+- `foreach` / `map { }` / `grep { }` aliasing through other sources: a list
+  of several variables (`for ($x, $y)`, `map { } @a, @b`), a deref
+  (`for (@$ref)`, `map { } @$r`), and `map EXPR, LIST` / `grep EXPR, LIST`.
 
 ## BUG-313 — `use utf8` is ignored inside a sub body — **`parity`**
 

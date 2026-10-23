@@ -9239,6 +9239,11 @@ impl VMHelper {
                     return Ok(StrykeValue::UNDEF);
                 }
                 let items = list_val.to_list();
+                // Alias write-back targets (BUG-019 / BUG-312): a bare `@arr`
+                // or single `$s` source takes the loop variable's value back
+                // after each iteration, including on `next` and `last`.
+                let alias_array = self.alias_array_source(list);
+                let alias_scalar = self.alias_scalar_source(list);
                 self.scope_push_hook();
                 self.scope.declare_scalar(var, StrykeValue::UNDEF);
                 self.english_note_lexical_scalar(var);
@@ -9274,11 +9279,31 @@ impl VMHelper {
                             Err(FlowOrError::Flow(Flow::Last(ref l)))
                                 if l == label || l.is_none() =>
                             {
+                                if let Err(e) = self.alias_write_back(
+                                    var,
+                                    alias_array.as_deref(),
+                                    alias_scalar.as_deref(),
+                                    i,
+                                    stmt.line,
+                                ) {
+                                    self.scope_pop_hook();
+                                    return Err(e);
+                                }
                                 break 'outer;
                             }
                             Err(FlowOrError::Flow(Flow::Next(ref l)))
                                 if l == label || l.is_none() =>
                             {
+                                if let Err(e) = self.alias_write_back(
+                                    var,
+                                    alias_array.as_deref(),
+                                    alias_scalar.as_deref(),
+                                    i,
+                                    stmt.line,
+                                ) {
+                                    self.scope_pop_hook();
+                                    return Err(e);
+                                }
                                 if let Some(cb) = continue_block {
                                     let _ = self.exec_block_smart(cb);
                                 }
@@ -9295,6 +9320,16 @@ impl VMHelper {
                                 return Err(e);
                             }
                         }
+                    }
+                    if let Err(e) = self.alias_write_back(
+                        var,
+                        alias_array.as_deref(),
+                        alias_scalar.as_deref(),
+                        i,
+                        stmt.line,
+                    ) {
+                        self.scope_pop_hook();
+                        return Err(e);
                     }
                     if let Some(cb) = continue_block {
                         let _ = self.exec_block_smart(cb);
@@ -12805,10 +12840,12 @@ impl VMHelper {
                 // block reads of `_` after an inner pipe stage return the
                 // wrong topic.
                 let saved_chain = self.scope.save_topic_chain();
+                let alias_array = self.alias_array_source(list);
                 let mut result = Vec::new();
-                for item in items {
+                for (i, item) in items.into_iter().enumerate() {
                     self.scope.set_topic(item);
                     let val = self.exec_block_with_tail(block, WantarrayCtx::List)?;
+                    self.alias_write_back("_", alias_array.as_deref(), None, i, line)?;
                     result.extend(val.map_flatten_outputs(*flatten_array_refs));
                 }
                 self.scope.restore_topic_chain(saved_chain);
@@ -12906,10 +12943,12 @@ impl VMHelper {
                         return Ok(StrykeValue::pipeline(Arc::clone(&p)));
                     }
                 }
+                let alias_array = self.alias_array_source(list);
                 let mut result = Vec::new();
-                for item in items {
+                for (i, item) in items.into_iter().enumerate() {
                     self.scope.set_topic(item.clone());
                     let val = self.exec_block(block)?;
+                    self.alias_write_back("_", alias_array.as_deref(), None, i, line)?;
                     // Bare regex in block → match against $_ (Perl: /pat/ in
                     // grep is `$_ =~ /pat/`, not a truthy regex object).
                     let keep = if let Some(re) = val.as_regex() {
@@ -12918,7 +12957,12 @@ impl VMHelper {
                         val.is_true()
                     };
                     if keep {
-                        result.push(item);
+                        // Perl's grep returns the (aliased) elements, edits included.
+                        if alias_array.is_some() {
+                            result.push(self.scope.get_scalar("_"));
+                        } else {
+                            result.push(item);
+                        }
                     }
                 }
                 if ctx == WantarrayCtx::List {
@@ -15379,10 +15423,19 @@ impl VMHelper {
             }
             ExprKind::PostfixForeach { expr, list } => {
                 let items = self.eval_expr_ctx(list, WantarrayCtx::List)?.to_list();
+                let alias_array = self.alias_array_source(list);
+                let alias_scalar = self.alias_scalar_source(list);
                 let mut last = StrykeValue::UNDEF;
-                for item in items {
+                for (i, item) in items.into_iter().enumerate() {
                     self.scope.set_topic(item);
                     last = self.eval_expr(expr)?;
+                    self.alias_write_back(
+                        "_",
+                        alias_array.as_deref(),
+                        alias_scalar.as_deref(),
+                        i,
+                        line,
+                    )?;
                 }
                 Ok(last)
             }
@@ -15390,6 +15443,57 @@ impl VMHelper {
     }
 
     // ── Helpers ──
+
+    /// The bare mutable array a `for`/`map`/`grep` source names, if any:
+    /// Perl aliases `$_` (or the loop variable) to its elements, approximated
+    /// here by writing the variable back after each iteration (see
+    /// [`Self::alias_write_back`]). A frozen (`val`) array has read-only
+    /// elements, so nothing is aliased back. Mirrors
+    /// `Compiler::alias_array_source` for blocks the tree-walker runs.
+    fn alias_array_source(&self, list: &Expr) -> Option<String> {
+        match &list.kind {
+            ExprKind::ArrayVar(name) if !self.scope.is_array_frozen(name) => Some(name.clone()),
+            _ => None,
+        }
+    }
+
+    /// A single bare mutable scalar as a `for` source (`for ($s) { s/x/y/ }`):
+    /// the loop variable aliases `$s`. `$_` itself is the loop variable and is
+    /// never a target. Mirrors `Compiler::alias_scalar_source`.
+    fn alias_scalar_source(&self, list: &Expr) -> Option<String> {
+        match &list.kind {
+            ExprKind::ScalarVar(name) if name != "_" && !self.scope.is_scalar_frozen(name) => {
+                Some(name.clone())
+            }
+            _ => None,
+        }
+    }
+
+    /// Copy the loop variable `var` (usually `$_`) back to the aliased source
+    /// after one iteration: element `index` of `alias_array`, or the whole of
+    /// `alias_scalar`.
+    fn alias_write_back(
+        &mut self,
+        var: &str,
+        alias_array: Option<&str>,
+        alias_scalar: Option<&str>,
+        index: usize,
+        line: usize,
+    ) -> Result<(), FlowOrError> {
+        if let Some(name) = alias_array {
+            let val = self.scope.get_scalar(var);
+            self.scope
+                .set_array_element(name, index as i64, val)
+                .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
+        }
+        if let Some(name) = alias_scalar {
+            let val = self.scope.get_scalar(var);
+            self.scope
+                .set_scalar(name, val)
+                .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
+        }
+        Ok(())
+    }
 
     fn overload_key_for_binop(op: BinOp) -> Option<&'static str> {
         match op {

@@ -1741,6 +1741,38 @@ impl Compiler {
         })
     }
 
+    /// Perl aliases `$_` (or the loop variable) to the elements of a bare array
+    /// source — `for (@a)`, `EXPR for @a`, `map { } @a`, `grep { } @a` — so writes
+    /// to `$_` land in the array. The alias is approximated by writing the
+    /// variable back to `$a[i]` after each iteration; this returns the interned
+    /// array name when `list` is such a source. A `val` (frozen) array has
+    /// read-only elements, so nothing is aliased back. Lists, ranges, slices and
+    /// derefs keep copy semantics.
+    fn alias_array_source(&mut self, list: &Expr, line: usize) -> Option<u16> {
+        match &list.kind {
+            ExprKind::ArrayVar(name) if self.check_array_mutable(name, line).is_ok() => {
+                Some(self.chunk.intern_name(name))
+            }
+            _ => None,
+        }
+    }
+
+    /// `for ($s) { s/^\s+// }` — Perl aliases the loop variable to the single
+    /// scalar, so the common trim idiom edits `$s`. Returns the interned scalar
+    /// name for a bare mutable `$s` source (a parenthesised single scalar parses
+    /// to the same `ScalarVar`); `$_` itself is excluded since it is the loop
+    /// variable. Lists of several scalars are not aliased.
+    fn alias_scalar_source(&mut self, list: &Expr, line: usize) -> Option<u16> {
+        match &list.kind {
+            ExprKind::ScalarVar(name)
+                if name != "_" && self.check_scalar_mutable(name, line).is_ok() =>
+            {
+                Some(self.chunk.intern_name(name))
+            }
+            _ => None,
+        }
+    }
+
     fn check_scalar_mutable(&self, name: &str, line: usize) -> Result<(), CompileError> {
         for layer in self.scope_stack.iter().rev() {
             if layer.declared_scalars.contains(name) {
@@ -3659,14 +3691,8 @@ impl Compiler {
                 // (before the counter increment, after the body and any
                 // continue block). Complex sources (lists, ranges, `keys`)
                 // keep copy semantics, matching Perl. (BUG-019)
-                let alias_array_name_idx: Option<u16> = match &list.kind {
-                    // A `val` (frozen) array cannot be written through; its elements
-                    // are read-only, so there is nothing to alias back.
-                    ExprKind::ArrayVar(name) if self.check_array_mutable(name, line).is_ok() => {
-                        Some(self.chunk.intern_name(name))
-                    }
-                    _ => None,
-                };
+                let alias_array_name_idx = self.alias_array_source(list, line);
+                let alias_scalar_name_idx = self.alias_scalar_source(list, line);
                 // PushFrame isolates __foreach_list__ / __foreach_i__ from outer/nested loops.
                 self.emit_push_frame(line);
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
@@ -3783,6 +3809,15 @@ impl Compiler {
                         self.emit_get_scalar(counter_name, line, None);
                     }
                     self.chunk.emit(Op::SetArrayElem(arr_idx), line);
+                }
+                // Alias write-back for a single scalar source: `$s = $loopvar`.
+                if let Some(scalar_idx) = alias_scalar_name_idx {
+                    if let Some(s) = var_slot_opt {
+                        self.chunk.emit(Op::GetScalarSlot(s), line);
+                    } else {
+                        self.emit_get_scalar(var_name, line, None);
+                    }
+                    self.emit_set_scalar(scalar_idx, line, None);
                 }
                 if let Some(cb) = continue_block {
                     self.compile_block_no_frame(cb)?;
@@ -9187,14 +9222,8 @@ impl Compiler {
                 // `EXPR for @arr` aliases `$_` to each element, like the
                 // statement form: write `$_` back after each iteration (see
                 // BUG-019 in `StmtKind::Foreach`).
-                let alias_array_name_idx: Option<u16> = match &list.kind {
-                    // A `val` (frozen) array cannot be written through; its elements
-                    // are read-only, so there is nothing to alias back.
-                    ExprKind::ArrayVar(name) if self.check_array_mutable(name, line).is_ok() => {
-                        Some(self.chunk.intern_name(name))
-                    }
-                    _ => None,
-                };
+                let alias_array_name_idx = self.alias_array_source(list, line);
+                let alias_scalar_name_idx = self.alias_scalar_source(list, line);
                 self.compile_expr_ctx(list, WantarrayCtx::List)?;
                 let list_name = self.chunk.intern_name("__pf_foreach_list__");
                 self.emit_op(Op::DeclareArray(list_name), line, Some(root));
@@ -9224,6 +9253,10 @@ impl Compiler {
                     self.emit_get_scalar(underscore, line, Some(root));
                     self.emit_get_scalar(counter, line, Some(root));
                     self.emit_op(Op::SetArrayElem(arr_idx), line, Some(root));
+                }
+                if let Some(scalar_idx) = alias_scalar_name_idx {
+                    self.emit_get_scalar(underscore, line, Some(root));
+                    self.emit_set_scalar(scalar_idx, line, Some(root));
                 }
 
                 self.emit_pre_inc(counter, line, Some(root));
@@ -9384,8 +9417,11 @@ impl Compiler {
                     self.emit_op(Op::MapIntMul(k), line, Some(root));
                 } else {
                     let block_idx = self.add_deferred_block(block.clone());
+                    let alias = self.alias_array_source(list, line);
                     if *flatten_array_refs {
                         self.emit_op(Op::FlatMapWithBlock(block_idx), line, Some(root));
+                    } else if let Some(arr_idx) = alias {
+                        self.emit_op(Op::MapWithBlockAlias(block_idx, arr_idx), line, Some(root));
                     } else {
                         self.emit_op(Op::MapWithBlock(block_idx), line, Some(root));
                     }
@@ -9435,7 +9471,11 @@ impl Compiler {
                     self.emit_op(Op::GrepIntModEq(m, r), line, Some(root));
                 } else {
                     let block_idx = self.add_deferred_block(block.clone());
-                    self.emit_op(Op::GrepWithBlock(block_idx), line, Some(root));
+                    if let Some(arr_idx) = self.alias_array_source(list, line) {
+                        self.emit_op(Op::GrepWithBlockAlias(block_idx, arr_idx), line, Some(root));
+                    } else {
+                        self.emit_op(Op::GrepWithBlock(block_idx), line, Some(root));
+                    }
                 }
                 if ctx != WantarrayCtx::List {
                     self.emit_op(Op::StackArrayLen, line, Some(root));

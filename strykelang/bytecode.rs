@@ -1064,6 +1064,15 @@ pub enum Op {
     DeclareOurArray(u16),
     /// `our %h;` with no initializer — same rule as [`Op::DeclareOurScalar`] for hashes.
     DeclareOurHash(u16),
+
+    // ── `$_` aliasing for block map/grep over a bare array (appended — do not reorder earlier op tags) ──
+    /// `map { BLOCK } @arr` where `@arr` is a mutable named array: like [`Op::MapWithBlock`]
+    /// (`block_idx`), but after each iteration the block's `$_` is written back to
+    /// `$arr[i]` (`name_idx`), so `map { s/x/y/ } @arr` edits `@arr` in place as in Perl.
+    MapWithBlockAlias(u16, u16),
+    /// `grep { BLOCK } @arr` over a mutable named array — [`Op::GrepWithBlock`] plus the
+    /// same per-iteration `$_` write-back as [`Op::MapWithBlockAlias`].
+    GrepWithBlockAlias(u16, u16),
 }
 
 /// `${^GLOBAL_PHASE}` values emitted with [`Op::SetGlobalPhase`] (matches Perl’s phase strings).

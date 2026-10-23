@@ -1509,7 +1509,15 @@ impl Scope {
         // HOF block would clobber the surrounding scope's `$_`/`$_N` and
         // break the "topic chain is lexical, not iterative" invariant.
         if Self::is_topic_variant_name(name) {
-            if let Some(frame) = self.frames.last_mut() {
+            // The write lands in the frame that binds the topic — the one the
+            // enclosing `for`/`map`/`grep`/sub call set it in — not in a bare
+            // block frame pushed since (`map { s/x/y/ } @a`, `for (@a) { { $_++ } }`):
+            // a block-local copy would vanish when the block exits, while Perl
+            // writes the one (localized) `$_`. Raw set, so a CaptureCell held
+            // there is replaced, never written through.
+            let binding = self.frames.iter().rposition(|f| f.has_scalar(name));
+            let idx = binding.unwrap_or(self.frames.len().saturating_sub(1));
+            if let Some(frame) = self.frames.get_mut(idx) {
                 frame.set_scalar_raw(name, val.clone());
                 // Documented language invariant: `$_` and `$_0` are the same
                 // variable (the topic ≡ positional slot 0). For deeper

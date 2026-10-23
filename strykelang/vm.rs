@@ -792,11 +792,29 @@ impl<'a> VM<'a> {
         dst.extend(val.map_flatten_outputs(peel_array_ref));
     }
 
+    /// After one `map`/`grep` block iteration over a bare array source
+    /// (`alias_array` = the array's name index), copy the block's final `$_` back
+    /// to element `index` — Perl aliases `$_` to the element, so `map { s/a/b/ }
+    /// @arr` and `grep { $_++ } @arr` edit `@arr` in place.
+    fn alias_topic_back(&mut self, alias_array: Option<u16>, index: usize) -> StrykeResult<()> {
+        let Some(name_idx) = alias_array else {
+            return Ok(());
+        };
+        let name = self.names[name_idx as usize].as_str();
+        self.require_array_mutable(name)?;
+        let topic = self.interp.scope.get_scalar("_");
+        self.interp
+            .scope
+            .set_array_element(name, index as i64, topic)
+            .map_err(|e| e.at_line(self.line()))
+    }
+
     fn map_with_block_common(
         &mut self,
         list: Vec<StrykeValue>,
         block_idx: u16,
         peel_array_ref: bool,
+        alias_array: Option<u16>,
         op_count: &mut u64,
     ) -> StrykeResult<()> {
         if list.len() == 1 {
@@ -845,9 +863,10 @@ impl<'a> VM<'a> {
                 // Mirrors the sort-block save/restore in vm_helper.rs.
                 let saved_chain = self.interp.scope.save_topic_chain();
                 let mut result = Vec::new();
-                for item in list {
+                for (i, item) in list.into_iter().enumerate() {
                     self.interp.scope.set_topic(item);
                     let val = self.run_block_region(start, end, op_count)?;
+                    self.alias_topic_back(alias_array, i)?;
                     Self::extend_map_outputs(&mut result, val, peel_array_ref);
                 }
                 self.interp.scope.restore_topic_chain(saved_chain);
@@ -858,7 +877,7 @@ impl<'a> VM<'a> {
         let block = self.blocks[idx].clone();
         let saved_chain = self.interp.scope.save_topic_chain();
         let mut result = Vec::new();
-        for item in list {
+        for (i, item) in list.into_iter().enumerate() {
             self.interp.scope.set_topic(item);
             match self.interp.exec_block_with_tail(&block, WantarrayCtx::List) {
                 Ok(val) => Self::extend_map_outputs(&mut result, val, peel_array_ref),
@@ -867,6 +886,85 @@ impl<'a> VM<'a> {
                     return Err(e);
                 }
                 Err(_) => {}
+            }
+            if let Err(e) = self.alias_topic_back(alias_array, i) {
+                self.interp.scope.restore_topic_chain(saved_chain);
+                return Err(e);
+            }
+        }
+        self.interp.scope.restore_topic_chain(saved_chain);
+        self.push(StrykeValue::array(result));
+        Ok(())
+    }
+
+    /// `grep { BLOCK } LIST` — keeps the items whose block is true (a bare regex
+    /// result matches `$_`). See [`Self::alias_topic_back`] for `alias_array`.
+    fn grep_with_block_common(
+        &mut self,
+        list: Vec<StrykeValue>,
+        block_idx: u16,
+        alias_array: Option<u16>,
+        op_count: &mut u64,
+    ) -> StrykeResult<()> {
+        if list.len() == 1 {
+            if let Some(p) = list[0].as_pipeline() {
+                let idx = block_idx as usize;
+                let sub = self.interp.anon_coderef_from_block(&self.blocks[idx]);
+                let line = self.line();
+                self.interp
+                    .pipeline_push(&p, PipelineOp::Filter(sub), line)?;
+                self.push(StrykeValue::pipeline(Arc::clone(&p)));
+                return Ok(());
+            }
+        }
+        // Bare regex → match against $_ (Perl: /pat/ in grep is $_ =~ /pat/)
+        fn keep(val: &StrykeValue, item: &StrykeValue) -> bool {
+            match val.as_regex() {
+                Some(re) => re.is_match(&item.to_string()),
+                None => val.is_true(),
+            }
+        }
+        // Perl's grep returns the elements themselves, so with an aliased
+        // source a block that edits `$_` yields the edited value.
+        let kept = |vm: &Self, item: StrykeValue| match alias_array {
+            Some(_) => vm.interp.scope.get_scalar("_"),
+            None => item,
+        };
+        let idx = block_idx as usize;
+        // Save / restore the topic chain across the iter loop so this grep
+        // stage doesn't leak its final `_` (or chain shift) into the
+        // enclosing block. Mirror of map_with_block_common.
+        let saved_chain = self.interp.scope.save_topic_chain();
+        let mut result = Vec::new();
+        if let Some(&(start, end)) = self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref()) {
+            for (i, item) in list.into_iter().enumerate() {
+                self.interp.scope.set_topic(item.clone());
+                let val = self.run_block_region(start, end, op_count)?;
+                self.alias_topic_back(alias_array, i)?;
+                if keep(&val, &item) {
+                    result.push(kept(self, item));
+                }
+            }
+        } else {
+            let block = self.blocks[idx].clone();
+            for (i, item) in list.into_iter().enumerate() {
+                self.interp.scope.set_topic(item.clone());
+                match self.interp.exec_block(&block) {
+                    Ok(val) => {
+                        if keep(&val, &item) {
+                            result.push(kept(self, item));
+                        }
+                    }
+                    Err(crate::vm_helper::FlowOrError::Error(e)) => {
+                        self.interp.scope.restore_topic_chain(saved_chain);
+                        return Err(e);
+                    }
+                    Err(_) => {}
+                }
+                if let Err(e) = self.alias_topic_back(alias_array, i) {
+                    self.interp.scope.restore_topic_chain(saved_chain);
+                    return Err(e);
+                }
             }
         }
         self.interp.scope.restore_topic_chain(saved_chain);
@@ -8410,11 +8508,21 @@ impl<'a> VM<'a> {
                     }
                     Op::MapWithBlock(block_idx) => {
                         let list = self.pop().to_list();
-                        self.map_with_block_common(list, *block_idx, false, op_count)
+                        self.map_with_block_common(list, *block_idx, false, None, op_count)
+                    }
+                    Op::MapWithBlockAlias(block_idx, arr_idx) => {
+                        let list = self.pop().to_list();
+                        self.map_with_block_common(
+                            list,
+                            *block_idx,
+                            false,
+                            Some(*arr_idx),
+                            op_count,
+                        )
                     }
                     Op::FlatMapWithBlock(block_idx) => {
                         let list = self.pop().to_list();
-                        self.map_with_block_common(list, *block_idx, true, op_count)
+                        self.map_with_block_common(list, *block_idx, true, None, op_count)
                     }
                     Op::MapWithExpr(expr_idx) => {
                         let list = self.pop().to_list();
@@ -8491,70 +8599,11 @@ impl<'a> VM<'a> {
                     }
                     Op::GrepWithBlock(block_idx) => {
                         let list = self.pop().to_list();
-                        if list.len() == 1 {
-                            if let Some(p) = list[0].as_pipeline() {
-                                let idx = *block_idx as usize;
-                                let sub = self.interp.anon_coderef_from_block(&self.blocks[idx]);
-                                let line = self.line();
-                                self.interp
-                                    .pipeline_push(&p, PipelineOp::Filter(sub), line)?;
-                                self.push(StrykeValue::pipeline(Arc::clone(&p)));
-                                return Ok(());
-                            }
-                        }
-                        let idx = *block_idx as usize;
-                        // Save / restore the topic chain across the iter
-                        // loop so this grep stage doesn't leak its final
-                        // `_` (or chain shift) into the enclosing block.
-                        // Mirror of the map fix above.
-                        let saved_chain = self.interp.scope.save_topic_chain();
-                        if let Some(&(start, end)) =
-                            self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
-                        {
-                            let mut result = Vec::new();
-                            for item in list {
-                                self.interp.scope.set_topic(item.clone());
-                                let val = self.run_block_region(start, end, op_count)?;
-                                // Bare regex → match against $_ (Perl: /pat/ in grep is $_ =~ /pat/)
-                                let keep = if let Some(re) = val.as_regex() {
-                                    re.is_match(&item.to_string())
-                                } else {
-                                    val.is_true()
-                                };
-                                if keep {
-                                    result.push(item);
-                                }
-                            }
-                            self.interp.scope.restore_topic_chain(saved_chain);
-                            self.push(StrykeValue::array(result));
-                            Ok(())
-                        } else {
-                            let block = self.blocks[idx].clone();
-                            let mut result = Vec::new();
-                            for item in list {
-                                self.interp.scope.set_topic(item.clone());
-                                match self.interp.exec_block(&block) {
-                                    Ok(val) => {
-                                        let keep = if let Some(re) = val.as_regex() {
-                                            re.is_match(&item.to_string())
-                                        } else {
-                                            val.is_true()
-                                        };
-                                        if keep {
-                                            result.push(item);
-                                        }
-                                    }
-                                    Err(crate::vm_helper::FlowOrError::Error(e)) => {
-                                        self.interp.scope.restore_topic_chain(saved_chain);
-                                        return Err(e);
-                                    }
-                                    Err(_) => {}
-                                }
-                            }
-                            self.interp.scope.restore_topic_chain(saved_chain);
-                            self.push(StrykeValue::array(result));
-                            Ok(())
-                        }
+                        self.grep_with_block_common(list, *block_idx, None, op_count)
+                    }
+                    Op::GrepWithBlockAlias(block_idx, arr_idx) => {
+                        let list = self.pop().to_list();
+                        self.grep_with_block_common(list, *block_idx, Some(*arr_idx), op_count)
                     }
                     Op::ForEachWithBlock(block_idx) => {
                         let val = self.pop();
