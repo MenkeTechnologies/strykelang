@@ -136,7 +136,11 @@ fn is_identifier_like(t: &Token) -> bool {
 fn is_sigil_var(t: &Token) -> bool {
     matches!(
         t,
-        Token::ScalarVar(_) | Token::DerefScalarVar(_) | Token::ArrayVar(_) | Token::HashVar(_)
+        Token::ScalarVar(_)
+            | Token::DerefScalarVar(_)
+            | Token::ArrayLastIndexDeref(_)
+            | Token::ArrayVar(_)
+            | Token::HashVar(_)
     )
 }
 
@@ -185,6 +189,8 @@ fn token_source(t: &Token) -> String {
         ScalarVar(s) => format!("${s}"),
         DerefScalarVar(s) => format!("$${s}"),
         ScalarDerefLBrace => "${".into(),
+        ArrayLastIndexLBrace => "$#{".into(),
+        ArrayLastIndexDeref(s) => format!("$#${s}"),
         ArrayVar(s) => format!("@{s}"),
         HashVar(s) => format!("%{s}"),
         ArrayAt => "@".into(),

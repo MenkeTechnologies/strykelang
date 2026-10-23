@@ -3093,34 +3093,6 @@ Pin: `heredoc_in_var_then_passed_to_fn`,
 Severity: **polish** (workaround is one extra line; no semantic loss).
 
 
-## BUG-246 — `$$ref` does not deref inside double-quoted string
-
-```sh
-$ s -e 'my $x = 7; my $r = \$x; print "val=$$r\n"'
-val=SCALAR(0x...)
-```
-
-In Perl, `"$$r"` inside a qq-string evaluates the scalar deref
-`$$r` and inserts the value (`7`). Stryke instead interpolates `$r`
-as the ref's stringification, leaving the result as
-`SCALAR(0x...)`-style output.
-
-Workaround: use the `${\ EXPR }` form, which always works:
-
-```stryke
-my $x = 7;
-my $r = \$x;
-print "val=${\ $$r }\n";   # val=7
-```
-
-Pin: `scalar_ref_double_dollar_does_not_deref_in_interp` (broken
-form) and `scalar_ref_deref_works_via_backslash_block` (working
-idiom) in `tests/suite/string_interpolation_pin.rs`.
-
-Severity: **bug** (P2; common Perl idiom silently produces wrong
-output instead of erroring; workaround exists but is non-obvious).
-
-
 ## BUG-247 — `length($str)` returns byte-count, not char-count
 
 ```sh

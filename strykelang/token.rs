@@ -36,6 +36,14 @@ pub enum Token {
     /// single [`Token::ScalarVar`] / [`Token::DerefScalarVar`]; only the expression form emits
     /// this token, and the body plus its closing `}` then lex as ordinary tokens.
     ScalarDerefLBrace,
+    /// The `$#{` that opens a last-index deref whose body is a general expression —
+    /// `$#{$r}`, `$#{ $h->{list} }` (Perl: last index of the referenced array). The body and
+    /// its closing `}` lex as ordinary tokens. A plain-identifier body (`$#{name}`) lexes as
+    /// the single [`Token::ScalarVar`] `#name`, exactly like `$#name`.
+    ArrayLastIndexLBrace,
+    /// `$#$foo` — last index of the array referenced by `$foo` (inner name is `foo` without
+    /// sigil).
+    ArrayLastIndexDeref(String),
     /// `ArrayVar` variant.
     ArrayVar(String),
     /// `HashVar` variant.
@@ -281,6 +289,8 @@ impl Token {
                 | Token::ScalarVar(_)
                 | Token::DerefScalarVar(_)
                 | Token::ScalarDerefLBrace
+                | Token::ArrayLastIndexLBrace
+                | Token::ArrayLastIndexDeref(_)
                 | Token::ArrayVar(_)
                 | Token::HashVar(_)
                 | Token::Ident(_)

@@ -10227,6 +10227,24 @@ impl Parser {
                     line,
                 })
             }
+            // `$#$name` — last index of the array `$name` references (Perl `$#$aref`).
+            Token::ArrayLastIndexDeref(name) => {
+                self.advance();
+                let aref = Expr {
+                    kind: ExprKind::ScalarVar(name),
+                    line,
+                };
+                Ok(last_index_of_array_ref(aref, line))
+            }
+            // `$#{ EXPR }` — last index of the array `EXPR` references (`$#{$r}`,
+            // `$#{ $h->{list} }`). The lexer only emits this token when the body is not a
+            // plain identifier (`$#{name}` lexes as `$#name`).
+            Token::ArrayLastIndexLBrace => {
+                self.advance();
+                let aref = self.parse_expression()?;
+                self.expect(&Token::RBrace)?;
+                Ok(last_index_of_array_ref(aref, line))
+            }
             // `${ EXPR }` — block scalar deref with a general expression body. The lexer only
             // emits this token when the body is not a plain variable name (see
             // `Lexer::braced_scalar_body_is_plain_name`), so the body is parsed here as a full
@@ -21043,6 +21061,74 @@ impl Parser {
     /// subscripts. Perl auto-implies `->` between consecutive subscripts, so
     /// `$matrix[1][1]` is `$matrix[1]->[1]` and `$h{a}{b}` is `$h{a}->{b}`.
     /// Each step wraps the current expression in an `ArrowDeref`.
+    /// Consume one bracketed subscript (`[…]` or `{…}`) at `chars[*i] == open` inside an
+    /// interpolated string, honoring nesting of the same bracket pair, and return its body.
+    /// `*i` ends past the closing bracket (or at the end of the string when unterminated).
+    fn scan_interp_subscript(chars: &[char], i: &mut usize, open: char, close: char) -> String {
+        let mut body = String::new();
+        let mut depth = 1usize;
+        *i += 1; // past `open`
+        while *i < chars.len() {
+            let c = chars[*i];
+            *i += 1;
+            if c == open {
+                depth += 1;
+            } else if c == close {
+                depth -= 1;
+                if depth == 0 {
+                    break;
+                }
+            }
+            body.push(c);
+        }
+        body
+    }
+
+    /// `@$r[…]` / `@{$r}[…]` / `@$r{…}` / `@{$r}{…}` — slice through a reference inside an
+    /// interpolated string. `source` is the deref body (`$r`); when a subscript follows it
+    /// becomes the same `AnonymousListSlice` / `HashSliceDeref` the code parser builds for
+    /// `@{$r}[…]` / `@{$r}{…}`, otherwise the whole-array deref. A hash slice is only taken
+    /// under `--compat`, matching the named `@h{…}` interpolation.
+    fn interp_deref_or_slice(
+        chars: &[char],
+        i: &mut usize,
+        source: Expr,
+        line: usize,
+    ) -> StrykeResult<Expr> {
+        let deref = |expr: Expr| Expr {
+            kind: ExprKind::Deref {
+                expr: Box::new(expr),
+                kind: Sigil::Array,
+            },
+            line,
+        };
+        match chars.get(*i) {
+            Some('[') => {
+                let body = Self::scan_interp_subscript(chars, i, '[', ']');
+                let indices = parse_slice_indices_from_str(body.trim(), "<interp>")?;
+                Ok(Expr {
+                    kind: ExprKind::AnonymousListSlice {
+                        source: Box::new(deref(source)),
+                        indices,
+                    },
+                    line,
+                })
+            }
+            Some('{') if crate::compat_mode() => {
+                let body = Self::scan_interp_subscript(chars, i, '{', '}');
+                let keys = parse_slice_indices_from_str(body.trim(), "<interp>")?;
+                Ok(Expr {
+                    kind: ExprKind::HashSliceDeref {
+                        container: Box::new(source),
+                        keys,
+                    },
+                    line,
+                })
+            }
+            _ => Ok(deref(source)),
+        }
+    }
+
     fn interp_chain_subscripts(
         &self,
         chars: &[char],
@@ -21063,74 +21149,24 @@ impl Parser {
             }
             match chars[after] {
                 '[' => {
-                    *i = after + 1;
-                    let mut idx_str = String::new();
-                    while *i < chars.len() && chars[*i] != ']' {
-                        idx_str.push(chars[*i]);
-                        *i += 1;
-                    }
-                    if *i < chars.len() {
-                        *i += 1;
-                    }
-                    let idx_expr = if let Some(rest) = idx_str.strip_prefix('$') {
-                        Expr {
-                            kind: ExprKind::ScalarVar(rest.to_string()),
-                            line,
-                        }
-                    } else if let Ok(n) = idx_str.parse::<i64>() {
-                        Expr {
-                            kind: ExprKind::Integer(n),
-                            line,
-                        }
-                    } else {
-                        Expr {
-                            kind: ExprKind::String(idx_str),
-                            line,
-                        }
-                    };
+                    *i = after;
+                    let idx = Self::scan_interp_subscript(chars, i, '[', ']');
                     base = Expr {
                         kind: ExprKind::ArrowDeref {
                             expr: Box::new(base),
-                            index: Box::new(idx_expr),
+                            index: Box::new(interp_array_index_expr(&idx, line)),
                             kind: DerefKind::Array,
                         },
                         line,
                     };
                 }
                 '{' => {
-                    *i = after + 1;
-                    let mut key = String::new();
-                    let mut depth = 1usize;
-                    while *i < chars.len() && depth > 0 {
-                        if chars[*i] == '{' {
-                            depth += 1;
-                        } else if chars[*i] == '}' {
-                            depth -= 1;
-                            if depth == 0 {
-                                break;
-                            }
-                        }
-                        key.push(chars[*i]);
-                        *i += 1;
-                    }
-                    if *i < chars.len() {
-                        *i += 1;
-                    }
-                    let key_expr = if let Some(rest) = key.strip_prefix('$') {
-                        Expr {
-                            kind: ExprKind::ScalarVar(rest.to_string()),
-                            line,
-                        }
-                    } else {
-                        Expr {
-                            kind: ExprKind::String(key),
-                            line,
-                        }
-                    };
+                    *i = after;
+                    let key = Self::scan_interp_subscript(chars, i, '{', '}');
                     base = Expr {
                         kind: ExprKind::ArrowDeref {
                             expr: Box::new(base),
-                            index: Box::new(key_expr),
+                            index: Box::new(interp_hash_key_expr(&key, line)),
                             kind: DerefKind::Hash,
                         },
                         line,
@@ -21287,6 +21323,38 @@ impl Parser {
                 // `$#name` — last index of `@name` (Perl `$#array`).
                 if chars[i] == '#' {
                     i += 1;
+                    // `$#{ EXPR }` / `$#$name` — last index of a referenced array. The
+                    // exact source text goes to the code parser, so the string form
+                    // lowers identically to `$#{$r}` / `$#$r` outside a string.
+                    if chars.get(i) == Some(&'{') {
+                        if let Some((inner, close)) = Self::scan_interp_braces(&chars, i + 1) {
+                            i = close + 1;
+                            let src = format!("$#{{{inner}}}");
+                            parts.push(StringPart::Expr(parse_expression_from_str(
+                                &src, "<interp>",
+                            )?));
+                            continue;
+                        }
+                    }
+                    if chars.get(i) == Some(&'$')
+                        && chars
+                            .get(i + 1)
+                            .is_some_and(|c| c.is_alphabetic() || *c == '_')
+                    {
+                        let start = i + 1;
+                        i = start;
+                        while i < chars.len()
+                            && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == ':')
+                        {
+                            i += 1;
+                        }
+                        let name: String = chars[start..i].iter().collect();
+                        let src = format!("$#${name}");
+                        parts.push(StringPart::Expr(parse_expression_from_str(
+                            &src, "<interp>",
+                        )?));
+                        continue;
+                    }
                     let mut sname = String::from("#");
                     while i < chars.len()
                         && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == ':')
@@ -21309,6 +21377,9 @@ impl Parser {
                 // `$$` — process id (Perl `$$`), only when the two `$` are adjacent (no whitespace
                 // between) and the second `$` is not followed by a word character or digit (`$$x`
                 // / `$$_` / `$$0` are `$` + `$x` / `$_` / `$0`).
+                // `$$name` is a scalar deref (`"$$r"` → value of `$$r`); `$$name[0]` /
+                // `$$name{k}` read `${$name}[0]` = `$name->[0]`, as in Perl.
+                let mut deref_scalar = false;
                 if chars[i] == '$' {
                     let next_c = chars.get(i + 1).copied();
                     let is_pid = match next_c {
@@ -21325,7 +21396,8 @@ impl Parser {
                         i += 1; // consume second `$`
                         continue;
                     }
-                    i += 1; // skip second `$` — same as a single `$` before the identifier
+                    deref_scalar = true;
+                    i += 1; // past the second `$`; the identifier follows
                 }
                 if chars[i] == '{' {
                     // `${…}` — braced variable OR expression interpolation.
@@ -21407,72 +21479,20 @@ impl Parser {
                         i += 1;
                     }
                     if i < chars.len() && chars[i] == '{' {
-                        i += 1; // skip {
-                        let mut key = String::new();
-                        let mut depth = 1;
-                        while i < chars.len() && depth > 0 {
-                            if chars[i] == '{' {
-                                depth += 1;
-                            } else if chars[i] == '}' {
-                                depth -= 1;
-                                if depth == 0 {
-                                    break;
-                                }
-                            }
-                            key.push(chars[i]);
-                            i += 1;
-                        }
-                        if i < chars.len() {
-                            i += 1;
-                        }
-                        let key_expr = if let Some(rest) = key.strip_prefix('$') {
-                            Expr {
-                                kind: ExprKind::ScalarVar(rest.to_string()),
-                                line,
-                            }
-                        } else {
-                            Expr {
-                                kind: ExprKind::String(key),
-                                line,
-                            }
-                        };
+                        let key = Self::scan_interp_subscript(&chars, &mut i, '{', '}');
                         parts.push(StringPart::Expr(Expr {
                             kind: ExprKind::HashElement {
                                 hash: name,
-                                key: Box::new(key_expr),
+                                key: Box::new(interp_hash_key_expr(&key, line)),
                             },
                             line,
                         }));
                     } else if i < chars.len() && chars[i] == '[' {
-                        i += 1;
-                        let mut idx_str = String::new();
-                        while i < chars.len() && chars[i] != ']' {
-                            idx_str.push(chars[i]);
-                            i += 1;
-                        }
-                        if i < chars.len() {
-                            i += 1;
-                        }
-                        let idx_expr = if let Some(rest) = idx_str.strip_prefix('$') {
-                            Expr {
-                                kind: ExprKind::ScalarVar(rest.to_string()),
-                                line,
-                            }
-                        } else if let Ok(n) = idx_str.parse::<i64>() {
-                            Expr {
-                                kind: ExprKind::Integer(n),
-                                line,
-                            }
-                        } else {
-                            Expr {
-                                kind: ExprKind::String(idx_str),
-                                line,
-                            }
-                        };
+                        let idx = Self::scan_interp_subscript(&chars, &mut i, '[', ']');
                         parts.push(StringPart::Expr(Expr {
                             kind: ExprKind::ArrayElement {
                                 array: name,
-                                index: Box::new(idx_expr),
+                                index: Box::new(interp_array_index_expr(&idx, line)),
                             },
                             line,
                         }));
@@ -21569,75 +21589,42 @@ impl Parser {
                     // (`->[…]` / `->{…}`) onto it so things like `$ar->[2]`,
                     // `$href->{k}`, and chained `$x->{a}[1]->{b}` interpolate
                     // correctly inside double-quoted strings (Perl convention).
-                    let mut base = if i < chars.len() && chars[i] == '{' {
-                        // $hash{key}
-                        i += 1; // skip {
-                        let mut key = String::new();
-                        let mut depth = 1;
-                        while i < chars.len() && depth > 0 {
-                            if chars[i] == '{' {
-                                depth += 1;
-                            } else if chars[i] == '}' {
-                                depth -= 1;
-                                if depth == 0 {
-                                    break;
-                                }
-                            }
-                            key.push(chars[i]);
-                            i += 1;
-                        }
-                        if i < chars.len() {
-                            i += 1;
-                        } // skip }
-                        let key_expr = if let Some(rest) = key.strip_prefix('$') {
-                            Expr {
-                                kind: ExprKind::ScalarVar(rest.to_string()),
-                                line,
-                            }
+                    let mut base = if deref_scalar {
+                        // `$$name`: with a subscript next (`$$r[0]`, `$$r{k}`) the bare
+                        // `$name` base lets the chain loop below build `$name->[0]` /
+                        // `$name->{k}`; without one it is the scalar deref itself.
+                        let name_expr = Expr {
+                            kind: ExprKind::ScalarVar(name),
+                            line,
+                        };
+                        if matches!(chars.get(i), Some('[') | Some('{')) {
+                            name_expr
                         } else {
                             Expr {
-                                kind: ExprKind::String(key),
+                                kind: ExprKind::Deref {
+                                    expr: Box::new(name_expr),
+                                    kind: Sigil::Scalar,
+                                },
                                 line,
                             }
-                        };
+                        }
+                    } else if i < chars.len() && chars[i] == '{' {
+                        // $hash{key}
+                        let key = Self::scan_interp_subscript(&chars, &mut i, '{', '}');
                         Expr {
                             kind: ExprKind::HashElement {
                                 hash: name,
-                                key: Box::new(key_expr),
+                                key: Box::new(interp_hash_key_expr(&key, line)),
                             },
                             line,
                         }
                     } else if i < chars.len() && chars[i] == '[' {
                         // $array[idx]
-                        i += 1;
-                        let mut idx_str = String::new();
-                        while i < chars.len() && chars[i] != ']' {
-                            idx_str.push(chars[i]);
-                            i += 1;
-                        }
-                        if i < chars.len() {
-                            i += 1;
-                        }
-                        let idx_expr = if let Some(rest) = idx_str.strip_prefix('$') {
-                            Expr {
-                                kind: ExprKind::ScalarVar(rest.to_string()),
-                                line,
-                            }
-                        } else if let Ok(n) = idx_str.parse::<i64>() {
-                            Expr {
-                                kind: ExprKind::Integer(n),
-                                line,
-                            }
-                        } else {
-                            Expr {
-                                kind: ExprKind::String(idx_str),
-                                line,
-                            }
-                        };
+                        let idx = Self::scan_interp_subscript(&chars, &mut i, '[', ']');
                         Expr {
                             kind: ExprKind::ArrayElement {
                                 array: name,
-                                index: Box::new(idx_expr),
+                                index: Box::new(interp_array_index_expr(&idx, line)),
                             },
                             line,
                         }
@@ -21697,39 +21684,11 @@ impl Parser {
                         i += 1;
                         // Check for hash element access: `$+{key}`, `$-{key}`, etc.
                         if i < chars.len() && chars[i] == '{' {
-                            i += 1; // skip {
-                            let mut key = String::new();
-                            let mut depth = 1;
-                            while i < chars.len() && depth > 0 {
-                                if chars[i] == '{' {
-                                    depth += 1;
-                                } else if chars[i] == '}' {
-                                    depth -= 1;
-                                    if depth == 0 {
-                                        break;
-                                    }
-                                }
-                                key.push(chars[i]);
-                                i += 1;
-                            }
-                            if i < chars.len() {
-                                i += 1;
-                            } // skip }
-                            let key_expr = if let Some(rest) = key.strip_prefix('$') {
-                                Expr {
-                                    kind: ExprKind::ScalarVar(rest.to_string()),
-                                    line,
-                                }
-                            } else {
-                                Expr {
-                                    kind: ExprKind::String(key),
-                                    line,
-                                }
-                            };
+                            let key = Self::scan_interp_subscript(&chars, &mut i, '{', '}');
                             let mut base = Expr {
                                 kind: ExprKind::HashElement {
                                     hash: probe,
-                                    key: Box::new(key_expr),
+                                    key: Box::new(interp_hash_key_expr(&key, line)),
                                 },
                                 line,
                             };
@@ -21867,13 +21826,8 @@ impl Parser {
                             line,
                         }
                     };
-                    parts.push(StringPart::Expr(Expr {
-                        kind: ExprKind::Deref {
-                            expr: Box::new(inner_expr),
-                            kind: Sigil::Array,
-                        },
-                        line,
-                    }));
+                    let expr = Self::interp_deref_or_slice(&chars, &mut i, inner_expr, line)?;
+                    parts.push(StringPart::Expr(expr));
                     continue 'istr;
                 }
                 if next == '{' {
@@ -21886,13 +21840,8 @@ impl Parser {
                     })?;
                     i = close + 1; // past closing `}`
                     let inner_expr = parse_expression_from_str(inner.trim(), "-e")?;
-                    parts.push(StringPart::Expr(Expr {
-                        kind: ExprKind::Deref {
-                            expr: Box::new(inner_expr),
-                            kind: Sigil::Array,
-                        },
-                        line,
-                    }));
+                    let expr = Self::interp_deref_or_slice(&chars, &mut i, inner_expr, line)?;
+                    parts.push(StringPart::Expr(expr));
                     continue 'istr;
                 }
                 if !(next.is_alphabetic() || next == '_' || next == '+' || next == '-') {
@@ -22114,6 +22063,70 @@ fn merge_expr_list(parts: Vec<Expr>) -> Expr {
 }
 
 /// Parse a single expression from `s` (e.g. contents of `@{ ... }` inside a double-quoted string).
+/// Key of a `{…}` hash subscript inside an interpolated string, following Perl's subscript
+/// rule: a bareword (optionally `-`-prefixed) is the literal key, a `'…'`-quoted key is its
+/// unquoted text, and anything else (`$k`, `"$a-$b"`, `lc $k`, `$i + 1`) is an expression.
+/// Text that fails to parse stays a literal key.
+fn interp_hash_key_expr(key: &str, line: usize) -> Expr {
+    let key = key.trim();
+    let literal = |s: &str| Expr {
+        kind: ExprKind::String(s.to_string()),
+        line,
+    };
+    let bare = key.strip_prefix('-').unwrap_or(key);
+    if !bare.is_empty() && bare.chars().all(|c| c.is_alphanumeric() || c == '_') {
+        return literal(key);
+    }
+    if let Some(inner) = key.strip_prefix('\'').and_then(|k| k.strip_suffix('\'')) {
+        return literal(&inner.replace("\\'", "'"));
+    }
+    parse_expression_from_str(key, "<interp>").unwrap_or_else(|_| literal(key))
+}
+
+/// Index of a `[…]` array subscript inside an interpolated string: an integer literal stays
+/// an integer, anything else (`$i`, `$i + 1`, `$#a`, `-1`) is an expression. Text that fails
+/// to parse stays a literal, numified at runtime.
+fn interp_array_index_expr(idx: &str, line: usize) -> Expr {
+    let idx = idx.trim();
+    if let Ok(n) = idx.parse::<i64>() {
+        return Expr {
+            kind: ExprKind::Integer(n),
+            line,
+        };
+    }
+    parse_expression_from_str(idx, "<interp>").unwrap_or_else(|_| Expr {
+        kind: ExprKind::String(idx.to_string()),
+        line,
+    })
+}
+
+/// `$#{EXPR}` / `$#$name` — last index of the array `aref` references. Perl's `$#` on a
+/// reference is the array's fill index, which for a read is `scalar(@{EXPR}) - 1` (`-1` for
+/// an empty array), so the parser lowers it to exactly that and no new runtime op is needed.
+fn last_index_of_array_ref(aref: Expr, line: usize) -> Expr {
+    let count = Expr {
+        kind: ExprKind::ScalarContext(Box::new(Expr {
+            kind: ExprKind::Deref {
+                expr: Box::new(aref),
+                kind: Sigil::Array,
+            },
+            line,
+        })),
+        line,
+    };
+    Expr {
+        kind: ExprKind::BinOp {
+            left: Box::new(count),
+            op: BinOp::Sub,
+            right: Box::new(Expr {
+                kind: ExprKind::Integer(1),
+                line,
+            }),
+        },
+        line,
+    }
+}
+
 pub fn parse_expression_from_str(s: &str, file: &str) -> StrykeResult<Expr> {
     let mut lexer = Lexer::new_with_file(s, file);
     let tokens = lexer.tokenize()?;

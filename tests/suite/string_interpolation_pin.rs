@@ -314,17 +314,15 @@ fn undef_interpolates_to_empty_in_qq() {
 // ── nested deref via $$ ────────────────────────────────────────────
 
 #[test]
-fn scalar_ref_double_dollar_does_not_deref_in_interp() {
-    // Stryke surface: `$$r` inside double-quoted string interpolates
-    // `$r` (the ref's stringification) followed by literal `$r`-like
-    // body — yielding `SCALAR(0x...)` instead of the dereferenced
-    // value. Workaround: `"${\ $$r }"`. Documented as BUG-246.
+fn scalar_ref_double_dollar_derefs_in_interp() {
+    // `"$$r"` inside a double-quoted string is the scalar deref, as in
+    // Perl. Formerly BUG-246: it interpolated `$r` (the ref's
+    // stringification, `SCALAR(0x...)`) instead of the value.
     let code = r#"
         my $x = 7;
         my $r = \$x;
         my $s = "val=$$r";
-        # Observed: contains "SCALAR("; never "val=7".
-        ($s =~ /SCALAR\(/) ? 1 : 0
+        $s eq "val=7" ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }

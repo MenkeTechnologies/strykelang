@@ -1769,6 +1769,34 @@ impl Lexer {
         at(i) == Some('}')
     }
 
+    /// `$#{name}` / `$#{ Foo::bar }` — when the braced body after `$#` is a plain identifier
+    /// (`self.pos` is the `#`), consume `#{ name }` and return `#name`, so the token is the
+    /// same [`Token::ScalarVar`] that `$#name` produces. `None` (nothing consumed) for an
+    /// expression body such as `$#{$r}` / `$#{ $h->{list} }`.
+    fn take_braced_last_index_plain_name(&mut self) -> Option<String> {
+        let at = |i: usize| self.input.get(i).copied();
+        let mut i = self.pos + 2; // past `#{`
+        while at(i).is_some_and(|c| c == ' ' || c == '\t') {
+            i += 1;
+        }
+        if !at(i).is_some_and(|c| c.is_alphabetic() || c == '_') {
+            return None;
+        }
+        let start = i;
+        while at(i).is_some_and(|c| c.is_alphanumeric() || c == '_' || c == ':') {
+            i += 1;
+        }
+        let name: String = self.input[start..i].iter().collect();
+        while at(i).is_some_and(|c| c == ' ' || c == '\t') {
+            i += 1;
+        }
+        if at(i) != Some('}') {
+            return None;
+        }
+        self.pos = i + 1; // past `}`
+        Some(format!("#{name}"))
+    }
+
     /// `${$name}` / `${$Foo::bar}` — when the braced body is a plain scalar `$identifier`, Perl treats it
     /// like `$$name` (scalar deref). The naive lexer otherwise yields a bogus [`Token::ScalarVar`] name
     /// containing a leading `$` (e.g. Try::Tiny's `${$code_ref}`).
@@ -1844,6 +1872,37 @@ impl Lexer {
                         // `$$` — process id (Perl `$$`)
                         self.last_was_term = true;
                         return Ok(Token::ScalarVar("$$".to_string()));
+                    }
+                }
+                // `$#{ EXPR }` / `$#$name` — last index of an array reached through a
+                // reference (Perl `$#{$r}`, `$#{ $h->{list} }`, `$#$r`). Without this,
+                // `$#` lexed as the deprecated output-format variable and the body was
+                // left dangling. `$#name` and `$#{name}` stay with `read_variable_name`.
+                if self.peek() == Some('#') {
+                    match self.input.get(self.pos + 1) {
+                        Some('{') => {
+                            if let Some(name) = self.take_braced_last_index_plain_name() {
+                                self.last_was_term = true;
+                                return Ok(Token::ScalarVar(name));
+                            }
+                            self.advance(); // `#`
+                            self.advance(); // `{`
+                            self.last_was_term = false;
+                            return Ok(Token::ArrayLastIndexLBrace);
+                        }
+                        Some('$')
+                            if self
+                                .input
+                                .get(self.pos + 2)
+                                .is_some_and(|c| c.is_alphabetic() || *c == '_') =>
+                        {
+                            self.advance(); // `#`
+                            self.advance(); // `$`
+                            let name = self.read_package_qualified_identifier();
+                            self.last_was_term = true;
+                            return Ok(Token::ArrayLastIndexDeref(name));
+                        }
+                        _ => {}
                     }
                 }
                 // `${ EXPR }` — a *block* scalar deref whose body is not a variable name.
