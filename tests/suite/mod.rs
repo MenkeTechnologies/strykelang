@@ -169,6 +169,7 @@ mod coderef_pin;
 mod collections;
 mod comb_raku;
 mod comments;
+mod compat_amp_call_and_arrow_autoviv;
 mod compat_perl_module_idioms;
 mod compat_perl_numeric_and_subst;
 mod compat_udf_shadow_extensions;

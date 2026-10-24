@@ -4120,3 +4120,29 @@ counts characters of a string holding a wide character; `pack` / `unpack` gained
 `b B h`, `c W j J F`, `u`, `X @ . x!`, `< > !` modifiers, `( ... )N` groups, `/`
 length prefixes, `[N]` counts and `%N` checksums, and `a*` / `A*` / `Z*` in
 `pack`; `unpack "a"` of non-UTF-8 bytes returns the byte string.
+
+## BUG-341 — bare `&name`, empty-call `@_`, and arrow-subscript autoviv — **`parity`** [FIXED]
+
+Fixed:
+
+- `&name;` / `&name` (no parens) called the sub with no arguments; it now
+  passes the caller's current `@_`, so `sub f { &g } f(1,2,3)` gives `g` the
+  three arguments. `&name()` still passes none.
+- `f()` with no arguments received `$_` as its one argument under `--compat`;
+  it now gets an empty `@_`. Native mode keeps the topic default, so
+  `map { dbl() } 1:3` with `fn dbl { $_[0] * 2 }` is still `2,4,6`.
+- `push` / `unshift` / `pop` / `shift` on `@{ $r->{k} }` or `@{ $r->[i] }`
+  died with `push argument is not an ARRAY reference` when the slot was undef;
+  the slot is now created, at every level of a chain such as `$r->{a}{b}`.
+- The same slot creation now happens inside blessed hashes and arrays:
+  `push @{ $self->{list} }, $x` and `$self->{a}{b} = 1` no longer die.
+
+Pins: `tests/suite/compat_amp_call_and_arrow_autoviv.rs`.
+
+Still open:
+
+- `&name;` copies `@_` instead of sharing it, the same as `&$code;` and
+  `f(@_)` (see BUG-312): `sub g { $_[0] = "X" } sub f { &g } f($v)` leaves
+  `$v` unchanged, and a `shift` in `g` does not shorten the caller's `@_`.
+- Without `use strict`, perl treats a non-reference string in the slot of
+  `push @{ $h->{k} }` as a symbolic array name; stryke dies.

@@ -11259,7 +11259,11 @@ impl VMHelper {
                     return_type: return_type.clone(),
                 })))
             }
-            ExprKind::SubroutineRef(name) => self.call_named_sub(name, vec![], line, ctx),
+            // Bare `&name` passes the caller's current `@_` along (perlsub).
+            ExprKind::SubroutineRef(name) => {
+                let args = self.scope.get_array("_");
+                self.call_named_sub(name, args, line, ctx)
+            }
             ExprKind::SubroutineCodeRef(name) => {
                 let sub = self.resolve_sub_by_name(name).ok_or_else(|| {
                     StrykeError::runtime(self.undefined_subroutine_resolve_message(name), line)
@@ -16412,6 +16416,14 @@ impl VMHelper {
                 .autoviv_hash_elem(&name, key, want, line)
                 .map_err(Into::into);
         }
+        // A blessed hash object: vivify inside the reference it wraps, so
+        // `$self->{list}` in `push @{ $self->{list} }, $x` becomes an arrayref.
+        if let Some(b) = container.as_blessed_ref() {
+            let inner = b.data.read().clone();
+            if inner.as_hash_ref().is_some() {
+                return self.autoviv_arrow_hash(inner, key, want, line);
+            }
+        }
         self.read_arrow_hash_element(container, key, line)
     }
 
@@ -16457,6 +16469,12 @@ impl VMHelper {
             return self
                 .autoviv_array_elem(&name, idx, want, line)
                 .map_err(Into::into);
+        }
+        if let Some(b) = container.as_blessed_ref() {
+            let inner = b.data.read().clone();
+            if inner.as_array_ref().is_some() {
+                return self.autoviv_arrow_array(inner, idx, want, line);
+            }
         }
         self.read_arrow_array_element(container, idx, line)
     }
@@ -17909,38 +17927,11 @@ impl VMHelper {
     }
 
     /// Evaluate `inner` and return an array ref, auto-vivifying when the result is undef
-    /// and `inner` denotes a writable lvalue (scalar var, hash element, array element).
-    /// Mirrors Perl 5: `push @{$h{k}}, $x` creates `$h{k}` as an arrayref on demand.
+    /// and `inner` denotes a writable lvalue (scalar var, hash or array element, or an
+    /// arrow subscript chain). Mirrors Perl 5: `push @{$h{k}}, $x` and
+    /// `push @{ $r->{a}{b} }, $x` create the missing levels on demand.
     fn eval_or_autoviv_array_ref(&mut self, inner: &Expr) -> Result<StrykeValue, FlowOrError> {
-        let line = inner.line;
-        let val = self.eval_expr(inner)?;
-        if !val.is_undef() {
-            return Ok(val);
-        }
-        let new_ref = StrykeValue::array_ref(Arc::new(RwLock::new(Vec::new())));
-        match &inner.kind {
-            ExprKind::ScalarVar(name) => {
-                self.scope
-                    .set_scalar(name, new_ref.clone())
-                    .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-                Ok(new_ref)
-            }
-            ExprKind::HashElement { hash, key } => {
-                let k = self.eval_expr(key)?.to_string();
-                self.scope
-                    .set_hash_element(hash, &k, new_ref.clone())
-                    .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-                Ok(new_ref)
-            }
-            ExprKind::ArrayElement { array, index } => {
-                let i = self.eval_expr(index)?.to_int();
-                self.scope
-                    .set_array_element(array, i, new_ref.clone())
-                    .map_err(|e| FlowOrError::Error(e.at_line(line)))?;
-                Ok(new_ref)
-            }
-            _ => Ok(val),
-        }
+        self.eval_base_autoviv(inner, DerefKind::Array, inner.line)
     }
 
     /// Current package (`main` when `__PACKAGE__` is unset or empty).
@@ -18022,8 +18013,11 @@ impl VMHelper {
         Some(self.call_sub(&sub, args, want, line))
     }
 
+    /// A call with no arguments receives the topic `$_` as its one argument
+    /// (stryke: `fn double { $_[0] * 2 }` then `map { double } @xs`). Perl
+    /// gives such a call an empty `@_`, so `--compat` leaves `args` alone.
     pub(crate) fn with_topic_default_args(&self, args: Vec<StrykeValue>) -> Vec<StrykeValue> {
-        if args.is_empty() {
+        if args.is_empty() && !crate::compat_mode() {
             vec![self.scope.get_scalar("_").clone()]
         } else {
             args

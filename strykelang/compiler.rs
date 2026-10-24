@@ -723,6 +723,24 @@ impl Compiler {
         }
     }
 
+    /// `@{EXPR}` operands of `push` / `pop` / `shift` / `unshift` that perl
+    /// autovivifies when the slot is undef: a scalar variable, a hash or array
+    /// element, or an arrow subscript (`$r->{k}`, `$r->[i]`, and deeper
+    /// chains). These take the `*Expr` pool path, whose runtime resolves the
+    /// operand as an lvalue and stores a fresh arrayref back into it.
+    fn array_deref_operand_autovivifies(expr: &Expr) -> bool {
+        matches!(
+            &expr.kind,
+            ExprKind::ScalarVar(_)
+                | ExprKind::HashElement { .. }
+                | ExprKind::ArrayElement { .. }
+                | ExprKind::ArrowDeref {
+                    kind: DerefKind::Hash | DerefKind::Array,
+                    ..
+                }
+        )
+    }
+
     /// Runtime name for `@arr` reads after `my`/`our` resolution. Mirrors
     /// [`Self::scalar_storage_name_for_ops`]. When no lexical match is found
     /// and the current package is non-main, fall back to the package stash
@@ -7638,16 +7656,11 @@ impl Compiler {
                     kind: Sigil::Array,
                 } = &array.kind
                 {
-                    // Autovivifiable inner shapes (`$x`, `$h{k}`, `$a[i]`) need lvalue
+                    // Autovivifiable inner shapes (`$x`, `$h{k}`, `$a[i]`, `$r->{k}`, `$r->[i]`) need lvalue
                     // resolution: when the slot is undef, `push @{...}` must create a new
                     // arrayref and store it back. Routed through PushExpr where
                     // `try_eval_array_deref_container` handles autoviv.
-                    let needs_autoviv = matches!(
-                        &aref_expr.kind,
-                        ExprKind::ScalarVar(_)
-                            | ExprKind::HashElement { .. }
-                            | ExprKind::ArrayElement { .. }
-                    );
+                    let needs_autoviv = Self::array_deref_operand_autovivifies(aref_expr);
                     if needs_autoviv {
                         let pool = self
                             .chunk
@@ -7681,12 +7694,7 @@ impl Compiler {
                     kind: Sigil::Array,
                 } = &array.kind
                 {
-                    let needs_autoviv = matches!(
-                        &aref_expr.kind,
-                        ExprKind::ScalarVar(_)
-                            | ExprKind::HashElement { .. }
-                            | ExprKind::ArrayElement { .. }
-                    );
+                    let needs_autoviv = Self::array_deref_operand_autovivifies(aref_expr);
                     if needs_autoviv {
                         let pool = self.chunk.add_pop_expr_entry(array.as_ref().clone());
                         self.emit_op(Op::PopExpr(pool), line, Some(root));
@@ -7711,12 +7719,7 @@ impl Compiler {
                     kind: Sigil::Array,
                 } = &array.kind
                 {
-                    let needs_autoviv = matches!(
-                        &aref_expr.kind,
-                        ExprKind::ScalarVar(_)
-                            | ExprKind::HashElement { .. }
-                            | ExprKind::ArrayElement { .. }
-                    );
+                    let needs_autoviv = Self::array_deref_operand_autovivifies(aref_expr);
                     if needs_autoviv {
                         let pool = self.chunk.add_shift_expr_entry(array.as_ref().clone());
                         self.emit_op(Op::ShiftExpr(pool), line, Some(root));
@@ -7749,12 +7752,7 @@ impl Compiler {
                     kind: Sigil::Array,
                 } = &array.kind
                 {
-                    let needs_autoviv = matches!(
-                        &aref_expr.kind,
-                        ExprKind::ScalarVar(_)
-                            | ExprKind::HashElement { .. }
-                            | ExprKind::ArrayElement { .. }
-                    );
+                    let needs_autoviv = Self::array_deref_operand_autovivifies(aref_expr);
                     if needs_autoviv || values.len() > u8::MAX as usize {
                         let pool = self
                             .chunk
@@ -8994,10 +8992,16 @@ impl Compiler {
                 self.emit_op(Op::MakeCodeRef(block_idx, sig_idx), line, Some(root));
             }
             ExprKind::SubroutineRef(name) => {
-                // Unary `&name` — invoke subroutine with no explicit args (same as tree `call_named_sub`).
+                // Bare `&name` (no parens) calls the sub with the caller's current `@_`
+                // (perlsub: "the current @_ is visible to the called subroutine"), so it
+                // compiles as `name(@_)`.
                 let q = self.qualify_sub_key(name);
                 let name_idx = self.chunk.intern_name(&q);
-                self.emit_op(Op::Call(name_idx, 0, ctx.as_byte()), line, Some(root));
+                let caller_args = [Expr {
+                    kind: ExprKind::ArrayVar("_".into()),
+                    line,
+                }];
+                self.compile_user_sub_call(name_idx, &caller_args, ctx, line, root)?;
             }
             ExprKind::SubroutineCodeRef(name) => {
                 // `\&name` — coderef (must exist at run time).
