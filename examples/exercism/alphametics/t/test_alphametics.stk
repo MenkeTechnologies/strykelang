@@ -1,8 +1,12 @@
 #!/usr/bin/env stryke
 require "./Alphametics.stk"
 
-# Unsolvable cases should return undef.
-assert_eq Exercism::Alphametics::solve("XX + YY == ZZ"), undef, "no solution → undef"
+# Unsolvable cases should return undef: two distinct letters cannot be equal.
+assert_eq Exercism::Alphametics::solve("A == B"), undef, "no solution → undef"
+
+# XX + YY == ZZ is 11X + 11Y == 11Z — solvable (11 + 22 == 33).
+val $s = Exercism::Alphametics::solve("XX + YY == ZZ")
+assert_eq join(",", map { "$_=$s->{$_}" } sort keys %$s), "X=1,Y=2,Z=3", "XX + YY == ZZ solution"
 
 # Helper sanity.
 assert_eq Exercism::Alphametics::_value("ABC", { A => 1, B => 2, C => 3 }), 123, "value 123"
