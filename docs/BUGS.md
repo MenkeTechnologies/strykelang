@@ -4146,3 +4146,15 @@ Still open:
   `$v` unchanged, and a `shift` in `g` does not shorten the caller's `@_`.
 - Without `use strict`, perl treats a non-reference string in the slot of
   `push @{ $h->{k} }` as a symbolic array name; stryke dies.
+
+## BUG-342 — par_reduce chunk `@_` rejected as captured state — **`bug`** [FIXED]
+
+`~p> @xs map { f } sum` died with "cannot modify captured non-mysync array
+`@_` in a parallel block". Each `par_reduce` worker (and the `preduce_init`
+merge/fold helpers) bound its chunk to `@_` in the frame that existed when the
+parallel guard took its baseline, so the guard classed the worker's own `@_` as
+a captured outer array. Since `map { } @arr` writes `$_` back to the source
+(Perl `$_` aliasing), every `map` over the chunk tripped the guard. The chunk
+`@_` is now bound in a frame pushed after the baseline.
+
+Pins: `tests/suite/par_chunk_macros.rs`.

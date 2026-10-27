@@ -204,3 +204,32 @@ fn par_outside_thread_macro_runs_at_top_level() {
     // 6 letters ("a","b","c","d","e","f") — flattened concat across chunks.
     assert_eq!(n, 6);
 }
+
+// ── worker-owned `@_` in par_reduce chunks ───────────────────────────────────
+
+#[test]
+fn par_map_block_over_chunk_args_writes_back_without_guard_error() {
+    // `~p> @xs map { f } sum` runs `map { f } @_` per chunk. `map` aliases
+    // `$_` to `@_` and writes it back after each iteration; `@_` is the
+    // worker's own chunk, so the parallel guard must not reject it as a
+    // captured outer array. Same shape as `Ci::count_tests_paths` in
+    // examples/run_all_ci.stk.
+    let code = r#"
+        fn ten($x) { $x * 10 }
+        my @xs = 1:200;
+        ~p> @xs map { ten } sum
+    "#;
+    assert_eq!(eval_int(code), 201_000);
+}
+
+#[test]
+fn par_reduce_block_may_modify_its_chunk_args() {
+    // Explicit writes to the chunk `@_` stay worker-local; the source array
+    // is untouched.
+    let code = r#"
+        my @xs = 1:100;
+        my $s = ~> @xs par_reduce { $_ *= 2 for @_; sum(@_) };
+        "$s " . sum(@xs)
+    "#;
+    assert_eq!(eval_string(code), "10100 5050");
+}

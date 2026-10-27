@@ -113,6 +113,9 @@ pub(crate) fn merge_preduce_init_partials(
     local_interp.subs = subs.clone();
     local_interp.scope.restore_capture(scope_capture);
     local_interp.enable_parallel_guard();
+    // `@_` is the worker's own pair, not captured state: bind it in a frame
+    // pushed after the guard baseline so the block may write it.
+    local_interp.scope.push_frame();
     local_interp
         .scope
         .declare_array("_", vec![a.clone(), b.clone()]);
@@ -146,6 +149,8 @@ pub(crate) fn fold_preduce_init_step(
     local_interp.subs = subs.clone();
     local_interp.scope.restore_capture(scope_capture);
     local_interp.enable_parallel_guard();
+    // Worker-owned `@_` — see `merge_preduce_init_partials`.
+    local_interp.scope.push_frame();
     local_interp
         .scope
         .declare_array("_", vec![acc.clone(), item.clone()]);
@@ -13479,6 +13484,11 @@ impl VMHelper {
                         local.scope.restore_capture(&scope_capture);
                         local.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
                         local.enable_parallel_guard();
+                        // The chunk `@_` belongs to this worker, so it lives in a
+                        // frame pushed after the guard baseline: `map { } @_`
+                        // writes $_ back through it (Perl aliasing), which the
+                        // guard rejects for captured outer arrays.
+                        local.scope.push_frame();
                         // Bind the chunk elements to `@_` (not wrapped) so
                         // `~p> @a sum` correctly passes all elements to `sum(@_)`.
                         // Also set `$_` to the first element for backwards compat.
