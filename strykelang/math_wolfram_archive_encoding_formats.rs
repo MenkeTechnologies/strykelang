@@ -129,12 +129,12 @@ fn builtin_lzma_range_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     Ok(StrykeValue::float(if bit == 0 { new_range } else { range - new_range }))
 }
 
-/// Quoted-Printable encode: encode byte as "=HH" if byte > 126 or (byte < 32
-/// and byte ≠ 9 and byte ≠ 32). Returns the 3-byte encoding packed as
-/// 0x3D·0x10000 + hi·0x100 + lo.
+/// Quoted-Printable encode (RFC 2045 §6.7): encode byte as "=HH" if byte > 126,
+/// byte == 61 ('=', the escape char itself), or (byte < 32 and byte ≠ 9).
+/// Returns the 3-byte encoding packed as 0x3D·0x10000 + hi·0x100 + lo.
 fn builtin_quoted_printable_encode(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let b = (i1(args) & 0xFF) as u8;
-    let needs_quote = b > 126 || (b < 32 && b != 9 && b != 32);
+    let needs_quote = b > 126 || b == b'=' || (b < 32 && b != 9);
     if !needs_quote { return Ok(StrykeValue::integer(b as i64)); }
     let hex = b"0123456789ABCDEF";
     let hi = hex[(b >> 4) as usize] as i64;

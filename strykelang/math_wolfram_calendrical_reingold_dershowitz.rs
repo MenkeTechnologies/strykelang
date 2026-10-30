@@ -8,8 +8,8 @@ fn builtin_fixed_from_gregorian(args: &[StrykeValue]) -> StrykeResult<StrykeValu
     let d = args.get(2).map(|v| v.to_number() as i64).unwrap_or(1);
     let y1 = y - 1;
     let leap_correction = if m <= 2 { 0 } else if leap_gregorian(y) { -1 } else { -2 };
-    let n = 365 * y1 + y1 / 4 - y1 / 100 + y1 / 400
-        + (367 * m - 362) / 12 + leap_correction + d;
+    let n = 365 * y1 + y1.div_euclid(4) - y1.div_euclid(100) + y1.div_euclid(400)
+        + (367 * m - 362).div_euclid(12) + leap_correction + d;
     Ok(StrykeValue::integer(n))
 }
 
@@ -44,7 +44,8 @@ fn builtin_gregorian_from_fixed(args: &[StrykeValue]) -> StrykeResult<StrykeValu
     Ok(StrykeValue::integer(year * 10000 + month * 100 + day))
 }
 
-/// Julian: leap if y mod 4 == 0 (no century rule). Epoch JD 0001-01-01 = RD -1.
+/// Julian: leap if y mod 4 == 0 (no century rule). Julian epoch (0001-01-01 Julian)
+/// = RD -1, so fixed = epoch - 1 + day count. Year 0 does not exist: -1 is 1 BCE.
 fn builtin_fixed_from_julian(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let y = i1(args);
     let m = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
@@ -52,19 +53,19 @@ fn builtin_fixed_from_julian(args: &[StrykeValue]) -> StrykeResult<StrykeValue> 
     let y1 = if y < 0 { y + 1 } else { y };
     let leap = y1.rem_euclid(4) == 0;
     let lc = if m <= 2 { 0 } else if leap { -1 } else { -2 };
-    let n = -1 + 365 * (y1 - 1) + (y1 - 1) / 4 + (367 * m - 362) / 12 + lc + d;
+    let n = -2 + 365 * (y1 - 1) + (y1 - 1).div_euclid(4) + (367 * m - 362).div_euclid(12) + lc + d;
     Ok(StrykeValue::integer(n))
 }
 
 /// `julian_from_fixed`
 fn builtin_julian_from_fixed(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let n = i1(args);
-    let approx = ((4 * (n + 1) + 1464) / 1461) - 1;
+    let approx = (4 * (n + 1) + 1464).div_euclid(1461);
     let y = if approx <= 0 { approx - 1 } else { approx };
     let prior_days = n - builtin_fixed_from_julian(&[
         StrykeValue::integer(y), StrykeValue::integer(1), StrykeValue::integer(1)
     ]).unwrap().to_number() as i64;
-    let leap = y.rem_euclid(4) == 0;
+    let leap = (if y < 0 { y + 1 } else { y }).rem_euclid(4) == 0;
     let correction = if n < builtin_fixed_from_julian(&[
         StrykeValue::integer(y), StrykeValue::integer(3), StrykeValue::integer(1)
     ]).unwrap().to_number() as i64 { 0 }
@@ -115,7 +116,7 @@ fn builtin_hebrew_year_length(args: &[StrykeValue]) -> StrykeResult<StrykeValue>
 
 fn hebrew_elapsed_days(year: i64) -> i64 {
     let months_elapsed = 235 * (year - 1).div_euclid(19) + 12 * (year - 1).rem_euclid(19)
-        + 7 * (year - 1).rem_euclid(19) / 19;
+        + (7 * (year - 1).rem_euclid(19) + 1) / 19;
     let parts_elapsed = 204 + 793 * months_elapsed.rem_euclid(1080);
     let hours_elapsed = 5 + 12 * months_elapsed + 793 * months_elapsed.div_euclid(1080)
         + parts_elapsed.div_euclid(1080);
@@ -215,7 +216,7 @@ fn builtin_coptic_from_fixed(args: &[StrykeValue]) -> StrykeResult<StrykeValue> 
     let year = (4 * (n - coptic_epoch_rd) + 1463) / 1461;
     let coptic_year_start = coptic_epoch_rd - 1
         + 365 * (year - 1) + (year / 4);
-    let prior = n - coptic_year_start;
+    let prior = n - (coptic_year_start + 1);
     let month = prior / 30 + 1;
     let day = prior - 30 * (month - 1) + 1;
     Ok(StrykeValue::integer(year * 10000 + month * 100 + day))
@@ -228,7 +229,7 @@ fn builtin_ethiopic_from_fixed(args: &[StrykeValue]) -> StrykeResult<StrykeValue
     let year = (4 * (n - eth_epoch_rd) + 1463) / 1461;
     let eth_year_start = eth_epoch_rd - 1
         + 365 * (year - 1) + (year / 4);
-    let prior = n - eth_year_start;
+    let prior = n - (eth_year_start + 1);
     let month = prior / 30 + 1;
     let day = prior - 30 * (month - 1) + 1;
     Ok(StrykeValue::integer(year * 10000 + month * 100 + day))
@@ -327,7 +328,7 @@ fn builtin_mayan_tzolkin_from_fixed(args: &[StrykeValue]) -> StrykeResult<Stryke
     let n = i1(args);
     let mlc_epoch: i64 = -1137142;
     let count = n - mlc_epoch;
-    let number = (count + 4).rem_euclid(13) + 1;
+    let number = (count + 3).rem_euclid(13) + 1;
     let name = (count + 19).rem_euclid(20) + 1;
     Ok(StrykeValue::integer(number * 100 + name))
 }
@@ -389,7 +390,7 @@ fn builtin_easter_orthodox_year(args: &[StrykeValue]) -> StrykeResult<StrykeValu
     ]).unwrap().to_number() as i64;
     let greg = builtin_gregorian_from_fixed(&[StrykeValue::integer(julian_n)])
         .unwrap().to_number() as i64;
-    Ok(StrykeValue::integer((greg / 100) % 10000))
+    Ok(StrykeValue::integer(greg % 10000))
 }
 
 /// Easter on the Julian (old-calendar) date: month*100 + day in JULIAN.
