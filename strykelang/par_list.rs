@@ -93,7 +93,9 @@ pub(crate) fn pany_run(
     test: impl Fn(StrykeValue) -> bool + Sync + Send,
 ) -> bool {
     let found = AtomicBool::new(false);
+    let io = crate::vm_helper::EmbedIo::for_task();
     list.into_par_iter().for_each(|item| {
+        let _io = io.enter();
         if !found.load(Ordering::Relaxed) && test(item) {
             found.store(true, Ordering::Relaxed);
         }
@@ -114,7 +116,9 @@ pub(crate) fn pfirst_run(
     let best = AtomicUsize::new(usize::MAX);
     let list = Arc::new(list);
     let len = list.len();
+    let io = crate::vm_helper::EmbedIo::for_task();
     (0..len).into_par_iter().for_each(|i| {
+        let _io = io.enter();
         let cur = best.load(Ordering::Acquire);
         if i >= cur {
             progress.tick();

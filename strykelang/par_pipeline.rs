@@ -274,9 +274,11 @@ pub(crate) fn run_par_pipeline(
         let aa_w = atomic_arrays.clone();
         let ah_w = atomic_hashes.clone();
         let err_w = Arc::clone(&first_err);
+        let io = crate::vm_helper::EmbedIo::for_task();
         items = items
             .into_par_iter()
             .map(|item| {
+                let _io = io.enter();
                 if err_w.lock().is_some() {
                     return StrykeValue::UNDEF;
                 }

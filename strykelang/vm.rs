@@ -2529,7 +2529,9 @@ impl<'a> VM<'a> {
         let our_scalars = self.interp.our_lexical_scalars_clone();
         let fan_progress = FanProgress::new(progress, n);
         let first_err: Arc<Mutex<Option<StrykeError>>> = Arc::new(Mutex::new(None));
+        let io = crate::vm_helper::EmbedIo::for_task();
         (0..n).into_par_iter().for_each(|i| {
+            let _io = io.enter();
             if first_err.lock().is_some() {
                 return;
             }
@@ -2590,9 +2592,11 @@ impl<'a> VM<'a> {
         let lex_scalars = self.interp.english_lexical_scalars_clone();
         let our_scalars = self.interp.our_lexical_scalars_clone();
         let fan_progress = FanProgress::new(progress, n);
+        let io = crate::vm_helper::EmbedIo::for_task();
         let pairs: Vec<(usize, Result<StrykeValue, FlowOrError>)> = (0..n)
             .into_par_iter()
             .map(|i| {
+                let _io = io.enter();
                 fan_progress.start_worker(i);
                 let mut local_interp = VMHelper::new();
                 local_interp.subs = subs.clone();
@@ -9165,9 +9169,11 @@ impl<'a> VM<'a> {
                             self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
                         {
                             let shared = Arc::new(ParallelBlockVmShared::from_vm(self));
+                            let io = crate::vm_helper::EmbedIo::for_task();
                             let results: Vec<StrykeValue> = list
                                 .into_par_iter()
                                 .map(|item| {
+                                    let _io = io.enter();
                                     let tid =
                                         rayon::current_thread_index().unwrap_or(0) % pool.len();
                                     let mut local_interp = pool[tid].lock();
@@ -9187,9 +9193,11 @@ impl<'a> VM<'a> {
                             Ok(())
                         } else {
                             let block = self.blocks[idx].clone();
+                            let io = crate::vm_helper::EmbedIo::for_task();
                             let results: Vec<StrykeValue> = list
                                 .into_par_iter()
                                 .map(|item| {
+                                    let _io = io.enter();
                                     let tid =
                                         rayon::current_thread_index().unwrap_or(0) % pool.len();
                                     let mut local_interp = pool[tid].lock();
@@ -9232,10 +9240,12 @@ impl<'a> VM<'a> {
                             self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
                         {
                             let shared = Arc::new(ParallelBlockVmShared::from_vm(self));
+                            let io = crate::vm_helper::EmbedIo::for_task();
                             let mut indexed: Vec<(usize, Vec<StrykeValue>)> = list
                                 .into_par_iter()
                                 .enumerate()
                                 .map(|(i, item)| {
+                                    let _io = io.enter();
                                     let tid =
                                         rayon::current_thread_index().unwrap_or(0) % pool.len();
                                     let mut local_interp = pool[tid].lock();
@@ -9259,10 +9269,12 @@ impl<'a> VM<'a> {
                             Ok(())
                         } else {
                             let block = self.blocks[idx].clone();
+                            let io = crate::vm_helper::EmbedIo::for_task();
                             let mut indexed: Vec<(usize, Vec<StrykeValue>)> = list
                                 .into_par_iter()
                                 .enumerate()
                                 .map(|(i, item)| {
+                                    let _io = io.enter();
                                     let tid =
                                         rayon::current_thread_index().unwrap_or(0) % pool.len();
                                     let mut local_interp = pool[tid].lock();
@@ -9440,9 +9452,11 @@ impl<'a> VM<'a> {
                             self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
                         {
                             let shared = Arc::new(ParallelBlockVmShared::from_vm(self));
+                            let io = crate::vm_helper::EmbedIo::for_task();
                             let mut chunk_results: Vec<(usize, Vec<StrykeValue>)> = indexed_chunks
                                 .into_par_iter()
                                 .map(|(chunk_idx, chunk)| {
+                                    let _io = io.enter();
                                     let mut local_interp = VMHelper::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
@@ -9474,9 +9488,11 @@ impl<'a> VM<'a> {
                             Ok(())
                         } else {
                             let block = self.blocks[idx].clone();
+                            let io = crate::vm_helper::EmbedIo::for_task();
                             let mut chunk_results: Vec<(usize, Vec<StrykeValue>)> = indexed_chunks
                                 .into_par_iter()
                                 .map(|(chunk_idx, chunk)| {
+                                    let _io = io.enter();
                                     let mut local_interp = VMHelper::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
@@ -9574,13 +9590,16 @@ impl<'a> VM<'a> {
                             self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
                         {
                             let shared = Arc::new(ParallelBlockVmShared::from_vm(self));
+                            let io = crate::vm_helper::EmbedIo::for_task();
                             let result = list
                                 .into_par_iter()
                                 .map(|x| {
+                                    let _io = io.enter();
                                     pmap_progress.tick();
                                     x
                                 })
                                 .reduce_with(|a, b| {
+                                    let _io = io.enter();
                                     let mut local_interp = VMHelper::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
@@ -9597,13 +9616,16 @@ impl<'a> VM<'a> {
                             Ok(())
                         } else {
                             let block = self.blocks[idx].clone();
+                            let io = crate::vm_helper::EmbedIo::for_task();
                             let result = list
                                 .into_par_iter()
                                 .map(|x| {
+                                    let _io = io.enter();
                                     pmap_progress.tick();
                                     x
                                 })
                                 .reduce_with(|a, b| {
+                                    let _io = io.enter();
                                     let mut local_interp = VMHelper::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
@@ -9643,18 +9665,23 @@ impl<'a> VM<'a> {
                             return Ok(());
                         }
                         let pmap_progress = PmapProgress::new(progress_flag, list.len());
+                        let io = crate::vm_helper::EmbedIo::for_task();
                         let result = list
                             .into_par_iter()
                             .fold(
                                 || preduce_init_fold_identity(&init_val),
                                 |acc, item| {
+                                    let _io = io.enter();
                                     pmap_progress.tick();
                                     fold_preduce_init_step(&subs, cap, &block, acc, item)
                                 },
                             )
                             .reduce(
                                 || preduce_init_fold_identity(&init_val),
-                                |a, b| merge_preduce_init_partials(a, b, &block, &subs, cap),
+                                |a, b| {
+                                    let _io = io.enter();
+                                    merge_preduce_init_partials(a, b, &block, &subs, cap)
+                                },
                             );
                         pmap_progress.finish();
                         self.push(result);
@@ -9701,9 +9728,11 @@ impl<'a> VM<'a> {
                             (map_range, reduce_range)
                         {
                             let shared = Arc::new(ParallelBlockVmShared::from_vm(self));
+                            let io = crate::vm_helper::EmbedIo::for_task();
                             let result = list
                                 .into_par_iter()
                                 .map(|item| {
+                                    let _io = io.enter();
                                     let mut local_interp = VMHelper::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
@@ -9722,6 +9751,7 @@ impl<'a> VM<'a> {
                                     val
                                 })
                                 .reduce_with(|a, b| {
+                                    let _io = io.enter();
                                     let mut local_interp = VMHelper::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
@@ -9743,9 +9773,11 @@ impl<'a> VM<'a> {
                         } else {
                             let map_block = self.blocks[map_i].clone();
                             let reduce_block = self.blocks[reduce_i].clone();
+                            let io = crate::vm_helper::EmbedIo::for_task();
                             let result = list
                                 .into_par_iter()
                                 .map(|item| {
+                                    let _io = io.enter();
                                     let mut local_interp = VMHelper::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
@@ -9758,6 +9790,7 @@ impl<'a> VM<'a> {
                                     val
                                 })
                                 .reduce_with(|a, b| {
+                                    let _io = io.enter();
                                     let mut local_interp = VMHelper::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
@@ -9785,9 +9818,11 @@ impl<'a> VM<'a> {
                             self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
                         {
                             let shared = Arc::new(ParallelBlockVmShared::from_vm(self));
+                            let io = crate::vm_helper::EmbedIo::for_task();
                             let results: Vec<StrykeValue> = list
                                 .into_par_iter()
                                 .map(|item| {
+                                    let _io = io.enter();
                                     let k = crate::pcache::cache_key(&item);
                                     if let Some(v) = cache.get(&k) {
                                         pmap_progress.tick();
@@ -9812,9 +9847,11 @@ impl<'a> VM<'a> {
                             self.push(StrykeValue::array(results));
                             Ok(())
                         } else {
+                            let io = crate::vm_helper::EmbedIo::for_task();
                             let results: Vec<StrykeValue> = list
                                 .into_par_iter()
                                 .map(|item| {
+                                    let _io = io.enter();
                                     let k = crate::pcache::cache_key(&item);
                                     if let Some(v) = cache.get(&k) {
                                         pmap_progress.tick();
@@ -9880,9 +9917,11 @@ impl<'a> VM<'a> {
                             self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
                         {
                             let shared = Arc::new(ParallelBlockVmShared::from_vm(self));
+                            let io = crate::vm_helper::EmbedIo::for_task();
                             let results: Vec<StrykeValue> = list
                                 .into_par_iter()
                                 .filter_map(|item| {
+                                    let _io = io.enter();
                                     let tid =
                                         rayon::current_thread_index().unwrap_or(0) % pool.len();
                                     let mut local_interp = pool[tid].lock();
@@ -9907,9 +9946,11 @@ impl<'a> VM<'a> {
                             Ok(())
                         } else {
                             let block = self.blocks[idx].clone();
+                            let io = crate::vm_helper::EmbedIo::for_task();
                             let results: Vec<StrykeValue> = list
                                 .into_par_iter()
                                 .filter_map(|item| {
+                                    let _io = io.enter();
                                     let tid =
                                         rayon::current_thread_index().unwrap_or(0) % pool.len();
                                     let mut local_interp = pool[tid].lock();
@@ -10020,7 +10061,9 @@ impl<'a> VM<'a> {
                             self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
                         {
                             let shared = Arc::new(ParallelBlockVmShared::from_vm(self));
+                            let io = crate::vm_helper::EmbedIo::for_task();
                             list.into_par_iter().for_each(|item| {
+                                let _io = io.enter();
                                 if first_err.lock().is_some() {
                                     return;
                                 }
@@ -10042,7 +10085,9 @@ impl<'a> VM<'a> {
                             });
                         } else {
                             let block = self.blocks[idx].clone();
+                            let io = crate::vm_helper::EmbedIo::for_task();
                             list.into_par_iter().for_each(|item| {
+                                let _io = io.enter();
                                 if first_err.lock().is_some() {
                                     return;
                                 }
@@ -10090,7 +10135,9 @@ impl<'a> VM<'a> {
                             self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
                         {
                             let shared = Arc::new(ParallelBlockVmShared::from_vm(self));
+                            let io = crate::vm_helper::EmbedIo::for_task();
                             items.par_sort_by(|a, b| {
+                                let _io = io.enter();
                                 let mut local_interp = VMHelper::new();
                                 local_interp.subs = subs.clone();
                                 local_interp.scope.restore_capture(&scope_capture);
@@ -10124,7 +10171,9 @@ impl<'a> VM<'a> {
                             });
                         } else {
                             let block = self.blocks[idx].clone();
+                            let io = crate::vm_helper::EmbedIo::for_task();
                             items.par_sort_by(|a, b| {
+                                let _io = io.enter();
                                 let mut local_interp = VMHelper::new();
                                 local_interp.subs = subs.clone();
                                 local_interp.scope.restore_capture(&scope_capture);

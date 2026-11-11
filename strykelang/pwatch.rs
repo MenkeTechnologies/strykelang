@@ -116,7 +116,9 @@ pub fn run_pwatch(
                     let scalars = scalars.clone();
                     let aa = atomic_arrays.clone();
                     let ah = atomic_hashes.clone();
+                    let io = crate::vm_helper::EmbedIo::for_task();
                     rayon::spawn(move || {
+                        let _io = io.enter();
                         let mut local_interp = VMHelper::new();
                         local_interp.subs = subs;
                         local_interp.scope.restore_capture(&scalars);

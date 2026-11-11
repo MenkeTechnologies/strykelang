@@ -725,6 +725,15 @@ impl EmbedIo {
         INHERITED_IO.with(|io| io.borrow().clone())
     }
 
+    /// Capture this thread's I/O for rayon tasks about to be spawned from it
+    /// (`par_iter`, `rayon::spawn`, ...). Each task calls [`TaskIo::enter`]
+    /// first, so interpreters it creates use the spawning run's I/O. Rayon
+    /// threads are shared by every run and by the CLI, so the guard puts the
+    /// thread's previous value back when the task ends.
+    pub fn for_task() -> TaskIo {
+        TaskIo(Self::inherited())
+    }
+
     /// Wrap a closure about to run on another OS thread (`thread::spawn`,
     /// `scope.spawn`) so interpreters it creates inherit this thread's I/O.
     pub fn carry<T>(f: impl FnOnce() -> T) -> impl FnOnce() -> T {
@@ -733,6 +742,31 @@ impl EmbedIo {
             io.install();
             f()
         }
+    }
+}
+
+/// [`EmbedIo`] captured by [`EmbedIo::for_task`] on the thread that starts
+/// parallel work, shared by reference with every rayon task of that work.
+pub struct TaskIo(EmbedIo);
+
+impl TaskIo {
+    /// Install the captured I/O on the current (rayon) thread until the
+    /// returned guard drops.
+    pub fn enter(&self) -> TaskIoGuard {
+        let prev = INHERITED_IO.with(|io| std::mem::replace(&mut *io.borrow_mut(), self.0.clone()));
+        TaskIoGuard { prev }
+    }
+}
+
+/// Restores the thread's previous [`EmbedIo`] on drop (see [`TaskIo::enter`]).
+pub struct TaskIoGuard {
+    prev: EmbedIo,
+}
+
+impl Drop for TaskIoGuard {
+    fn drop(&mut self) {
+        let prev = std::mem::take(&mut self.prev);
+        INHERITED_IO.with(|io| *io.borrow_mut() = prev);
     }
 }
 
@@ -7805,10 +7839,12 @@ impl VMHelper {
         let (scope_capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
         let pmap_progress = PmapProgress::new(show_progress, items.len());
         if flat_outputs {
+            let io = EmbedIo::for_task();
             let mut indexed: Vec<(usize, Vec<StrykeValue>)> = items
                 .into_par_iter()
                 .enumerate()
                 .map(|(i, item)| {
+                    let _io = io.enter();
                     let mut local_interp = VMHelper::new();
                     local_interp.subs = subs.clone();
                     local_interp.scope.restore_capture(&scope_capture);
@@ -7830,9 +7866,11 @@ impl VMHelper {
             indexed.sort_by_key(|(i, _)| *i);
             StrykeValue::array(indexed.into_iter().flat_map(|(_, v)| v).collect())
         } else {
+            let io = EmbedIo::for_task();
             let results: Vec<StrykeValue> = items
                 .into_par_iter()
                 .map(|item| {
+                    let _io = io.enter();
                     let mut local_interp = VMHelper::new();
                     local_interp.subs = subs.clone();
                     local_interp.scope.restore_capture(&scope_capture);
@@ -13316,9 +13354,11 @@ impl VMHelper {
                 let n_chunks = indexed_chunks.len();
                 let pmap_progress = PmapProgress::new(show_progress, n_chunks);
 
+                let io = EmbedIo::for_task();
                 let mut chunk_results: Vec<(usize, Vec<StrykeValue>)> = indexed_chunks
                     .into_par_iter()
                     .map(|(chunk_idx, chunk)| {
+                        let _io = io.enter();
                         let mut local_interp = VMHelper::new();
                         local_interp.subs = subs.clone();
                         local_interp.scope.restore_capture(&scope_capture);
@@ -13380,9 +13420,11 @@ impl VMHelper {
                     self.scope.capture_with_atomics();
                 let pmap_progress = PmapProgress::new(show_progress, items.len());
 
+                let io = EmbedIo::for_task();
                 let results: Vec<StrykeValue> = items
                     .into_par_iter()
                     .filter_map(|item| {
+                        let _io = io.enter();
                         let mut local_interp = VMHelper::new();
                         local_interp.subs = subs.clone();
                         local_interp.scope.restore_capture(&scope_capture);
@@ -13437,9 +13479,11 @@ impl VMHelper {
                     self.scope.capture_with_atomics();
                 let first_err: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
                 let err_w = Arc::clone(&first_err);
+                let io = EmbedIo::for_task();
                 let per_chunk: Vec<Vec<StrykeValue>> = chunks
                     .into_par_iter()
                     .map(|chunk| {
+                        let _io = io.enter();
                         if err_w.lock().is_some() {
                             return Vec::new();
                         }
@@ -13514,9 +13558,11 @@ impl VMHelper {
                     self.scope.capture_with_atomics();
                 let first_err: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
                 let err_w = Arc::clone(&first_err);
+                let io = EmbedIo::for_task();
                 let per_chunk: Vec<StrykeValue> = chunks
                     .into_par_iter()
                     .map(|chunk| {
+                        let _io = io.enter();
                         if err_w.lock().is_some() {
                             return StrykeValue::UNDEF;
                         }
@@ -13708,7 +13754,9 @@ impl VMHelper {
 
                 let pmap_progress = PmapProgress::new(show_progress, items.len());
                 let first_err: Arc<Mutex<Option<StrykeError>>> = Arc::new(Mutex::new(None));
+                let io = EmbedIo::for_task();
                 items.into_par_iter().for_each(|item| {
+                    let _io = io.enter();
                     if first_err.lock().is_some() {
                         return;
                     }
@@ -13770,9 +13818,11 @@ impl VMHelper {
                     if n == 0 {
                         return Ok(StrykeValue::array(Vec::new()));
                     }
+                    let io = EmbedIo::for_task();
                     let pairs: Vec<(usize, ExecResult)> = (0..n)
                         .into_par_iter()
                         .map(|i| {
+                            let _io = io.enter();
                             fan_progress.start_worker(i);
                             let mut local_interp = VMHelper::new();
                             local_interp.subs = subs.clone();
@@ -13803,7 +13853,9 @@ impl VMHelper {
                     return Ok(StrykeValue::array(out));
                 }
                 let first_err: Arc<Mutex<Option<StrykeError>>> = Arc::new(Mutex::new(None));
+                let io = EmbedIo::for_task();
                 (0..n).into_par_iter().for_each(|i| {
+                    let _io = io.enter();
                     if first_err.lock().is_some() {
                         return;
                     }
@@ -14070,7 +14122,9 @@ impl VMHelper {
                         let cmp_block = cmp_block.clone();
                         let subs = self.subs.clone();
                         let scope_capture = self.scope.capture();
+                        let io = EmbedIo::for_task();
                         items.par_sort_by(|a, b| {
+                            let _io = io.enter();
                             let mut local_interp = VMHelper::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
@@ -14148,13 +14202,16 @@ impl VMHelper {
                 let scope_capture = self.scope.capture();
                 let pmap_progress = PmapProgress::new(show_progress, items.len());
 
+                let io = EmbedIo::for_task();
                 let result = items
                     .into_par_iter()
                     .map(|x| {
+                        let _io = io.enter();
                         pmap_progress.tick();
                         x
                     })
                     .reduce_with(|a, b| {
+                        let _io = io.enter();
                         let mut local_interp = VMHelper::new();
                         local_interp.subs = subs.clone();
                         local_interp.scope.restore_capture(&scope_capture);
@@ -14200,18 +14257,23 @@ impl VMHelper {
                     ));
                 }
                 let pmap_progress = PmapProgress::new(show_progress, items.len());
+                let io = EmbedIo::for_task();
                 let result = items
                     .into_par_iter()
                     .fold(
                         || preduce_init_fold_identity(&init_val),
                         |acc, item| {
+                            let _io = io.enter();
                             pmap_progress.tick();
                             fold_preduce_init_step(&subs, cap, &block, acc, item)
                         },
                     )
                     .reduce(
                         || preduce_init_fold_identity(&init_val),
-                        |a, b| merge_preduce_init_partials(a, b, &block, &subs, cap),
+                        |a, b| {
+                            let _io = io.enter();
+                            merge_preduce_init_partials(a, b, &block, &subs, cap)
+                        },
                     );
                 pmap_progress.finish();
                 Ok(result)
@@ -14249,9 +14311,11 @@ impl VMHelper {
                     };
                 }
                 let pmap_progress = PmapProgress::new(show_progress, items.len());
+                let io = EmbedIo::for_task();
                 let result = items
                     .into_par_iter()
                     .map(|item| {
+                        let _io = io.enter();
                         let mut local_interp = VMHelper::new();
                         local_interp.subs = subs.clone();
                         local_interp.scope.restore_capture(&scope_capture);
@@ -14264,6 +14328,7 @@ impl VMHelper {
                         val
                     })
                     .reduce_with(|a, b| {
+                        let _io = io.enter();
                         let mut local_interp = VMHelper::new();
                         local_interp.subs = subs.clone();
                         local_interp.scope.restore_capture(&scope_capture);
@@ -14295,9 +14360,11 @@ impl VMHelper {
                 let scope_capture = self.scope.capture();
                 let cache = &*crate::pcache::GLOBAL_PCACHE;
                 let pmap_progress = PmapProgress::new(show_progress, items.len());
+                let io = EmbedIo::for_task();
                 let results: Vec<StrykeValue> = items
                     .into_par_iter()
                     .map(|item| {
+                        let _io = io.enter();
                         let k = crate::pcache::cache_key(&item);
                         if let Some(v) = cache.get(&k) {
                             pmap_progress.tick();
@@ -20382,9 +20449,11 @@ impl VMHelper {
         let subs = self.subs.clone();
         let (scope_capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
         let pmap_progress = PmapProgress::new(progress, items.len());
+        let io = EmbedIo::for_task();
         let results: Vec<StrykeValue> = items
             .into_par_iter()
             .map(|item| {
+                let _io = io.enter();
                 let mut local_interp = VMHelper::new();
                 local_interp.subs = subs.clone();
                 local_interp.scope.restore_capture(&scope_capture);
@@ -20419,9 +20488,11 @@ impl VMHelper {
         let subs = self.subs.clone();
         let (scope_capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
         let indexed: Vec<(usize, StrykeValue)> = items.into_iter().enumerate().collect();
+        let io = EmbedIo::for_task();
         let mut kept: Vec<(usize, StrykeValue)> = indexed
             .into_par_iter()
             .filter_map(|(i, item)| {
+                let _io = io.enter();
                 let mut local_interp = VMHelper::new();
                 local_interp.subs = subs.clone();
                 local_interp.scope.restore_capture(&scope_capture);
@@ -20459,9 +20530,11 @@ impl VMHelper {
         let subs = self.subs.clone();
         let (scope_capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
         let indexed: Vec<(usize, StrykeValue)> = items.into_iter().enumerate().collect();
+        let io = EmbedIo::for_task();
         let mut mapped: Vec<(usize, StrykeValue)> = indexed
             .into_par_iter()
             .map(|(i, item)| {
+                let _io = io.enter();
                 let mut local_interp = VMHelper::new();
                 local_interp.subs = subs.clone();
                 local_interp.scope.restore_capture(&scope_capture);
@@ -20580,9 +20653,11 @@ impl VMHelper {
                     let (scope_capture, atomic_arrays, atomic_hashes) =
                         self.scope.capture_with_atomics();
                     let pmap_progress = PmapProgress::new(progress, v.len());
+                    let io = EmbedIo::for_task();
                     v = v
                         .into_par_iter()
                         .filter_map(|item| {
+                            let _io = io.enter();
                             let mut local_interp = VMHelper::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
@@ -20613,7 +20688,9 @@ impl VMHelper {
                         self.scope.capture_with_atomics();
                     let pmap_progress = PmapProgress::new(progress, v.len());
                     let first_err: Arc<Mutex<Option<StrykeError>>> = Arc::new(Mutex::new(None));
+                    let io = EmbedIo::for_task();
                     v.clone().into_par_iter().for_each(|item| {
+                        let _io = io.enter();
                         if first_err.lock().is_some() {
                             return;
                         }
@@ -20667,9 +20744,11 @@ impl VMHelper {
                         .collect();
                     let n_chunks = indexed_chunks.len();
                     let pmap_progress = PmapProgress::new(progress, n_chunks);
+                    let io = EmbedIo::for_task();
                     let mut chunk_results: Vec<(usize, Vec<StrykeValue>)> = indexed_chunks
                         .into_par_iter()
                         .map(|(chunk_idx, chunk)| {
+                            let _io = io.enter();
                             let mut local_interp = VMHelper::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
@@ -20710,7 +20789,9 @@ impl VMHelper {
                             } else {
                                 let subs = self.subs.clone();
                                 let scope_capture = self.scope.capture();
+                                let io = EmbedIo::for_task();
                                 v.par_sort_by(|a, b| {
+                                    let _io = io.enter();
                                     let mut local_interp = VMHelper::new();
                                     local_interp.subs = subs.clone();
                                     local_interp.scope.restore_capture(&scope_capture);
@@ -20748,9 +20829,11 @@ impl VMHelper {
                     let scope_capture = self.scope.capture();
                     let cache = &*crate::pcache::GLOBAL_PCACHE;
                     let pmap_progress = PmapProgress::new(progress, v.len());
+                    let io = EmbedIo::for_task();
                     v = v
                         .into_par_iter()
                         .map(|item| {
+                            let _io = io.enter();
                             let k = crate::pcache::cache_key(&item);
                             if let Some(cached) = cache.get(&k) {
                                 pmap_progress.tick();
@@ -20785,13 +20868,16 @@ impl VMHelper {
                     let subs = self.subs.clone();
                     let scope_capture = self.scope.capture();
                     let pmap_progress = PmapProgress::new(progress, v.len());
+                    let io = EmbedIo::for_task();
                     let result = v
                         .into_par_iter()
                         .map(|x| {
+                            let _io = io.enter();
                             pmap_progress.tick();
                             x
                         })
                         .reduce_with(|a, b| {
+                            let _io = io.enter();
                             let mut local_interp = VMHelper::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
@@ -20827,18 +20913,23 @@ impl VMHelper {
                         ));
                     }
                     let pmap_progress = PmapProgress::new(progress, v.len());
+                    let io = EmbedIo::for_task();
                     let result = v
                         .into_par_iter()
                         .fold(
                             || preduce_init_fold_identity(&init),
                             |acc, item| {
+                                let _io = io.enter();
                                 pmap_progress.tick();
                                 fold_preduce_init_step(&subs, cap, &block, acc, item)
                             },
                         )
                         .reduce(
                             || preduce_init_fold_identity(&init),
-                            |a, b| merge_preduce_init_partials(a, b, &block, &subs, cap),
+                            |a, b| {
+                                let _io = io.enter();
+                                merge_preduce_init_partials(a, b, &block, &subs, cap)
+                            },
                         );
                     pmap_progress.finish();
                     return Ok(result);
@@ -20866,9 +20957,11 @@ impl VMHelper {
                         };
                     }
                     let pmap_progress = PmapProgress::new(progress, v.len());
+                    let io = EmbedIo::for_task();
                     let result = v
                         .into_par_iter()
                         .map(|item| {
+                            let _io = io.enter();
                             let mut local_interp = VMHelper::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
@@ -20881,6 +20974,7 @@ impl VMHelper {
                             val
                         })
                         .reduce_with(|a, b| {
+                            let _io = io.enter();
                             let mut local_interp = VMHelper::new();
                             local_interp.subs = subs.clone();
                             local_interp.scope.restore_capture(&scope_capture);
@@ -23098,7 +23192,9 @@ impl VMHelper {
         }
         let num_chunks = self.num_threads.saturating_mul(8).max(1);
         let chunks = crate::par_lines::line_aligned_chunks(data, num_chunks);
+        let io = EmbedIo::for_task();
         chunks.into_par_iter().try_for_each(|(start, end)| {
+            let _io = io.enter();
             let slice = &data[start..end];
             let mut s = 0usize;
             while s < slice.len() {
@@ -23170,7 +23266,9 @@ impl VMHelper {
         if show_progress {
             let paths = crate::par_walk::collect_paths(&roots);
             let pmap_progress = PmapProgress::new(true, paths.len());
+            let io = EmbedIo::for_task();
             paths.into_par_iter().try_for_each(|p| {
+                let _io = io.enter();
                 let s = p.to_string_lossy().into_owned();
                 let mut local_interp = VMHelper::new();
                 local_interp.subs = subs.clone();
@@ -23664,7 +23762,9 @@ fn par_walk_recursive(
         Err(_) => return Ok(()),
     };
     let entries: Vec<_> = read.filter_map(|e| e.ok()).collect();
+    let io = EmbedIo::for_task();
     entries.par_iter().try_for_each(|e| {
+        let _io = io.enter();
         par_walk_recursive(
             &e.path(),
             sub,

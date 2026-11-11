@@ -2370,12 +2370,11 @@ The `stryke` library crate exposes one string-in/string-out entry point for Rust
 pub fn run_program(src: &str, input: &str) -> Result<String, String>
 ```
 
-- Each call runs on its own rayon pool (16 MiB stacks) with a fresh interpreter; no state carries over between calls, and concurrent calls never share an output buffer.
-- Worker interpreters share the call's capture buffer and STDIN: `pmap`, `fan` and the other rayon-parallel builtins (pool threads), and `async`/`spawn`, `eval_timeout`, `ppool`, streaming map and pipeline stages (OS threads). Each `print` stays contiguous; order across workers is whatever the scheduler gives, as in the CLI.
+- Each call runs a fresh interpreter on its own thread (16 MiB stack); parallel work uses rayon's global pool, as in the CLI; no state carries over between calls, and concurrent calls never share an output buffer.
+- Worker interpreters share the call's capture buffer and STDIN, including when nested (`async { pmap ... }`): `pmap`, `fan` and the other rayon-parallel builtins, and `async`/`spawn`, `eval_timeout`, `ppool`, streaming map and pipeline stages (OS threads). Each `print` stays contiguous; order across workers is whatever the scheduler gives, as in the CLI.
 - `input` is the program's STDIN: `<STDIN>`, `<>` with no file arguments, `input`, `getc`, `read`/`sysread` on STDIN.
 - Returns everything written to STDOUT (`p`, `print`, `say`, `printf`). STDERR (`warn`, `print STDERR`) still goes to the process stderr.
 - Parse errors, `die`, runtime errors, `exit N` with N != 0, and interpreter panics return `Err(message)`. `exit 0` returns `Ok` with the output written so far. The process is never exited.
-- Known gap: a rayon-parallel builtin nested inside an OS-thread construct (`async { pmap ... }`, a `ppool` job calling `pmap`) runs on rayon's global pool, whose interpreters write to the process stdout and read the process stdin.
 
 ```rust
 let out = stryke::run_program(r#"while (my $l = <STDIN>) { p uc $l }"#, "ab\ncd\n")?;
