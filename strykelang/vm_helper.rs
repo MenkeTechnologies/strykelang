@@ -783,6 +783,13 @@ pub struct VMHelper {
     /// which *discards* output: capture keeps it and hands it back. `None` (the
     /// default) is the ordinary standalone `stryke` behaviour.
     capture: Option<String>,
+    /// Whether [`Self::capture`] also takes STDERR writes. [`Self::begin_capture`]
+    /// sets it (a TUI must keep both streams off the terminal);
+    /// [`Self::begin_stdout_capture`] clears it so STDERR still reaches the process.
+    capture_stderr: bool,
+    /// Program stdin supplied by an embedder ([`Self::set_stdin`]). `None` reads
+    /// the process stdin. A `Mutex` so the `&VMHelper` builtins (`input`) can advance it.
+    stdin_override: Option<Mutex<Cursor<Vec<u8>>>>,
     /// Per-instance test counters for `assert_*` / `test_run` / `test_skip` (stryke
     /// `.stk` test framework). Atomics so the immutable-ref builtin signature
     /// (`fn(&VMHelper, ...)`) can mutate without changing every call site. Replaces
@@ -1836,6 +1843,8 @@ impl VMHelper {
             default_print_handle: "STDOUT".to_string(),
             suppress_stdout: false,
             capture: None,
+            capture_stderr: false,
+            stdin_override: None,
             test_pass_count: std::sync::atomic::AtomicUsize::new(0),
             test_fail_count: std::sync::atomic::AtomicUsize::new(0),
             test_skip_count: std::sync::atomic::AtomicUsize::new(0),
@@ -2203,6 +2212,8 @@ impl VMHelper {
             // capture buffer — the buffer is not shared, so inheriting `Some`
             // here would silently drop the worker's output.
             capture: None,
+            capture_stderr: false,
+            stdin_override: None,
             // Workers start with fresh test counters — they don't share with the
             // parent. The parent is responsible for aggregating across workers if
             // it cares (none of the current parallel callers do).
@@ -6256,32 +6267,17 @@ impl VMHelper {
                 self.bump_line_for_handle("STDIN");
                 return Ok(StrykeValue::string(queued));
             }
-            let r: Result<usize, io::Error> = if self.open_pragma_utf8 {
-                let mut buf = Vec::new();
-                read_perl_record(
-                    &mut io::stdin().lock(),
-                    irs.as_deref(),
-                    record_len,
-                    &mut buf,
-                )
-                .inspect(|n| {
-                    if *n > 0 {
-                        line_str = String::from_utf8_lossy(&buf).into_owned();
-                    }
-                })
-            } else {
-                let mut buf = Vec::new();
-                let mut lock = io::stdin().lock();
-                match read_perl_record(&mut lock, irs.as_deref(), record_len, &mut buf) {
-                    Ok(n) => {
-                        if n > 0 {
-                            line_str = crate::perl_decode::decode_utf8_or_latin1_read_until(&buf);
-                        }
-                        Ok(n)
-                    }
-                    Err(e) => Err(e),
-                }
-            };
+            let mut buf = Vec::new();
+            let r: Result<usize, io::Error> = self.with_stdin(|mut stdin| {
+                read_perl_record(&mut stdin, irs.as_deref(), record_len, &mut buf)
+            });
+            if matches!(r, Ok(n) if n > 0) {
+                line_str = if self.open_pragma_utf8 {
+                    String::from_utf8_lossy(&buf).into_owned()
+                } else {
+                    crate::perl_decode::decode_utf8_or_latin1_read_until(&buf)
+                };
+            }
             match r {
                 Ok(0) => Ok(StrykeValue::UNDEF),
                 Ok(_) => {
@@ -6873,7 +6869,7 @@ impl VMHelper {
         let n = if let Some(slot) = self.io_file_slots.get(&fh).cloned() {
             slot.lock().read(&mut buf).unwrap_or(0)
         } else if fh == "STDIN" {
-            std::io::stdin().read(&mut buf).unwrap_or(0)
+            self.with_stdin(|s| s.read(&mut buf)).unwrap_or(0)
         } else {
             return Err(StrykeError::runtime(format!("read: unopened handle {}", fh), line).into());
         };
@@ -12208,7 +12204,7 @@ impl VMHelper {
                     let n = if let Some(slot) = self.io_file_slots.get(&fh).cloned() {
                         slot.lock().read(&mut buf).unwrap_or(0)
                     } else if fh == "STDIN" {
-                        std::io::stdin().read(&mut buf).unwrap_or(0)
+                        self.with_stdin(|s| s.read(&mut buf)).unwrap_or(0)
                     } else {
                         return Err(StrykeError::runtime(
                             format!("read: unopened handle {}", fh),
@@ -18849,6 +18845,30 @@ impl VMHelper {
     /// suppression throws the output away, capture hands it back.
     pub fn begin_capture(&mut self) {
         self.capture = Some(String::new());
+        self.capture_stderr = true;
+    }
+
+    /// Like [`Self::begin_capture`], but only STDOUT is captured; STDERR
+    /// (`warn`, `print STDERR`) still goes to the process stderr.
+    pub fn begin_stdout_capture(&mut self) {
+        self.capture = Some(String::new());
+        self.capture_stderr = false;
+    }
+
+    /// Feed `input` to the program as its STDIN: `<STDIN>`, `<>` with no file
+    /// arguments, `input`, `getc`, `read`/`sysread` on STDIN all read from it
+    /// instead of the process stdin.
+    pub fn set_stdin(&mut self, input: &str) {
+        self.stdin_override = Some(Mutex::new(Cursor::new(input.as_bytes().to_vec())));
+    }
+
+    /// Run `f` against the program's STDIN: the [`Self::set_stdin`] buffer when
+    /// one was supplied, else the locked process stdin.
+    pub(crate) fn with_stdin<T>(&self, f: impl FnOnce(&mut dyn BufRead) -> T) -> T {
+        match &self.stdin_override {
+            Some(buf) => f(&mut *buf.lock()),
+            None => f(&mut io::stdin().lock()),
+        }
     }
 
     /// Stop capturing and take everything written since [`Self::begin_capture`],
@@ -18870,13 +18890,16 @@ impl VMHelper {
             .declare_scalar(name, StrykeValue::string(text.to_string()));
     }
 
-    /// Write program output: into the capture buffer when capturing, else to
+    /// Write program output: into the capture buffer when capturing (STDERR
+    /// only under [`Self::begin_capture`]), else to
     /// the process stream `stderr` selects — honouring `suppress_stdout` (which
     /// discards STDOUT for progress-bar workers) and `$|` autoflush.
     pub(crate) fn write_out(&mut self, output: &str, stderr: bool) {
         if let Some(buf) = &mut self.capture {
-            buf.push_str(output);
-            return;
+            if !stderr || self.capture_stderr {
+                buf.push_str(output);
+                return;
+            }
         }
         if stderr {
             eprint!("{}", output);
@@ -25187,10 +25210,7 @@ pub(crate) fn exec_builtin(
                     ));
                 }
             };
-            print!("{}", out);
-            if this.output_autoflush {
-                let _ = io::stdout().flush();
-            }
+            this.write_out(&out, false);
             Ok(StrykeValue::integer(1))
         }
         Some(BuiltinId::Open) => {

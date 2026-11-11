@@ -48,6 +48,7 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - [\[0x0C-test\] Test Runner — Worker Pool Architecture](#0x0c-test-test-runner--worker-pool-architecture)
 - [\[0x0D\] Standalone Binaries (`stryke build`)](#0x0d-standalone-binaries-stryke-build)
 - [\[0x0E\] Inline Rust FFI (`rust { ... }`)](#0x0e-inline-rust-ffi-rust---)
+- [\[0x0Eb\] Embedding (`run_program`)](#0x0eb-embedding-run_program)
 - [\[0x0F\] Bytecode Cache (rkyv)](#0x0f-bytecode-cache-rkyv)
 - [\[0x10\] Distributed `pmap_on` / `~d>` over SSH (`cluster`)](#0x10-distributed-pmap_on--d-over-ssh-cluster)
 - [\[0x10a\] Infrastructure Load Testing](#0x10a-infrastructure-load-testing)
@@ -2358,6 +2359,27 @@ p fib 50             # 12586269025
 - Signatures beyond the table above are silently ignored (the function still exists in the cdylib, just not Perl-callable).
 - Body must be self-contained Rust with `std` only — no `Cargo.toml` / external crate deps. If you need `regex` or similar, vendor the minimal code into the block.
 - The cdylib runs with the calling process's privileges. Trust model is equivalent to `do FILE`.
+
+---
+
+## [0x0Eb] EMBEDDING (`run_program`)
+
+The `stryke` library crate exposes one string-in/string-out entry point for Rust hosts:
+
+```rust
+pub fn run_program(src: &str, input: &str) -> Result<String, String>
+```
+
+- Each call parses into a fresh interpreter on its own thread (16 MiB stack); no state carries over between calls, and concurrent calls never share an output buffer.
+- `input` is the program's STDIN: `<STDIN>`, `<>` with no file arguments, `input`, `getc`, `read`/`sysread` on STDIN.
+- Returns everything written to STDOUT (`p`, `print`, `say`, `printf`). STDERR (`warn`, `print STDERR`) still goes to the process stderr.
+- Parse errors, `die`, runtime errors, `exit N` with N != 0, and interpreter panics return `Err(message)`. `exit 0` returns `Ok` with the output written so far. The process is never exited.
+- Known gap: output printed from inside a parallel worker block (`pmap`, `fan`, ...) is written by the worker's own interpreter and reaches the process stdout, not the returned string.
+
+```rust
+let out = stryke::run_program(r#"while (my $l = <STDIN>) { p uc $l }"#, "ab\ncd\n")?;
+assert_eq!(out, "AB\nCD\n");
+```
 
 ---
 

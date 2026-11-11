@@ -17112,14 +17112,14 @@ fn builtin_input(
     use std::io::Read;
     if args.is_empty() {
         let mut buf = String::new();
-        std::io::stdin().read_to_string(&mut buf).unwrap_or(0);
+        interp.with_stdin(|s| s.read_to_string(&mut buf)).unwrap_or(0);
         return Ok(StrykeValue::string(buf));
     }
     let name = args[0].to_string();
     // STDIN handle — read stdin directly
     if name == "STDIN" {
         let mut buf = String::new();
-        std::io::stdin().read_to_string(&mut buf).unwrap_or(0);
+        interp.with_stdin(|s| s.read_to_string(&mut buf)).unwrap_or(0);
         return Ok(StrykeValue::string(buf));
     }
     // If <STDIN> was used, the parser already read all of stdin into the arg string.
@@ -43237,7 +43237,7 @@ impl VMHelper {
             .unwrap_or_else(|| "STDIN".to_string());
         let mut buf = [0u8; 1];
         if name == "STDIN" {
-            match std::io::stdin().read(&mut buf) {
+            match self.with_stdin(|s| s.read(&mut buf)) {
                 Ok(0) => return Ok(StrykeValue::UNDEF),
                 Ok(_) => {
                     return Ok(StrykeValue::string(decode_utf8_or_latin1(&buf[..1])));
@@ -43615,7 +43615,7 @@ impl VMHelper {
             let _ = self.scope.set_scalar(&var_name, data);
             Ok(StrykeValue::integer(n as i64))
         } else if fh == "STDIN" {
-            let n = std::io::stdin().read(&mut buf).unwrap_or(0);
+            let n = self.with_stdin(|s| s.read(&mut buf)).unwrap_or(0);
             buf.truncate(n);
             let data = StrykeValue::string(crate::perl_fs::decode_utf8_or_latin1(&buf));
             let var_name = args[1].to_string();

@@ -94,6 +94,9 @@ pub mod deparse;
 pub mod doc_render;
 /// `docs` submodule.
 pub mod docs;
+/// `embed` submodule: [`run_program`], the string-in/string-out entry point.
+pub mod embed;
+pub use embed::run_program;
 /// `english` submodule.
 pub mod english;
 /// `error` submodule.
