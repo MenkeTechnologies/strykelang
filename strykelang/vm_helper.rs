@@ -676,6 +676,66 @@ impl IoWrite for IoSharedFileWrite {
     }
 }
 
+/// Embedder I/O for a run: where program STDOUT (and optionally STDERR) is
+/// captured, and what STDIN reads. Both are shared handles, so every worker
+/// interpreter a run creates (`pmap`, `fan`, `async`, pipelines, ...) writes
+/// into the same buffer and reads the same input as its parent. Each write
+/// takes the lock once, so one `print`'s bytes stay contiguous.
+///
+/// `Default` is the standalone CLI: no capture, process stdin.
+#[derive(Clone, Default)]
+pub struct EmbedIo {
+    capture: Option<Arc<Mutex<String>>>,
+    /// Whether `capture` also takes STDERR writes.
+    capture_stderr: bool,
+    stdin: Option<Arc<Mutex<Cursor<Vec<u8>>>>>,
+}
+
+thread_local! {
+    /// The [`EmbedIo`] every [`VMHelper::new`] on this thread starts with.
+    static INHERITED_IO: std::cell::RefCell<EmbedIo> = std::cell::RefCell::default();
+}
+
+impl EmbedIo {
+    /// Capture STDOUT only and read STDIN from `input` — what
+    /// [`crate::run_program`] installs for a run.
+    pub fn stdout_capture_with_stdin(input: &str) -> Self {
+        EmbedIo {
+            capture: Some(Arc::default()),
+            capture_stderr: false,
+            stdin: Some(Arc::new(Mutex::new(Cursor::new(input.as_bytes().to_vec())))),
+        }
+    }
+
+    /// Everything captured so far, leaving the buffer empty.
+    pub fn take_output(&self) -> String {
+        self.capture
+            .as_ref()
+            .map(|buf| std::mem::take(&mut *buf.lock()))
+            .unwrap_or_default()
+    }
+
+    /// Make `self` what interpreters created on the current thread start with.
+    pub fn install(self) {
+        INHERITED_IO.with(|io| *io.borrow_mut() = self);
+    }
+
+    /// The current thread's inherited I/O (default when none was installed).
+    pub fn inherited() -> Self {
+        INHERITED_IO.with(|io| io.borrow().clone())
+    }
+
+    /// Wrap a closure about to run on another OS thread (`thread::spawn`,
+    /// `scope.spawn`) so interpreters it creates inherit this thread's I/O.
+    pub fn carry<T>(f: impl FnOnce() -> T) -> impl FnOnce() -> T {
+        let io = Self::inherited();
+        move || {
+            io.install();
+            f()
+        }
+    }
+}
+
 /// There is no Tree walking Interpreter, this is Just a Virtual Machine helper struct
 pub struct VMHelper {
     /// `scope` field.
@@ -776,20 +836,10 @@ pub struct VMHelper {
     pub default_print_handle: String,
     /// Suppress stdout output (fan workers with progress bars).
     pub suppress_stdout: bool,
-    /// In-process output sink. When `Some`, everything the program writes to
-    /// STDOUT/STDERR is appended here instead of reaching the process streams —
-    /// what an embedder that owns the terminal (a TUI) needs so a `print`
-    /// cannot corrupt its display. Distinct from [`Self::suppress_stdout`],
-    /// which *discards* output: capture keeps it and hands it back. `None` (the
-    /// default) is the ordinary standalone `stryke` behaviour.
-    capture: Option<String>,
-    /// Whether [`Self::capture`] also takes STDERR writes. [`Self::begin_capture`]
-    /// sets it (a TUI must keep both streams off the terminal);
-    /// [`Self::begin_stdout_capture`] clears it so STDERR still reaches the process.
-    capture_stderr: bool,
-    /// Program stdin supplied by an embedder ([`Self::set_stdin`]). `None` reads
-    /// the process stdin. A `Mutex` so the `&VMHelper` builtins (`input`) can advance it.
-    stdin_override: Option<Mutex<Cursor<Vec<u8>>>>,
+    /// Embedder I/O: the in-process capture sink and the STDIN source. Default
+    /// (no capture, process stdin) is the ordinary standalone `stryke`
+    /// behaviour. See [`EmbedIo`].
+    embed_io: EmbedIo,
     /// Per-instance test counters for `assert_*` / `test_run` / `test_skip` (stryke
     /// `.stk` test framework). Atomics so the immutable-ref builtin signature
     /// (`fn(&VMHelper, ...)`) can mutate without changing every call site. Replaces
@@ -1842,9 +1892,7 @@ impl VMHelper {
             output_autoflush: false,
             default_print_handle: "STDOUT".to_string(),
             suppress_stdout: false,
-            capture: None,
-            capture_stderr: false,
-            stdin_override: None,
+            embed_io: EmbedIo::inherited(),
             test_pass_count: std::sync::atomic::AtomicUsize::new(0),
             test_fail_count: std::sync::atomic::AtomicUsize::new(0),
             test_skip_count: std::sync::atomic::AtomicUsize::new(0),
@@ -2208,12 +2256,9 @@ impl VMHelper {
             output_autoflush: self.output_autoflush,
             default_print_handle: self.default_print_handle.clone(),
             suppress_stdout: self.suppress_stdout,
-            // A worker writes to the parent's streams, not into the parent's
-            // capture buffer — the buffer is not shared, so inheriting `Some`
-            // here would silently drop the worker's output.
-            capture: None,
-            capture_stderr: false,
-            stdin_override: None,
+            // The capture sink and STDIN source are shared handles, so a worker
+            // writes into (and reads from) the same ones as its parent.
+            embed_io: self.embed_io.clone(),
             // Workers start with fresh test counters — they don't share with the
             // parent. The parent is responsible for aggregating across workers if
             // it cares (none of the current parallel callers do).
@@ -7903,7 +7948,7 @@ impl VMHelper {
         let result = Arc::new(ParkMutex::new(None));
         let join = Arc::new(ParkMutex::new(None));
         let result2 = result.clone();
-        let h = std::thread::spawn(move || {
+        let h = std::thread::spawn(EmbedIo::carry(move || {
             let mut interp = VMHelper::new();
             interp.subs = subs;
             interp.scope.restore_capture(&scalars);
@@ -7918,7 +7963,7 @@ impl VMHelper {
                 Err(FlowOrError::Flow(_)) => Ok(StrykeValue::UNDEF),
             };
             *result2.lock() = Some(r);
-        });
+        }));
         *join.lock() = Some(h);
         StrykeValue::async_task(Arc::new(StrykeAsyncTask { result, join }))
     }
@@ -7943,7 +7988,7 @@ impl VMHelper {
         let argv = self.argv.clone();
         let inc = self.scope.get_array("INC");
         let (tx, rx) = channel::<StrykeResult<StrykeValue>>();
-        let _handle = std::thread::spawn(move || {
+        let _handle = std::thread::spawn(EmbedIo::carry(move || {
             let mut interp = VMHelper::new();
             interp.subs = subs;
             interp.struct_defs = struct_defs;
@@ -7975,7 +8020,7 @@ impl VMHelper {
                 Err(FlowOrError::Flow(_)) => Ok(StrykeValue::UNDEF),
             };
             let _ = tx.send(out);
-        });
+        }));
         let dur = Duration::from_secs_f64(secs.max(0.0));
         match rx.recv_timeout(dur) {
             Ok(Ok(v)) => Ok(v),
@@ -18844,28 +18889,28 @@ impl VMHelper {
     /// This is what an embedder wants instead of [`Self::suppress_stdout`]:
     /// suppression throws the output away, capture hands it back.
     pub fn begin_capture(&mut self) {
-        self.capture = Some(String::new());
-        self.capture_stderr = true;
+        self.embed_io.capture = Some(Arc::default());
+        self.embed_io.capture_stderr = true;
     }
 
     /// Like [`Self::begin_capture`], but only STDOUT is captured; STDERR
     /// (`warn`, `print STDERR`) still goes to the process stderr.
     pub fn begin_stdout_capture(&mut self) {
-        self.capture = Some(String::new());
-        self.capture_stderr = false;
+        self.embed_io.capture = Some(Arc::default());
+        self.embed_io.capture_stderr = false;
     }
 
     /// Feed `input` to the program as its STDIN: `<STDIN>`, `<>` with no file
     /// arguments, `input`, `getc`, `read`/`sysread` on STDIN all read from it
     /// instead of the process stdin.
     pub fn set_stdin(&mut self, input: &str) {
-        self.stdin_override = Some(Mutex::new(Cursor::new(input.as_bytes().to_vec())));
+        self.embed_io.stdin = Some(Arc::new(Mutex::new(Cursor::new(input.as_bytes().to_vec()))));
     }
 
     /// Run `f` against the program's STDIN: the [`Self::set_stdin`] buffer when
     /// one was supplied, else the locked process stdin.
     pub(crate) fn with_stdin<T>(&self, f: impl FnOnce(&mut dyn BufRead) -> T) -> T {
-        match &self.stdin_override {
+        match &self.embed_io.stdin {
             Some(buf) => f(&mut *buf.lock()),
             None => f(&mut io::stdin().lock()),
         }
@@ -18874,12 +18919,16 @@ impl VMHelper {
     /// Stop capturing and take everything written since [`Self::begin_capture`],
     /// returning the empty string when capture was not on.
     pub fn end_capture(&mut self) -> String {
-        self.capture.take().unwrap_or_default()
+        self.embed_io
+            .capture
+            .take()
+            .map(|buf| std::mem::take(&mut *buf.lock()))
+            .unwrap_or_default()
     }
 
     /// Whether output is being captured.
     pub fn capturing(&self) -> bool {
-        self.capture.is_some()
+        self.embed_io.capture.is_some()
     }
 
     /// Bind `$name` to `text` in the current scope, so an embedder can hand a
@@ -18895,9 +18944,9 @@ impl VMHelper {
     /// the process stream `stderr` selects — honouring `suppress_stdout` (which
     /// discards STDOUT for progress-bar workers) and `$|` autoflush.
     pub(crate) fn write_out(&mut self, output: &str, stderr: bool) {
-        if let Some(buf) = &mut self.capture {
-            if !stderr || self.capture_stderr {
-                buf.push_str(output);
+        if let Some(buf) = &self.embed_io.capture {
+            if !stderr || self.embed_io.capture_stderr {
+                buf.lock().push_str(output);
                 return;
             }
         }
@@ -20919,16 +20968,16 @@ impl VMHelper {
             // when bounded channels fill up.
             let result_rx_c = result_rx.clone();
             let results_c = Arc::clone(&results);
-            scope.spawn(move || {
+            scope.spawn(EmbedIo::carry(move || {
                 while let Ok(item) = result_rx_c.recv() {
                     results_c.lock().push(item);
                 }
-            });
+            }));
 
             // Source feeder thread.
             let err_s = Arc::clone(&err);
             let take_done_s = Arc::clone(&take_done);
-            scope.spawn(move || {
+            scope.spawn(EmbedIo::carry(move || {
                 for item in source {
                     if err_s.lock().is_some()
                         || take_done_s.load(std::sync::atomic::Ordering::Relaxed)
@@ -20939,7 +20988,7 @@ impl VMHelper {
                         break;
                     }
                 }
-            });
+            }));
 
             // Spawn workers for each stage.
             for (stage_idx, op) in streamable_ops.iter().enumerate() {
@@ -20959,7 +21008,7 @@ impl VMHelper {
                     match *op {
                         PipelineOp::Filter(ref sub) | PipelineOp::PGrep { ref sub, .. } => {
                             let sub = Arc::clone(sub);
-                            scope.spawn(move || {
+                            scope.spawn(EmbedIo::carry(move || {
                                 while let Ok(item) = rx.recv() {
                                     if err_w.lock().is_some() {
                                         break;
@@ -20980,11 +21029,11 @@ impl VMHelper {
                                         break;
                                     }
                                 }
-                            });
+                            }));
                         }
                         PipelineOp::Map(ref sub) | PipelineOp::PMap { ref sub, .. } => {
                             let sub = Arc::clone(sub);
-                            scope.spawn(move || {
+                            scope.spawn(EmbedIo::carry(move || {
                                 while let Ok(item) = rx.recv() {
                                     if err_w.lock().is_some() {
                                         break;
@@ -21005,13 +21054,13 @@ impl VMHelper {
                                         break;
                                     }
                                 }
-                            });
+                            }));
                         }
                         PipelineOp::Take(n) => {
                             let limit = (*n).max(0) as usize;
                             let count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
                             let count_w = Arc::clone(&count);
-                            scope.spawn(move || {
+                            scope.spawn(EmbedIo::carry(move || {
                                 while let Ok(item) = rx.recv() {
                                     let prev =
                                         count_w.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -21024,13 +21073,13 @@ impl VMHelper {
                                         break;
                                     }
                                 }
-                            });
+                            }));
                             // Take only needs 1 worker; skip remaining worker spawns.
                             break;
                         }
                         PipelineOp::PFor { ref sub, .. } => {
                             let sub = Arc::clone(sub);
-                            scope.spawn(move || {
+                            scope.spawn(EmbedIo::carry(move || {
                                 while let Ok(item) = rx.recv() {
                                     if err_w.lock().is_some() {
                                         break;
@@ -21066,11 +21115,11 @@ impl VMHelper {
                                         break;
                                     }
                                 }
-                            });
+                            }));
                         }
                         PipelineOp::Tap(ref sub) => {
                             let sub = Arc::clone(sub);
-                            scope.spawn(move || {
+                            scope.spawn(EmbedIo::carry(move || {
                                 while let Ok(item) = rx.recv() {
                                     if err_w.lock().is_some() {
                                         break;
@@ -21109,11 +21158,11 @@ impl VMHelper {
                                         break;
                                     }
                                 }
-                            });
+                            }));
                         }
                         PipelineOp::PCache { ref sub, .. } => {
                             let sub = Arc::clone(sub);
-                            scope.spawn(move || {
+                            scope.spawn(EmbedIo::carry(move || {
                                 while let Ok(item) = rx.recv() {
                                     if err_w.lock().is_some() {
                                         break;
@@ -21145,7 +21194,7 @@ impl VMHelper {
                                         break;
                                     }
                                 }
-                            });
+                            }));
                         }
                         // Non-streaming ops already rejected above.
                         _ => unreachable!(),

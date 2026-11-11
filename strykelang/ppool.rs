@@ -211,7 +211,8 @@ pub fn create_pool(workers: usize) -> StrykeResult<StrykeValue> {
     for _ in 0..workers {
         let jrx = job_rx.clone();
         let rtx = result_tx.clone();
-        handles.push(thread::spawn(move || worker_loop(jrx, rtx)));
+        let job = move || worker_loop(jrx, rtx);
+        handles.push(thread::spawn(crate::vm_helper::EmbedIo::carry(job)));
     }
     drop(job_rx);
     drop(result_tx);

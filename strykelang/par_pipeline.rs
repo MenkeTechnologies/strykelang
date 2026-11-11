@@ -448,13 +448,13 @@ pub(crate) fn run_thread_par(
 
     std::thread::scope(|scope| {
         // Source thread: drain `items` into the first stage's input channel.
-        scope.spawn(move || {
+        scope.spawn(crate::vm_helper::EmbedIo::carry(move || {
             for item in items {
                 if tx0.send(item).is_err() {
                     break;
                 }
             }
-        });
+        }));
 
         // One worker per stage (matches par_pipeline_streaming semantics).
         for (stage_idx, stage_sub) in stage_closures.iter().enumerate() {
@@ -475,7 +475,7 @@ pub(crate) fn run_thread_par(
             let aa_w = atomic_arrays.clone();
             let ah_w = atomic_hashes.clone();
             let err_w = Arc::clone(&err);
-            scope.spawn(move || {
+            scope.spawn(crate::vm_helper::EmbedIo::carry(move || {
                 run_thread_par_worker(
                     sub,
                     subs_w,
@@ -487,7 +487,7 @@ pub(crate) fn run_thread_par(
                     err_w,
                     last_collector,
                 );
-            });
+            }));
         }
         txs.clear();
         rxs.clear();
@@ -534,9 +534,9 @@ pub(crate) fn run_par_pipeline_streaming(
     let err_s = Arc::clone(&err);
 
     std::thread::scope(|scope| {
-        scope.spawn(move || {
+        scope.spawn(crate::vm_helper::EmbedIo::carry(move || {
             run_source(source, subs_s, cap_s, aa_s, ah_s, tx0, err_s);
-        });
+        }));
 
         for (stage_idx, stage_sub) in spec.stages.iter().enumerate() {
             let wn = spec.workers[stage_idx];
@@ -567,9 +567,9 @@ pub(crate) fn run_par_pipeline_streaming(
                 let ah_w = ah_w.clone();
                 let err_w = Arc::clone(&err_w);
                 let last_ctr = last_ctr.clone();
-                scope.spawn(move || {
+                scope.spawn(crate::vm_helper::EmbedIo::carry(move || {
                     run_worker(sub, subs_w, cap_w, aa_w, ah_w, rx, tx_out, err_w, last_ctr);
-                });
+                }));
             }
         }
         txs.clear();
@@ -606,9 +606,9 @@ mod tests {
         let ctr = Arc::clone(&processed);
 
         thread::scope(|scope| {
-            scope.spawn(move || {
+            scope.spawn(crate::vm_helper::EmbedIo::carry(move || {
                 let _ = tx0.send(StrykeValue::integer(7));
-            });
+            }));
             for stage_idx in 0..k {
                 let rx = rxs[stage_idx].clone();
                 let tx_out = if stage_idx + 1 < k {
@@ -621,7 +621,7 @@ mod tests {
                 } else {
                     None
                 };
-                scope.spawn(move || {
+                scope.spawn(crate::vm_helper::EmbedIo::carry(move || {
                     while let Ok(item) = rx.recv() {
                         let out = item;
                         if let Some(c) = &last_ctr {
@@ -631,7 +631,7 @@ mod tests {
                             let _ = t.send(out);
                         }
                     }
-                });
+                }));
             }
             txs.clear();
             rxs.clear();

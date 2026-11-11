@@ -10225,7 +10225,7 @@ impl<'a> VM<'a> {
                         let join_slot: Arc<Mutex<Option<std::thread::JoinHandle<()>>>> =
                             Arc::new(Mutex::new(None));
                         let rs = Arc::clone(&result_slot);
-                        let h = std::thread::spawn(move || {
+                        let h = std::thread::spawn(crate::vm_helper::EmbedIo::carry(move || {
                             let mut local_interp = VMHelper::new();
                             local_interp.subs = subs;
                             local_interp.scope.restore_capture(&scope_capture);
@@ -10242,7 +10242,7 @@ impl<'a> VM<'a> {
                             };
                             local_interp.scope_pop_hook();
                             *rs.lock() = Some(out);
-                        });
+                        }));
                         *join_slot.lock() = Some(h);
                         self.push(StrykeValue::async_task(Arc::new(StrykeAsyncTask {
                             result: result_slot,

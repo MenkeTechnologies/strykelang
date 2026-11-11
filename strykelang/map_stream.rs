@@ -1547,7 +1547,7 @@ impl PMapStreamIterator {
         peel: bool,
     ) -> Self {
         let (tx, rx) = crossbeam::channel::bounded::<StrykeValue>(256);
-        let handle = std::thread::spawn(move || {
+        let handle = std::thread::spawn(crate::vm_helper::EmbedIo::carry(move || {
             // Persistent worker threads — each creates ONE Interpreter and
             // reuses it, avoiding the Interpreter::new() cost per item.
             let n_workers = rayon::current_num_threads().max(1);
@@ -1563,28 +1563,30 @@ impl PMapStreamIterator {
                 let atomic_arrays = atomic_arrays.clone();
                 let atomic_hashes = atomic_hashes.clone();
                 let sub = Arc::clone(&sub);
-                workers.push(std::thread::spawn(move || {
-                    let mut interp = VMHelper::new();
-                    interp.subs = subs.clone();
-                    interp.scope.restore_capture(&capture);
-                    interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
-                    interp.enable_parallel_guard();
-                    while let Ok(item) = work_rx.recv() {
-                        interp.scope.set_topic(item);
-                        match interp.exec_block_with_tail(&sub.body, WantarrayCtx::List) {
-                            Ok(val) => {
-                                for v in val.map_flatten_outputs(peel) {
-                                    if tx.send(v).is_err() {
-                                        return;
+                workers.push(std::thread::spawn(crate::vm_helper::EmbedIo::carry(
+                    move || {
+                        let mut interp = VMHelper::new();
+                        interp.subs = subs.clone();
+                        interp.scope.restore_capture(&capture);
+                        interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
+                        interp.enable_parallel_guard();
+                        while let Ok(item) = work_rx.recv() {
+                            interp.scope.set_topic(item);
+                            match interp.exec_block_with_tail(&sub.body, WantarrayCtx::List) {
+                                Ok(val) => {
+                                    for v in val.map_flatten_outputs(peel) {
+                                        if tx.send(v).is_err() {
+                                            return;
+                                        }
                                     }
                                 }
-                            }
-                            Err(_) => {
-                                let _ = tx.send(StrykeValue::UNDEF);
+                                Err(_) => {
+                                    let _ = tx.send(StrykeValue::UNDEF);
+                                }
                             }
                         }
-                    }
-                }));
+                    },
+                )));
             }
             drop(tx); // workers own the result senders
 
@@ -1597,7 +1599,7 @@ impl PMapStreamIterator {
             for w in workers {
                 let _ = w.join();
             }
-        });
+        }));
         Self {
             rx,
             _handle: Some(handle),
@@ -1627,7 +1629,7 @@ impl PGrepStreamIterator {
         atomic_hashes: Vec<(String, AtomicHash)>,
     ) -> Self {
         let (tx, rx) = crossbeam::channel::bounded::<StrykeValue>(256);
-        let handle = std::thread::spawn(move || {
+        let handle = std::thread::spawn(crate::vm_helper::EmbedIo::carry(move || {
             let n_workers = rayon::current_num_threads().max(1);
             let (work_tx, work_rx) = crossbeam::channel::bounded::<StrykeValue>(n_workers * 2);
             let work_rx = Arc::new(work_rx);
@@ -1641,22 +1643,24 @@ impl PGrepStreamIterator {
                 let atomic_arrays = atomic_arrays.clone();
                 let atomic_hashes = atomic_hashes.clone();
                 let sub = Arc::clone(&sub);
-                workers.push(std::thread::spawn(move || {
-                    let mut interp = VMHelper::new();
-                    interp.subs = subs.clone();
-                    interp.scope.restore_capture(&capture);
-                    interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
-                    interp.enable_parallel_guard();
-                    while let Ok(item) = work_rx.recv() {
-                        interp.scope.set_topic(item.clone());
-                        match interp.exec_block(&sub.body) {
-                            Ok(v) if v.is_true() && tx.send(item).is_err() => {
-                                return;
+                workers.push(std::thread::spawn(crate::vm_helper::EmbedIo::carry(
+                    move || {
+                        let mut interp = VMHelper::new();
+                        interp.subs = subs.clone();
+                        interp.scope.restore_capture(&capture);
+                        interp.scope.restore_atomics(&atomic_arrays, &atomic_hashes);
+                        interp.enable_parallel_guard();
+                        while let Ok(item) = work_rx.recv() {
+                            interp.scope.set_topic(item.clone());
+                            match interp.exec_block(&sub.body) {
+                                Ok(v) if v.is_true() && tx.send(item).is_err() => {
+                                    return;
+                                }
+                                _ => {}
                             }
-                            _ => {}
                         }
-                    }
-                }));
+                    },
+                )));
             }
             drop(tx);
 
@@ -1669,7 +1673,7 @@ impl PGrepStreamIterator {
             for w in workers {
                 let _ = w.join();
             }
-        });
+        }));
         Self {
             rx,
             _handle: Some(handle),
