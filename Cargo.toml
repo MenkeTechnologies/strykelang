@@ -124,7 +124,7 @@ lz4_flex = "0.11"
 tar = "0.4"
 snap = "1"
 weezl = "0.1"
-zip = "2"
+zip = "9.0.5"
 xxhash-rust = { version = "0.8", features = ["xxh32", "xxh64", "xxh3"] }
 tdigest = { version = "0.2", features = ["use_serde"] }
 roaring = "0.11"

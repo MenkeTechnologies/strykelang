@@ -2833,7 +2833,11 @@ pub(crate) fn zip_extract(
         let mut file = archive
             .by_index(i)
             .map_err(|e| StrykeError::runtime(format!("zip_extract: {}", e), 0))?;
-        let outpath = Path::new(&dest).join(file.name());
+        let name = file
+            .name()
+            .map_err(|e| StrykeError::runtime(format!("zip_extract: {}", e), 0))?
+            .into_owned();
+        let outpath = Path::new(&dest).join(name);
 
         if file.is_dir() {
             fs::create_dir_all(&outpath)
@@ -2866,7 +2870,11 @@ pub(crate) fn zip_list(zip_data: &StrykeValue) -> StrykeResult<StrykeValue> {
     let mut files = Vec::new();
     for i in 0..archive.len() {
         files.push(StrykeValue::string(
-            archive.name_for_index(i).unwrap_or("").to_string(),
+            archive
+                .name_for_index(i)
+                .and_then(Result::ok)
+                .map(std::borrow::Cow::into_owned)
+                .unwrap_or_default(),
         ));
     }
     Ok(StrykeValue::array(files))
