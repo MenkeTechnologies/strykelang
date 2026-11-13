@@ -77,17 +77,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      # TEMPORARY diagnostic: the runner is shut down mid-build (exit 143);
-      # sample memory and disk into this step's log to find out why.
-      - run: |
-          nproc; free -m; df -h /
-          (while sleep 30; do
-             echo "== diag $(date -u +%T)"
-             free -m | tail -n +2
-             df -h / | tail -1
-             ps -eo rss,comm --sort=-rss | head -4
-           done) &
-          cargo build --release --locked
+      - run: cargo build --release --locked
       - name: Compare stryke output to perl on parity/cases
         # Exit code is the signal: any mismatch fails the step, fails the
         # job, and blocks the release-build chain via `needs: [parity]`.
