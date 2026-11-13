@@ -77,7 +77,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo build --release --locked
+      # Only the binary run_parity.sh runs. stryke, st and s are the same
+      # entry point over the library, and under `lto = "fat"` each one is its
+      # own whole-program LTO link of ~3.7 GB; linking all four at once
+      # exhausted the 16 GB runner, which GitHub then shut down (exit 143).
+      - run: cargo build --release --locked --bin st
       - name: Compare stryke output to perl on parity/cases
         # Exit code is the signal: any mismatch fails the step, fails the
         # job, and blocks the release-build chain via `needs: [parity]`.
@@ -105,7 +109,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo build --release --locked
+      # Only the binary the examples run (ST below); see the parity job.
+      - run: cargo build --release --locked --bin stryke
       - name: Examples CI (parse, run, demos, project, rosetta, exercism, ruby, scheme)
         # Single stryke orchestrator replaces the former seven separate steps.
         # All phases run in parallel (pmaps); each phase parallelizes its own
