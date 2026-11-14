@@ -170,7 +170,7 @@ jobs:
     # build finishes in ~28 min, while both macOS targets were still
     # compiling when a flat 60 killed them. macOS gets no dependency cache
     # (the step below is a no-op there), so every run rebuilds cranelift,
-    # wasmtime and git2 from scratch under `lto = "fat"`.
+    # wasmtime and git2 from scratch.
     timeout-minutes: ${{ matrix.timeout }}
     strategy:
       fail-fast: false
@@ -192,7 +192,7 @@ jobs:
           targets: ${{ matrix.target }}
       # No-op on macOS via runner.os guard in the composite action.
       - uses: Swatinem/rust-cache@v2
-      - name: Set Linux release profile (compile-time memory budget)
+      - name: Set CI release profile (thin LTO, bounded build time and memory)
         # The Linux leg died twice at the same point (runs 39070098832
         # attempts 1 and 2, 2026-10-17 and 2026-10-22): the last line is
         # `Compiling git2`, then 12.5 minutes of silence, then
@@ -210,7 +210,12 @@ jobs:
         # 16 units (bounded, parallel peak memory) is the right profile
         # here. The shipped x86_64 Linux binary still comes from
         # release.yml's fat-LTO build.
-        if: runner.os == 'Linux'
+        #
+        # The macOS legs take the same profile for build time: uncached
+        # fat-LTO builds ran 75-116 min against the 120 min limit, and
+        # runs 43386331345 and 43414406577 (2026-11-13) were cancelled at
+        # 120 min still inside `cargo build`. The shipped macOS binaries
+        # also come from release.yml, which keeps fat LTO.
         run: |
           {
             echo 'CARGO_PROFILE_RELEASE_DEBUG=0'
