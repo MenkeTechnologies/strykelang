@@ -838,6 +838,36 @@ fn parse_semver(s: &str) -> Option<(u64, u64, u64, String, String)> {
     let patch = parts[2].parse::<u64>().ok()?;
     Some((major, minor, patch, pre, build))
 }
+/// SemVer 2.0.0 §11.4: compare dot-separated identifiers left to right.
+/// All-digit identifiers compare numerically and sort below alphanumeric
+/// ones; alphanumeric identifiers compare in ASCII order; when every shared
+/// identifier is equal, the longer list wins.
+fn semver_prerelease_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    let numeric = |s: &str| !s.is_empty() && s.bytes().all(|c| c.is_ascii_digit());
+    let mut ai = a.split('.');
+    let mut bi = b.split('.');
+    loop {
+        let ord = match (ai.next(), bi.next()) {
+            (None, None) => return Ordering::Equal,
+            (None, Some(_)) => return Ordering::Less,
+            (Some(_), None) => return Ordering::Greater,
+            (Some(x), Some(y)) => match (numeric(x), numeric(y)) {
+                // Length first so arbitrarily long digit runs never overflow.
+                (true, true) => {
+                    let (x, y) = (x.trim_start_matches('0'), y.trim_start_matches('0'));
+                    x.len().cmp(&y.len()).then_with(|| x.cmp(y))
+                }
+                (true, false) => Ordering::Less,
+                (false, true) => Ordering::Greater,
+                (false, false) => x.cmp(y),
+            },
+        };
+        if ord != Ordering::Equal {
+            return ord;
+        }
+    }
+}
 /// `semver_compare` — see implementation.
 pub fn semver_compare(args: &[StrykeValue]) -> StrykeValue {
     let a = args.first().map(|v| v.to_string()).unwrap_or_default();
@@ -853,12 +883,12 @@ pub fn semver_compare(args: &[StrykeValue]) -> StrykeValue {
     let ord = if ord != Ordering::Equal {
         ord
     } else {
-        // Pre-release ordering: no-pre > has-pre; otherwise lexicographic
+        // Pre-release ordering: no-pre > has-pre; otherwise SemVer 2.0.0 §11.4.
         match (a_pre.is_empty(), b_pre.is_empty()) {
             (true, true) => Ordering::Equal,
             (true, false) => Ordering::Greater,
             (false, true) => Ordering::Less,
-            (false, false) => a_pre.cmp(&b_pre),
+            (false, false) => semver_prerelease_cmp(&a_pre, &b_pre),
         }
     };
     StrykeValue::integer(match ord {

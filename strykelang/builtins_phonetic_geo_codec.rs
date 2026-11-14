@@ -1021,16 +1021,22 @@ fn crc_bitwise(
     xorout: u64,
     width: u32,
 ) -> u64 {
-    let mask = if width == 64 {
+    // Widths below 8 run in an 8-bit register with poly/init shifted to the
+    // top bits, then shift back down; a byte cannot be XORed into a register
+    // narrower than itself.
+    let pad = 8u32.saturating_sub(width);
+    let reg_width = width + pad;
+    let mask = if reg_width == 64 {
         u64::MAX
     } else {
-        (1u64 << width) - 1
+        (1u64 << reg_width) - 1
     };
-    let top = 1u64 << (width - 1);
-    let mut crc = init & mask;
+    let top = 1u64 << (reg_width - 1);
+    let poly = poly << pad;
+    let mut crc = (init << pad) & mask;
     for &b in data {
         let byte = if refin { b.reverse_bits() } else { b };
-        crc ^= (byte as u64) << (width - 8);
+        crc ^= (byte as u64) << (reg_width - 8);
         for _ in 0..8 {
             if crc & top != 0 {
                 crc = (crc << 1) ^ poly;
@@ -1040,6 +1046,7 @@ fn crc_bitwise(
             crc &= mask;
         }
     }
+    let crc = crc >> pad;
     if refout {
         let mut rev = 0u64;
         let mut val = crc;
@@ -1143,8 +1150,10 @@ pub fn adler32_combine(args: &[StrykeValue]) -> StrykeValue {
     let mut sum1 = a & 0xFFFF;
     let mut sum2 = (a >> 16) & 0xFFFF;
     sum2 = (sum2 + blen * sum1) % BASE;
-    sum1 = (sum1 + (b & 0xFFFF) - 1) % BASE;
-    sum2 = (sum2 + ((b >> 16) & 0xFFFF) - blen) % BASE;
+    // zlib adds BASE before subtracting so the intermediate never goes
+    // negative (blen < BASE after the reduction above).
+    sum1 = (sum1 + (b & 0xFFFF) + BASE - 1) % BASE;
+    sum2 = (sum2 + ((b >> 16) & 0xFFFF) + BASE - blen) % BASE;
     StrykeValue::integer(((sum2 << 16) | sum1) as i64)
 }
 /// `fletcher16` — see implementation.
@@ -1192,6 +1201,15 @@ pub fn fletcher64(args: &[StrykeValue]) -> StrykeValue {
         sum1 = (sum1 + word).rem_euclid(4294967295);
         sum2 = (sum2 + sum1).rem_euclid(4294967295);
         i += 4;
+    }
+    if i < bytes.len() {
+        // Zero-pad the final partial 32-bit word (little-endian).
+        let word = bytes[i..]
+            .iter()
+            .enumerate()
+            .fold(0u64, |w, (k, &b)| w | ((b as u64) << (8 * k)));
+        sum1 = (sum1 + word).rem_euclid(4294967295);
+        sum2 = (sum2 + sum1).rem_euclid(4294967295);
     }
     StrykeValue::integer(((sum2 << 32) | sum1) as i64)
 }
